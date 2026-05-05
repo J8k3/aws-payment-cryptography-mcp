@@ -222,6 +222,22 @@ The agent system prompt and code analysis tooling must have embedded knowledge o
 | **DUKPT** | Derived Unique Key Per Transaction — each transaction uses a unique key derived from a base derivation key (BDK) and a Key Serial Number (KSN), so compromise of one transaction key does not expose others | ANSI X9.24 Part 1 (TDES), ANSI X9.24 Part 3 (AES) | APC natively supports DUKPT for PIN, MAC, and data encryption operations. The agent must understand the BDK → IPEK → working key derivation chain and help users configure it correctly. |
 | **TR-34** | Electronically distributing symmetric Key Encryption Keys (KEKs) using asymmetric (RSA) techniques, replacing paper key component ceremonies | ASC X9 TR-34 | APC `get_parameters_for_import`, `import_key`, and `export_key` support TR-34 for KEK establishment. The agent must guide users through the two-pass and one-pass TR-34 flows when setting up key exchange with acquirers, processors, or HSM partners. |
 
+### ISO 8583 Field Map — Cryptographic Fields
+
+When analyzing payment system code, the agent must recognize ISO 8583 message construction and identify which fields carry cryptographic data. These are the primary fields relevant to payment cryptography:
+
+| Field | Name | Format | Cryptographic Relevance |
+|-------|------|--------|------------------------|
+| **35** | Track 2 Data | z, LLVAR (max 37) | Contains PAN + expiry + service code — source data for CVV/CVK operations and EMV derivation |
+| **36** | Track 3 Data | z, LLVAR (max 104) | Extended track data — rarely used but may carry key management data in some networks |
+| **45** | Track 1 Data | ans, LLVAR (max 76) | Contains PAN + cardholder name + discretionary data — source for CVV1 and card validation |
+| **52** | PIN Data (PIN Block) | b-64 | 8-byte binary PIN block encrypted under PEK/DUKPT — maps directly to APC `translate_pin_data` inbound |
+| **55** | ICC / EMV Data | b, LLLVAR (max 999) | Raw EMV tag-length-value data including ARQC, ATC, cryptogram info — maps to APC `verify_auth_request_cryptogram` |
+| **64** | MAC (Primary) | b-64 | 8-byte MAC over the message body — maps to APC `generate_mac` / `verify_mac` |
+| **128** | MAC (Secondary) | b-64 | Secondary MAC, present when secondary bitmap is used |
+
+**Agent behavior**: When the agent sees code constructing or parsing ISO 8583 messages, it must identify which fields are being handled, what cryptographic operations are implied, and map them to the correct APC data plane operations and key types.
+
 ### Agent Behavior Requirements for Scheme Knowledge
 
 - When analyzing existing payment code, the agent must identify which of the above schemes are in use (e.g., detecting DUKPT KSN structures, TR-31 key block headers, ISO format PIN blocks) and map them to the corresponding APC operations.
