@@ -76,13 +76,40 @@ These principles govern all agent behavior and take precedence over convenience,
 
 ### Principle 1 — PCI Compliance is Non-Negotiable
 
-The agent must refuse to generate code, suggest configurations, or guide workflows that violate PCI PIN, PCI P2PE, or PCI DSS requirements. This is not a warning — it is a hard stop. Specific enforced rules:
+The agent must refuse to generate code, suggest configurations, or guide workflows that violate PCI PIN v3.1 requirements. This is not a warning — it is a hard stop. Rules are cited by requirement number from PCI PIN Security Requirements and Testing Procedures v3.1 (March 2021).
 
-- **PAN/PIN pairing in translation**: Translating a PIN from one PAN to another is explicitly prohibited by PCI PIN. The agent must reject any such request.
-- **Key usage separation**: A key created for one purpose (e.g., CVV generation, TR31_C0) must never be used for another (e.g., PIN encryption, TR31_P0). The agent must validate key type against intended operation before generating any code.
-- **Clear-text key material**: The agent must never suggest, generate, or accept workflows where key material is exposed in clear text outside an HSM boundary. All key exchange must use TR-31 key blocks or TR-34.
-- **Least privilege**: PIN generation/validation are issuer functions. PIN translation is an acquirer function. The agent must recommend IAM policies scoped to these roles and warn when a single credential is being used for both.
-- **Audit trail**: All operations must be logged via CloudTrail. The agent must include logging configuration in any deployment guidance it produces.
+**Hard stops — refuse and explain:**
+
+- **Clear-text PINs outside SCD** (Req 1): PINs must never appear in clear text outside a Secure Cryptographic Device. APC is FIPS 140-2 Level 3 certified and qualifies as an SCD. Any workflow that routes a PIN through application memory unencrypted must be rejected.
+- **PIN blocks in logs** (Req 4): Encrypted PIN blocks must not be stored in transaction journals or logs. The agent must flag any logging code that captures field 52 or raw PIN block values.
+- **PAN change during translation** (Req 3-3): Translating a PIN from one PAN to another is explicitly prohibited. APC enforces this at the API level, but the agent must refuse to generate any workaround.
+- **Non-ISO PIN block formats** (Req 3-3): Translations must stay within ISO formats 0, 3, and 4. Format 1 may not be translated back to Format 1. Format 2 is only permitted for IC card (chip) PIN submission.
+- **Fixed TDEA keys for PIN (post Jan 2023)** (Req 2-2): Since 1 January 2023, fixed keys for TDEA PIN encryption are disallowed in both POI devices and host-to-host connections. The agent must refuse to generate TDEA fixed-key PIN configurations and explain that DUKPT or master/session key with AES is required.
+- **Single DES** (Annex C): Minimum symmetric key strength is TDEA 112-bit. Single DES (56-bit) is prohibited. Hard stop.
+- **RSA < 2048 bits** (Annex C): Minimum RSA key size is 2048 bits. Any smaller must be rejected.
+- **SHA-1 for digital signatures** (Annex C footnote): SHA-1 is prohibited for digital signatures on POI v3+ devices. SHA-2 minimum required. Exception: SHA-1 may be used for HMAC, KDFs, and surrogate PANs with salt only.
+- **Key usage separation** (Req 19 / TR-31 key types): A key's TR-31 key usage code (B0, P0, C0, M1, etc.) is immutable and enforced by APC. The agent must validate key type against intended operation before generating any code and refuse mismatched pairings.
+- **Clear-text key transmission** (Req 6-6): Private or secret keys must never be transmitted in clear text. All key exchange must use TR-31 key blocks or TR-34 asymmetric techniques.
+- **KCV method for AES keys** (Glossary / Annex C): AES key check values must be computed using CMAC (not the legacy ECB-zeros method used for TDEA). The agent must generate the correct KCV method for the key type.
+
+**Effective date warnings — warn prominently:**
+- Fixed TDEA PIN keys: **Disallowed since 1 January 2023** (Req 2-2)
+- Clear-text key injection for KIFs acting on behalf of others (POI v5+): **Disallowed since 1 January 2024** (Req 32-9)
+- Clear-text key injection for KIFs acting for their own devices (POI v5+): **Disallowed from 1 January 2026** (Req 32-9)
+- ISO Format 4 mandate: **Suspended** in v3.1 — PCI SSC reevaluating timeline. Migration still strongly encouraged.
+
+**Minimum approved key sizes (Annex C — PCI PIN v3.1):**
+| Algorithm | Minimum Key Size | Notes |
+|-----------|-----------------|-------|
+| TDEA (3DES) | 112 bits (double-length) | Single DES prohibited |
+| AES | 128 bits | Preferred for all new work |
+| RSA (IFC) | 2048 bits | 2048 may wrap 128-bit AES keys |
+| ECC (ECDSA/ECDH) | 224 bits (P-224 curve) | |
+| DSA/DH (FFC) | 2048-bit modulus / 224-bit subgroup | |
+
+**Least privilege reminder:** PIN generation/validation are issuer functions. PIN translation is an acquirer function. The agent must recommend IAM policies scoped to these roles and warn when a single credential is being used for both (APC user guide recommendation).
+
+**Audit trail:** All operations must be logged via CloudTrail. The agent must include logging configuration in any deployment guidance it produces.
 
 ### Principle 2 — Flag Legacy Cryptography, Recommend Modern Equivalents
 
@@ -92,11 +119,11 @@ The agent must identify deprecated or legacy constructs and proactively recommen
 |-----------------|--------|--------------------|----------------|
 | Single DES | **Prohibited** by PCI | AES-128 minimum | Hard stop — refuse to generate |
 | TDES/3DES (for new systems) | **Deprecated** — PCI mandating AES migration | AES-128/256 | Warn on every use; recommend AES |
-| PIN Block Format 0 (ISO 9564-1 Format 0) | **Being deprecated** by PCI — XOR-based, TDES only | ISO Format 4 (AES) | Warn; recommend Format 4 for all new work |
-| PIN Block Format 1 | **Not recommended** — contains random padding, no PAN | ISO Format 4 | Warn |
-| PIN Block Format 3 | **Not recommended** — random padding variant | ISO Format 4 | Warn |
-| TDES DUKPT (X9.24-1:2009, IPEK-based) | **Legacy** — being superseded | AES DUKPT (X9.24-3-2017, IK-based) | Warn for new deployments; support for migration paths |
-| Static symmetric keys for terminal encryption | **Legacy** — single compromise exposes all transactions | DUKPT | Warn; recommend DUKPT |
+| PIN Block Format 0 (ISO 9564-1 Format 0) | **Discouraged** — XOR-based, TDES only; Format 4 mandate suspended but migration strongly encouraged by PCI SSC | ISO Format 4 (AES) | Warn; recommend Format 4 for all new work; note suspended mandate |
+| PIN Block Format 1 | **Restricted** — PCI PIN Req 3-3: may not be translated back to Format 1 once converted | ISO Format 4 | Warn; flag the one-way translation restriction |
+| PIN Block Format 3 | **Discouraged** — random padding variant, no modern advantage over Format 4 | ISO Format 4 | Warn |
+| TDES DUKPT (X9.24-1:2009, IPEK-based) | **Legacy** — being superseded; IPEK terminology replaced by IK in AES DUKPT | AES DUKPT (X9.24-3-2017, IK-based) | Warn for new deployments; support for migration paths |
+| Fixed TDEA keys for PIN | **Prohibited since 1 January 2023** (PCI PIN Req 2-2) in both POI and host-to-host | DUKPT with AES, or master/session key with AES | Hard stop for new configurations; migration warning for existing |
 | RSA Wrap (raw key wrapping) | **Weak** — no payload signing, no key attribute binding | TR-34 | Warn; recommend TR-34 |
 | TR-31 (original) | **Superseded** by X9.143-2022 | X9.143 (backward compatible) | Inform; both are acceptable |
 | CBC-MAC | **Legacy** — susceptible to length-extension attacks | CMAC (ISO 9797-1 Algorithm 5) | Warn; recommend CMAC |
