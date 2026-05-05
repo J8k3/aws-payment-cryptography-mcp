@@ -158,6 +158,42 @@ aws-payment-cryptography-claude-agent-template/
 
 ---
 
+## Payment Scheme and Cryptographic Concept Reference
+
+The agent system prompt and code analysis tooling must have embedded knowledge of the following schemes and standards. These are the conceptual building blocks the agent must recognize in existing payment code and map to APC capabilities.
+
+| Scheme / Concept | Primary Use Case | Key Standard | APC Relevance |
+|------------------|-----------------|--------------|---------------|
+| **TR-31** | Securely wrapping symmetric keys with typed metadata (key usage, algorithm, mode of use) for inter-system transport | ISO 20038 | APC uses TR-31 key blocks for all `import_key` and `export_key` operations involving symmetric keys. The agent must understand TR-31 header attributes (usage, algorithm, mode, key version, exportability) to correctly configure key exchange. |
+| **ARQC / ARPC** | Chip card (EMV) transaction validation — the card generates an Authorization Request Cryptogram (ARQC); the issuer responds with an Authorization Response Cryptogram (ARPC) to confirm transaction authenticity | EMV Specifications (Book 2) | APC `generate_card_validation_data` and `verify_card_validation_data` support ARQC/ARPC using DUKPT or static TDES/AES keys. The agent must understand the EMV session key derivation model and the Application Transaction Counter (ATC) role. |
+| **FPE (FF1 / FF3-1)** | Format-Preserving Encryption — encrypt a PAN or other numeric field so the ciphertext is the same length and character set as the plaintext, enabling use in legacy systems that cannot store arbitrary binary | NIST SP 800-38G | APC `encrypt_data` and `decrypt_data` support FF1 and FF3-1 modes. Critical for tokenization pipelines where downstream systems expect a 16-digit value. The agent must warn that FF3-1 has known weaknesses under certain tweak conditions. |
+| **ISO Format 4 PIN Block** | AES-based PIN block format that encrypts both the PIN and the PAN together, replacing older XOR-based formats (ISO Formats 0, 1, 3) with a cryptographically stronger construction | ISO 9564-1 | APC `translate_pin_data` and `generate_pin_data` support ISO Format 4. The agent should actively recommend Format 4 over legacy formats and understand the PCI PIN mandate timeline for Format 0 deprecation. |
+| **MAC (Message Authentication Code)** | Ensuring transaction data integrity — a keyed hash appended to a transaction message so the recipient can verify it has not been tampered with in transit | ANSI X9.19 (retail MAC), ISO 9797-1 | APC `generate_mac` and `verify_mac` support TDES and AES MACs. The agent must understand the difference between CBC-MAC, CMAC, and HMAC and which APC key types correspond to each. |
+| **DUKPT** | Derived Unique Key Per Transaction — each transaction uses a unique key derived from a base derivation key (BDK) and a Key Serial Number (KSN), so compromise of one transaction key does not expose others | ANSI X9.24 Part 1 (TDES), ANSI X9.24 Part 3 (AES) | APC natively supports DUKPT for PIN, MAC, and data encryption operations. The agent must understand the BDK → IPEK → working key derivation chain and help users configure it correctly. |
+| **TR-34** | Electronically distributing symmetric Key Encryption Keys (KEKs) using asymmetric (RSA) techniques, replacing paper key component ceremonies | ASC X9 TR-34 | APC `get_parameters_for_import`, `import_key`, and `export_key` support TR-34 for KEK establishment. The agent must guide users through the two-pass and one-pass TR-34 flows when setting up key exchange with acquirers, processors, or HSM partners. |
+
+### Agent Behavior Requirements for Scheme Knowledge
+
+- When analyzing existing payment code, the agent must identify which of the above schemes are in use (e.g., detecting DUKPT KSN structures, TR-31 key block headers, ISO format PIN blocks) and map them to the corresponding APC operations.
+- When a user describes a payment flow in natural language, the agent must identify the correct scheme(s) and propose the right APC API sequence.
+- The agent must flag scheme mismatches — e.g., using a MAC key for encryption, or configuring a DUKPT operation without a correct BDK/IPEK setup.
+
+---
+
+## R8 — Code Analysis and Refactoring Mode
+
+The agent must support a structured workflow for analyzing existing payment system code:
+
+1. **Identify** — Detect cryptographic operations in the codebase: HSM vendor SDK calls (Thales `payShield`, Utimaco `Se-Series`, Futurex `KMES`), JCE provider calls, raw socket HSM host commands, or legacy in-house crypto libraries.
+2. **Map** — Translate each detected operation to the equivalent APC API call, noting key type requirements, parameter mappings, and any behavioral differences.
+3. **Assess** — Flag operations that have no direct APC equivalent, require architectural changes (e.g., moving from static keys to DUKPT), or involve deprecated/insecure constructs.
+4. **Propose** — Generate refactored Python code using `boto3` APC clients with the correct key configurations and operation parameters.
+5. **Validate** — Confirm the proposed refactoring preserves the original security properties and is consistent with applicable PCI standards.
+
+The agent's embedded scheme knowledge (R-Schemes table above) is the primary context for steps 1–3. The authoritative APC API references are the primary context for steps 4–5.
+
+---
+
 ## Out of Scope (v1)
 
 - AWS CloudHSM integration (separate service, different use case)
