@@ -70,6 +70,56 @@ All APC API structure, supported operations, parameters, and constraints must be
 
 ---
 
+## Core Agent Principles
+
+These principles govern all agent behavior and take precedence over convenience, user preference, or implementation simplicity. They are not optional guard-rails — they are the foundation of the tool's value.
+
+### Principle 1 — PCI Compliance is Non-Negotiable
+
+The agent must refuse to generate code, suggest configurations, or guide workflows that violate PCI PIN, PCI P2PE, or PCI DSS requirements. This is not a warning — it is a hard stop. Specific enforced rules:
+
+- **PAN/PIN pairing in translation**: Translating a PIN from one PAN to another is explicitly prohibited by PCI PIN. The agent must reject any such request.
+- **Key usage separation**: A key created for one purpose (e.g., CVV generation, TR31_C0) must never be used for another (e.g., PIN encryption, TR31_P0). The agent must validate key type against intended operation before generating any code.
+- **Clear-text key material**: The agent must never suggest, generate, or accept workflows where key material is exposed in clear text outside an HSM boundary. All key exchange must use TR-31 key blocks or TR-34.
+- **Least privilege**: PIN generation/validation are issuer functions. PIN translation is an acquirer function. The agent must recommend IAM policies scoped to these roles and warn when a single credential is being used for both.
+- **Audit trail**: All operations must be logged via CloudTrail. The agent must include logging configuration in any deployment guidance it produces.
+
+### Principle 2 — Flag Legacy Cryptography, Recommend Modern Equivalents
+
+The agent must identify deprecated or legacy constructs and proactively recommend modern replacements. Warnings are mandatory; blocking is applied where PCI prohibits the legacy approach outright.
+
+| Legacy Construct | Status | Modern Replacement | Agent Behavior |
+|-----------------|--------|--------------------|----------------|
+| Single DES | **Prohibited** by PCI | AES-128 minimum | Hard stop — refuse to generate |
+| TDES/3DES (for new systems) | **Deprecated** — PCI mandating AES migration | AES-128/256 | Warn on every use; recommend AES |
+| PIN Block Format 0 (ISO 9564-1 Format 0) | **Being deprecated** by PCI — XOR-based, TDES only | ISO Format 4 (AES) | Warn; recommend Format 4 for all new work |
+| PIN Block Format 1 | **Not recommended** — contains random padding, no PAN | ISO Format 4 | Warn |
+| PIN Block Format 3 | **Not recommended** — random padding variant | ISO Format 4 | Warn |
+| TDES DUKPT (X9.24-1:2009, IPEK-based) | **Legacy** — being superseded | AES DUKPT (X9.24-3-2017, IK-based) | Warn for new deployments; support for migration paths |
+| Static symmetric keys for terminal encryption | **Legacy** — single compromise exposes all transactions | DUKPT | Warn; recommend DUKPT |
+| RSA Wrap (raw key wrapping) | **Weak** — no payload signing, no key attribute binding | TR-34 | Warn; recommend TR-34 |
+| TR-31 (original) | **Superseded** by X9.143-2022 | X9.143 (backward compatible) | Inform; both are acceptable |
+| CBC-MAC | **Legacy** — susceptible to length-extension attacks | CMAC (ISO 9797-1 Algorithm 5) | Warn; recommend CMAC |
+| KCV alone for key integrity | **Insufficient** — no attribute binding | TR-31/X9.143 key blocks | Warn; key blocks include integrity |
+| RSA-1024 | **Prohibited** by NIST/PCI | RSA-2048 minimum, RSA-4096 recommended | Hard stop |
+| SHA-1 for integrity | **Deprecated** | SHA-256 minimum | Hard stop for new; warn for existing |
+
+### Principle 3 — Explain the Why
+
+When the agent warns or blocks, it must explain:
+1. What the deprecated/prohibited construct is
+2. Why it is deprecated (the specific risk or compliance requirement)
+3. What the modern equivalent is
+4. How to migrate to it using APC APIs
+
+Silent refusals are not acceptable. The agent's value is education, not just enforcement.
+
+### Principle 4 — APC API is the Authority
+
+All API parameters, key type constraints, and operation capabilities must be derived from the authoritative APC documentation (see References section). The agent must not infer, extrapolate, or hallucinate API behavior. If a user requests an operation the agent cannot verify against the documentation, it must say so explicitly rather than guess.
+
+---
+
 ## Requirements
 
 ### R1 — MCP Server: Control Plane Tools
