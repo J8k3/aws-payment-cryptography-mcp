@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "apc-agent": {
+      "command": "apc-agent",
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    }
+  }
+}
