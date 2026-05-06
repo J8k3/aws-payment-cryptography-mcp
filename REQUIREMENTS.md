@@ -312,6 +312,9 @@ When a user needs to implement a deprecated or legacy construct because a downst
 4. **Implement correctly** — the legacy path done right is better than the legacy path done wrong
 5. **Flag for future review** — note that this should be revisited when the downstream party upgrades
 
+5. **Flag for future review** — note that this should be revisited when the downstream party upgrades
+6. **Compliance documentation notice** — inform the user that implementing a deprecated or non-preferred construct may require a formal exception or compensating control documented with their QSA (Qualified Security Assessor) and the relevant payment brand (Visa, Mastercard, etc.). The agent must not generate this documentation — that is the QSA's responsibility — but must ensure the user is aware the obligation exists and does not treat the implementation as silently compliant.
+
 This protocol applies to: Format 0 PIN blocks when Format 4 is unavailable, TDES when AES is not supported by the counterparty, and any other case where the user's hand is forced by ecosystem constraints rather than choice.
 
 ## Reference Architecture — Acquirer Happy Path
