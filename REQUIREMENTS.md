@@ -287,9 +287,60 @@ The agent's embedded scheme knowledge (R-Schemes table above) is the primary con
 
 ---
 
+## Architectural Decisions
+
+These are locked decisions from the design process. Do not revisit without explicit reason.
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Language | Python | Accuracy over performance; boto3 has first-class APC support and all AWS examples are in Python |
+| MCP transport | `stdio` (local process) | Runs on developer's machine; works with Claude Desktop and Claude Code out of the box |
+| MCP SDK | `mcp` (Anthropic official Python SDK) | First-party, best maintained |
+| Deployment target | Local developer machine | No hosted infrastructure in v1 |
+| Scope | Acquirer / processor only | APC does not support issuer use cases (no IMK/CMK derivation, no card personalization) |
+| Agent posture | Opinionated toward modern cryptography | Default happy path: AES DUKPT, ISO Format 4, CMAC, TR-34. Deviations require explicit user confirmation |
+| Legacy constraint handling | Confirm-then-assist | If a downstream system doesn't support the modern approach, agent confirms the user has verified this, then helps implement the legacy path correctly and safely |
+| R8 vendor recognition | Source code analysis only | No live traffic interception; analyzes socket call construction and command string patterns in Thales payShield, Atalla, and Futurex codebases. Blocked on vendor command syntax documentation — do not implement R8 until that material is available |
+
+## Legacy Constraint Protocol
+
+When a user needs to implement a deprecated or legacy construct because a downstream party does not support the modern equivalent, the agent must follow this sequence:
+
+1. **Explain** the modern approach and why it is preferred
+2. **Ask explicitly**: "Have you confirmed with the downstream party that [Format 4 / AES / etc.] is not supported?"
+3. **Document the constraint** in a code comment generated alongside the implementation
+4. **Implement correctly** — the legacy path done right is better than the legacy path done wrong
+5. **Flag for future review** — note that this should be revisited when the downstream party upgrades
+
+This protocol applies to: Format 0 PIN blocks when Format 4 is unavailable, TDES when AES is not supported by the counterparty, and any other case where the user's hand is forced by ecosystem constraints rather than choice.
+
+## Reference Architecture — Acquirer Happy Path
+
+The agent's opinionated default for a new acquirer integration:
+
+```
+Terminal / POI
+  └── AES DUKPT (BDK stored in APC, KSN per transaction)
+        └── ISO Format 4 PIN block → translate_pin_data
+              └── ZPK (Zone PIN Key, AES) → host-to-host PIN routing
+                    └── MAC (CMAC, AES) on ISO 8583 message (field 64)
+
+Key Exchange with Network / Processor
+  └── TR-34 (asymmetric KEK establishment)
+        └── TR-31 key blocks for all subsequent symmetric key transport
+
+Card Data Protection
+  └── AES encryption (D0 key) or FPE FF1 for format-preserving tokenization
+```
+
+Any deviation from this architecture requires the legacy constraint protocol above.
+
 ## Out of Scope (v1)
 
 - AWS CloudHSM integration (separate service, different use case)
 - AWS KMS integration (general-purpose, not payment-specific)
+- Issuer use cases: card personalization, IMK/CMK derivation, issuer script processing
 - Card network certification or scheme-specific compliance automation
+- Live HSM traffic interception or man-in-the-middle analysis
+- R8 vendor command recognition: blocked until Thales payShield, Atalla, and Futurex command documentation is available
 - A production-hardened deployment — this is a template, not a service
