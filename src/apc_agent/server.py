@@ -4,6 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .control_plane import register_control_plane_tools
 from .data_plane import register_data_plane_tools
+from .hsm_tools import register_hsm_tools
 from .system_prompt import SYSTEM_PROMPT
 
 mcp = FastMCP(
@@ -13,6 +14,7 @@ mcp = FastMCP(
 
 register_control_plane_tools(mcp)
 register_data_plane_tools(mcp)
+register_hsm_tools(mcp)
 
 
 def main() -> None:
