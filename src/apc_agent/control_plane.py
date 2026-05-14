@@ -223,20 +223,21 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_parameters_for_import(
         key_material_type: str,
-        wrapping_key_spec: str,
+        wrapping_key_algorithm: str,
     ) -> dict:
         """
         Get APC's public key and import token needed to import a key.
-        Use this as the first step in TR-34 or TR-31 key import flows.
+        Use this as the first step in TR-34 or KeyCryptogram key import flows.
 
         Args:
-            key_material_type: RootCertificatePublicKey, TrustedCertificatePublicKey,
-                               Tr31KeyBlock, Tr34KeyBlock, or DerivationSymmetricKey
-            wrapping_key_spec: RSA_2048, RSA_3072, RSA_4096 (for asymmetric flows)
+            key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
+                               RootCertificatePublicKey, or TrustedCertificatePublicKey
+            wrapping_key_algorithm: RSA_2048, RSA_3072, RSA_4096 (for asymmetric flows).
+                                    AES-128 requires RSA_3072 or higher (key-strength rule).
         """
         return client().get_parameters_for_import(
             KeyMaterialType=key_material_type,
-            WrappingKeySpec=wrapping_key_spec,
+            WrappingKeyAlgorithm=wrapping_key_algorithm,
         )
 
     @mcp.tool()
@@ -429,39 +430,41 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
 def _default_modes_of_use(key_usage: str) -> dict:
     """Return sensible default modes of use for a given key usage code."""
-    pin_keys = {"TR31_P0_PIN_ENCRYPTION_KEY"}
-    mac_keys = {"TR31_M0_ISO_16609_MAC_KEY", "TR31_M1_ISO_9797_1_MAC_KEY",
-                "TR31_M3_ISO_9797_3_MAC_KEY", "TR31_M6_ISO_9797_5_CMAC_KEY", "TR31_M7_HMAC_KEY"}
-    verify_keys = {"TR31_V1_IBM3624_PIN_VERIFICATION_KEY", "TR31_V2_VISA_PIN_VERIFICATION_KEY"}
-    card_keys = {"TR31_C0_CARD_VERIFICATION_KEY"}
-    enc_keys = {"TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY", "TR31_D1_ASYMMETRIC_KEY_FOR_DATA_ENCRYPTION"}
-    kek_keys = {"TR31_K0_KEY_ENCRYPTION_KEY", "TR31_K1_KEY_BLOCK_PROTECTION_KEY"}
-    bdk_keys = {"TR31_B0_BASE_DERIVATION_KEY"}
-    emv_app = {"TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS"}
+    # TR-31 prohibits Encrypt+Decrypt as a combined mode — use NoRestrictions instead
+    no_restrictions_keys = {
+        "TR31_P0_PIN_ENCRYPTION_KEY",
+        "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
+        "TR31_D1_ASYMMETRIC_KEY_FOR_DATA_ENCRYPTION",
+    }
+    mac_keys = {
+        "TR31_M0_ISO_16609_MAC_KEY", "TR31_M1_ISO_9797_1_MAC_KEY",
+        "TR31_M3_ISO_9797_3_MAC_KEY", "TR31_M6_ISO_9797_5_CMAC_KEY", "TR31_M7_HMAC_KEY",
+    }
+    generate_verify_keys = {
+        "TR31_V1_IBM3624_PIN_VERIFICATION_KEY", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+        "TR31_C0_CARD_VERIFICATION_KEY",
+    }
+    wrap_unwrap_keys = {
+        "TR31_K0_KEY_ENCRYPTION_KEY", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+    }
+    derive_key_keys = {
+        "TR31_B0_BASE_DERIVATION_KEY",
+        # EMV master keys derive per-card session keys — DeriveKey is the correct mode
+        "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+        "TR31_E1_EMV_MKEY_CONFIDENTIALITY",
+        "TR31_E2_EMV_MKEY_INTEGRITY",
+        "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
+        "TR31_E6_EMV_MKEY_OTHER",
+    }
 
-    if key_usage in pin_keys:
-        return {"Encrypt": True, "Decrypt": True, "Wrap": False, "Unwrap": False,
-                "Generate": False, "Sign": False, "Verify": False, "DeriveKey": False}
+    if key_usage in no_restrictions_keys:
+        return {"NoRestrictions": True}
     if key_usage in mac_keys:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": False, "Unwrap": False,
-                "Generate": True, "Sign": False, "Verify": True, "DeriveKey": False}
-    if key_usage in verify_keys:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": False, "Unwrap": False,
-                "Generate": True, "Sign": False, "Verify": True, "DeriveKey": False}
-    if key_usage in card_keys:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": False, "Unwrap": False,
-                "Generate": True, "Sign": False, "Verify": True, "DeriveKey": False}
-    if key_usage in enc_keys:
-        return {"Encrypt": True, "Decrypt": True, "Wrap": False, "Unwrap": False,
-                "Generate": False, "Sign": False, "Verify": False, "DeriveKey": False}
-    if key_usage in kek_keys:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": True, "Unwrap": True,
-                "Generate": False, "Sign": False, "Verify": False, "DeriveKey": False}
-    if key_usage in bdk_keys:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": False, "Unwrap": False,
-                "Generate": False, "Sign": False, "Verify": False, "DeriveKey": True}
-    if key_usage in emv_app:
-        return {"Encrypt": False, "Decrypt": False, "Wrap": False, "Unwrap": False,
-                "Generate": True, "Sign": False, "Verify": True, "DeriveKey": False}
-    return {"Encrypt": True, "Decrypt": True, "Wrap": False, "Unwrap": False,
-            "Generate": False, "Sign": False, "Verify": False, "DeriveKey": False}
+        return {"Generate": True, "Verify": True}
+    if key_usage in generate_verify_keys:
+        return {"Generate": True, "Verify": True}
+    if key_usage in wrap_unwrap_keys:
+        return {"Wrap": True, "Unwrap": True}
+    if key_usage in derive_key_keys:
+        return {"DeriveKey": True}
+    return {"NoRestrictions": True}

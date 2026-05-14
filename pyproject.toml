@@ -24,3 +24,6 @@ dependencies = [
     "pytest-asyncio>=0.23.0",
     "moto[payment-cryptography]>=5.0.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

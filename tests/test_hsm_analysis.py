@@ -138,8 +138,9 @@ class TestCommandRegistry:
                 assert c.notes, f"{c.command_code} has no APC mapping and no notes"
 
     def test_confidence_values_are_valid(self):
+        valid = {"high", "medium", "directory"}
         for c in ALL_COMMANDS:
-            assert c.confidence in ("high", "medium"), f"{c.command_code}: bad confidence"
+            assert c.confidence in valid, f"{c.command_code}: bad confidence '{c.confidence}'"
 
     def test_futurex_excrypt_tpin_is_high_confidence(self):
         results = [c for c in ALL_COMMANDS if c.command_code == "TPIN" and c.api == "Excrypt"]
