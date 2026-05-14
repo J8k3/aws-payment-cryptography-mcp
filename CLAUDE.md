@@ -74,6 +74,18 @@ Tools are registered by calling `register_*_tools(mcp: FastMCP)` functions. Each
 
 **AES KCV**: Must use CMAC, never ANSI_X9_24 (ECB-zeros method). This is enforced in `create_key`.
 
+## APC Data Plane Capability Catalog
+
+`aws-payment-cryptography-data-plane-use-cases.json` (repo root) is the authoritative source of truth for APC data plane capabilities. It was generated from the official AWS Payment Cryptography Data Plane API Reference (API Version 2022-02-03) and captures all 14 operations, all documented union branches, all enum values, and documented compatibility rules.
+
+**Use it for:**
+- Verifying which fields are required vs. optional before implementing or changing a tool
+- Checking which key algorithms are supported for a given operation
+- Understanding documented inconsistencies (e.g., `VerifyPinData` prose vs. valid-values list for `PinBlockFormat`)
+- Determining which operations support dynamic keys (`WrappedKey`) or ECDH
+
+**Do not** infer API behavior from naming conventions or the operation list alone — always cross-check against this catalog first.
+
 ## Key Constraints and Non-obvious Behaviors
 
 - APC is acquirer/processor scope only. Do not generate issuer functions (card personalization, IMK derivation).

@@ -60,14 +60,9 @@ def create_zpk() -> str:
             "KeyUsage": "TR31_P0_PIN_ENCRYPTION_KEY",
             "KeyClass": "SYMMETRIC_KEY",
             "KeyModesOfUse": {
-                "Encrypt": True,
-                "Decrypt": True,
-                "Wrap": False,
-                "Unwrap": False,
-                "Generate": False,
-                "Sign": False,
-                "Verify": False,
-                "DeriveKey": False,
+                # APC enforces TR-31: Encrypt+Decrypt together is not a valid
+                # combination. Use NoRestrictions for a bidirectional ZPK.
+                "NoRestrictions": True,
             },
         },
         Exportable=True,

@@ -25,6 +25,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         key_identifier: str,
         plain_text: str,
         encryption_attributes: dict,
+        wrapped_key: dict | None = None,
     ) -> dict:
         """
         Encrypt payment data using an APC key.
@@ -34,28 +35,37 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
 
         encryption_attributes examples:
           Symmetric AES-CBC:
-            {"Symmetric": {"Mode": "CBC", "InitializationVector": "<16-byte hex>", "PaddingType": "PKCS1"}}
+            {"Symmetric": {"Mode": "CBC", "InitializationVector": "<16-byte hex>"}}
           DUKPT AES:
             {"Dukpt": {"KeySerialNumber": "<KSN hex>", "Mode": "CBC", "DukptKeyDerivationType": "AES_128"}}
-          Format-Preserving (FF1):
-            {"Emv": {...}}  or use the FPE-specific attributes per API reference
+          EMV:
+            {"Emv": {"MajorKeyDerivationMode": "EMV_OPTION_A", "PrimaryAccountNumber": "...",
+                     "PanSequenceNumber": "01", "SessionDerivationData": "...", "Mode": "CBC"}}
+
+        wrapped_key (dynamic key — TR-31 key block passed directly):
+          {"WrappedKeyMaterial": {"Tr31KeyBlock": "<TR-31 block>"}, "KeyCheckValueAlgorithm": "CMAC"}
 
         Args:
-            key_identifier: Key ARN or alias (must be D0, D1, B0, E1, or E6 key)
+            key_identifier: Key ARN or alias of the KEK (when using wrapped_key) or the working key
             plain_text: Hex-encoded plaintext to encrypt
             encryption_attributes: Algorithm-specific parameters dict
+            wrapped_key: Optional TR-31 wrapped working key (key_identifier becomes the KEK)
         """
-        return client().encrypt_data(
-            KeyIdentifier=key_identifier,
-            PlainText=plain_text,
-            EncryptionAttributes=encryption_attributes,
-        )
+        params: dict = {
+            "KeyIdentifier": key_identifier,
+            "PlainText": plain_text,
+            "EncryptionAttributes": encryption_attributes,
+        }
+        if wrapped_key:
+            params["WrappedKey"] = wrapped_key
+        return client().encrypt_data(**params)
 
     @mcp.tool()
     def decrypt_data(
         key_identifier: str,
         cipher_text: str,
         decryption_attributes: dict,
+        wrapped_key: dict | None = None,
     ) -> dict:
         """
         Decrypt payment data using an APC key.
@@ -64,15 +74,19 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         All inputs and outputs are hexBinary encoded.
 
         Args:
-            key_identifier: Key ARN or alias
+            key_identifier: Key ARN or alias of the KEK (when using wrapped_key) or the working key
             cipher_text: Hex-encoded ciphertext
             decryption_attributes: Algorithm-specific parameters (mirrors encrypt_data)
+            wrapped_key: Optional TR-31 wrapped working key (key_identifier becomes the KEK)
         """
-        return client().decrypt_data(
-            KeyIdentifier=key_identifier,
-            CipherText=cipher_text,
-            DecryptionAttributes=decryption_attributes,
-        )
+        params: dict = {
+            "KeyIdentifier": key_identifier,
+            "CipherText": cipher_text,
+            "DecryptionAttributes": decryption_attributes,
+        }
+        if wrapped_key:
+            params["WrappedKey"] = wrapped_key
+        return client().decrypt_data(**params)
 
     @mcp.tool()
     def re_encrypt_data(
@@ -81,25 +95,34 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         cipher_text: str,
         incoming_encryption_attributes: dict,
         outgoing_encryption_attributes: dict,
+        incoming_wrapped_key: dict | None = None,
+        outgoing_wrapped_key: dict | None = None,
     ) -> dict:
         """
         Re-encrypt data from one key to another without exposing plaintext.
         The decryption and re-encryption occur entirely within the APC HSM boundary.
 
         Args:
-            incoming_key_identifier: ARN or alias of the current encryption key
-            outgoing_key_identifier: ARN or alias of the target encryption key
+            incoming_key_identifier: ARN or alias of the current encryption key (or KEK)
+            outgoing_key_identifier: ARN or alias of the target encryption key (or KEK)
             cipher_text: Hex-encoded ciphertext under the incoming key
             incoming_encryption_attributes: Algorithm params for decryption
             outgoing_encryption_attributes: Algorithm params for re-encryption
+            incoming_wrapped_key: Optional TR-31 wrapped incoming working key
+            outgoing_wrapped_key: Optional TR-31 wrapped outgoing working key
         """
-        return client().re_encrypt_data(
-            IncomingKeyIdentifier=incoming_key_identifier,
-            OutgoingKeyIdentifier=outgoing_key_identifier,
-            CipherText=cipher_text,
-            IncomingEncryptionAttributes=incoming_encryption_attributes,
-            OutgoingEncryptionAttributes=outgoing_encryption_attributes,
-        )
+        params: dict = {
+            "IncomingKeyIdentifier": incoming_key_identifier,
+            "OutgoingKeyIdentifier": outgoing_key_identifier,
+            "CipherText": cipher_text,
+            "IncomingEncryptionAttributes": incoming_encryption_attributes,
+            "OutgoingEncryptionAttributes": outgoing_encryption_attributes,
+        }
+        if incoming_wrapped_key:
+            params["IncomingWrappedKey"] = incoming_wrapped_key
+        if outgoing_wrapped_key:
+            params["OutgoingWrappedKey"] = outgoing_wrapped_key
+        return client().re_encrypt_data(**params)
 
     # ── PIN Operations ────────────────────────────────────────────────────────
 
@@ -112,6 +135,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         encrypted_pin_block: str,
         incoming_dukpt_attributes: dict | None = None,
         outgoing_dukpt_attributes: dict | None = None,
+        incoming_as2805_attributes: dict | None = None,
+        incoming_wrapped_key: dict | None = None,
+        outgoing_wrapped_key: dict | None = None,
     ) -> dict:
         """
         Translate a PIN block between encryption zones without exposing the PIN in clear text.
@@ -127,18 +153,28 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         incoming_translation_attributes examples:
           ISO Format 4 (AES): {"IsoFormat4": {"PrimaryAccountNumber": "1712345678901234"}}
           ISO Format 0 (TDES): {"IsoFormat0": {"PrimaryAccountNumber": "1712345678901234"}}
+          AS2805 Format 0:     {"As2805Format0": {"PrimaryAccountNumber": "1712345678901234"}}
 
         incoming_dukpt_attributes (when incoming key is a BDK):
           {"KeySerialNumber": "<10 or 12 byte KSN hex>"}
 
+        incoming_as2805_attributes (when incoming block uses AS2805 format):
+          {"SessionKeyDerivationAttributes": {...}}
+
+        incoming_wrapped_key / outgoing_wrapped_key (dynamic key — TR-31 block passed directly):
+          {"WrappedKeyMaterial": {"Tr31KeyBlock": "<TR-31 block>"}, "KeyCheckValueAlgorithm": "CMAC"}
+
         Args:
-            incoming_key_identifier: ARN or alias of inbound PEK or BDK
-            outgoing_key_identifier: ARN or alias of outbound PEK or BDK
+            incoming_key_identifier: ARN or alias of inbound PEK or BDK (or KEK for wrapped key)
+            outgoing_key_identifier: ARN or alias of outbound PEK or BDK (or KEK for wrapped key)
             incoming_translation_attributes: PIN block format and PAN for inbound
             outgoing_translation_attributes: PIN block format and PAN for outbound
             encrypted_pin_block: Hex-encoded encrypted PIN block
             incoming_dukpt_attributes: Required when incoming key is a BDK (DUKPT)
             outgoing_dukpt_attributes: Required when outgoing key is a BDK (DUKPT)
+            incoming_as2805_attributes: Required when incoming block uses AS2805 format
+            incoming_wrapped_key: Optional TR-31 wrapped incoming PEK
+            outgoing_wrapped_key: Optional TR-31 wrapped outgoing PEK
         """
         incoming_format = _extract_pin_format(incoming_translation_attributes)
         outgoing_format = _extract_pin_format(outgoing_translation_attributes)
@@ -169,6 +205,12 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             params["IncomingDukptAttributes"] = incoming_dukpt_attributes
         if outgoing_dukpt_attributes:
             params["OutgoingDukptAttributes"] = outgoing_dukpt_attributes
+        if incoming_as2805_attributes:
+            params["IncomingAs2805Attributes"] = incoming_as2805_attributes
+        if incoming_wrapped_key:
+            params["IncomingWrappedKey"] = incoming_wrapped_key
+        if outgoing_wrapped_key:
+            params["OutgoingWrappedKey"] = outgoing_wrapped_key
 
         return client().translate_pin_data(**params)
 
@@ -178,27 +220,36 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         encryption_key_identifier: str,
         generation_attributes: dict,
         pin_block_format: str,
-        primary_account_number: str,
+        primary_account_number: str | None = None,
+        pin_data_length: int | None = None,
+        encryption_wrapped_key: dict | None = None,
     ) -> dict:
         """
         Generate a PIN and/or PIN verification value (PVV / offset).
         Issuer function — use with care in acquirer contexts.
 
         Supported schemes via generation_attributes:
-          Visa PVV: {"VisaPin": {"PinVerificationKeyIndex": 1}}
-          IBM3624 offset: {"Ibm3624PinOffset": {"DecimalizationTable": "...", "PinValidationData": "..."}}
-          IBM3624 random PIN: {"Ibm3624RandomPin": {"DecimalizationTable": "..."}}
+          Visa PVV:          {"VisaPin": {"PinVerificationKeyIndex": 1}}
+          Visa PVV value:    {"VisaPinVerificationValue": {"EncryptedPinBlock": "...", "PinVerificationKeyIndex": 1}}
+          IBM3624 offset:    {"Ibm3624PinOffset": {"DecimalizationTable": "...", "PinValidationData": "..."}}
+          IBM3624 random:    {"Ibm3624RandomPin": {"DecimalizationTable": "..."}}
+          IBM3624 natural:   {"Ibm3624NaturalPin": {"DecimalizationTable": "..."}}
+          IBM3624 from offset: {"Ibm3624PinFromOffset": {"DecimalizationTable": "...", "PinOffset": "...", "PinValidationData": "..."}}
 
         Supported key types:
           generation_key_identifier: V1 (IBM3624) or V2 (Visa) PVK
-          encryption_key_identifier: P0 PIN Encryption Key
+          encryption_key_identifier: P0 PIN Encryption Key (or KEK when using encryption_wrapped_key)
+
+        primary_account_number is optional for ISO_FORMAT_1 (which does not include PAN).
 
         Args:
             generation_key_identifier: ARN or alias of PVK (V1 or V2 key)
             encryption_key_identifier: ARN or alias of PEK (P0 key) to encrypt output PIN block
             generation_attributes: Scheme-specific generation parameters
-            pin_block_format: ISO_FORMAT_0, ISO_FORMAT_3, or ISO_FORMAT_4
-            primary_account_number: 12-19 digit PAN
+            pin_block_format: ISO_FORMAT_0, ISO_FORMAT_1, ISO_FORMAT_3, or ISO_FORMAT_4
+            primary_account_number: 12-19 digit PAN (required for all formats except ISO_FORMAT_1)
+            pin_data_length: PIN length (4-12); omit to use scheme default
+            encryption_wrapped_key: Optional TR-31 wrapped PEK (encryption_key_identifier becomes the KEK)
         """
         if pin_block_format == "ISO_FORMAT_0":
             result = check_legacy_construct("PIN_FORMAT_0")
@@ -209,13 +260,19 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
                     "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
                 }
 
-        return client().generate_pin_data(
-            GenerationKeyIdentifier=generation_key_identifier,
-            EncryptionKeyIdentifier=encryption_key_identifier,
-            GenerationAttributes=generation_attributes,
-            PinBlockFormat=pin_block_format,
-            PrimaryAccountNumber=primary_account_number,
-        )
+        params: dict = {
+            "GenerationKeyIdentifier": generation_key_identifier,
+            "EncryptionKeyIdentifier": encryption_key_identifier,
+            "GenerationAttributes": generation_attributes,
+            "PinBlockFormat": pin_block_format,
+        }
+        if primary_account_number:
+            params["PrimaryAccountNumber"] = primary_account_number
+        if pin_data_length is not None:
+            params["PinDataLength"] = pin_data_length
+        if encryption_wrapped_key:
+            params["EncryptionWrappedKey"] = encryption_wrapped_key
+        return client().generate_pin_data(**params)
 
     @mcp.tool()
     def verify_pin_data(
@@ -224,8 +281,10 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         encryption_key_identifier: str,
         verification_attributes: dict,
         pin_block_format: str,
-        primary_account_number: str,
+        primary_account_number: str | None = None,
         pin_data_length: int | None = None,
+        dukpt_attributes: dict | None = None,
+        encryption_wrapped_key: dict | None = None,
     ) -> dict:
         """
         Verify a cardholder PIN against a stored PIN verification value.
@@ -234,14 +293,21 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
           verification_key_identifier: V1 (IBM3624) or V2 (Visa) PVK
           encryption_key_identifier: P0 PIN Encryption Key or B0 BDK (DUKPT)
 
+        primary_account_number is optional for ISO_FORMAT_1 (which does not include PAN).
+
+        dukpt_attributes (when encryption_key_identifier is a BDK):
+          {"KeySerialNumber": "<KSN hex>", "DukptKeyDerivationType": "AES_128"}
+
         Args:
             verification_key_identifier: ARN or alias of PVK
             encrypted_pin_block: Hex-encoded encrypted PIN block
-            encryption_key_identifier: ARN or alias of PEK or BDK
+            encryption_key_identifier: ARN or alias of PEK or BDK (or KEK for wrapped key)
             verification_attributes: Scheme-specific verification params (mirrors generate_pin_data)
-            pin_block_format: ISO_FORMAT_0, ISO_FORMAT_3, or ISO_FORMAT_4
-            primary_account_number: 12-19 digit PAN
+            pin_block_format: ISO_FORMAT_0, ISO_FORMAT_1, ISO_FORMAT_3, or ISO_FORMAT_4
+            primary_account_number: 12-19 digit PAN (required for all formats except ISO_FORMAT_1)
             pin_data_length: Optional PIN length override
+            dukpt_attributes: Required when encryption_key_identifier is a BDK
+            encryption_wrapped_key: Optional TR-31 wrapped PEK (encryption_key_identifier becomes the KEK)
         """
         params: dict = {
             "VerificationKeyIdentifier": verification_key_identifier,
@@ -249,10 +315,15 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             "EncryptionKeyIdentifier": encryption_key_identifier,
             "VerificationAttributes": verification_attributes,
             "PinBlockFormat": pin_block_format,
-            "PrimaryAccountNumber": primary_account_number,
         }
+        if primary_account_number:
+            params["PrimaryAccountNumber"] = primary_account_number
         if pin_data_length is not None:
             params["PinDataLength"] = pin_data_length
+        if dukpt_attributes:
+            params["DukptAttributes"] = dukpt_attributes
+        if encryption_wrapped_key:
+            params["EncryptionWrappedKey"] = encryption_wrapped_key
         return client().verify_pin_data(**params)
 
     # ── Card Validation ───────────────────────────────────────────────────────
@@ -493,41 +564,78 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def translate_key_material(
-        incoming_key_identifier: str,
-        outgoing_key_identifier: str,
-        incoming_wrapped_key: dict,
-        outgoing_key_material_type: str,
+        incoming_key_material: dict,
+        outgoing_key_material: dict,
+        key_check_value_algorithm: str | None = None,
     ) -> dict:
         """
-        Translate key material between wrapping keys without exposing the key in clear text.
+        Translate an ECDH-wrapped TR-31 key block into a KEK-wrapped TR-31 key block
+        without ever importing the working key into APC storage.
+
+        The only documented use case is ECDH → TR-31 (KEK):
+          incoming_key_material = {
+            "DiffieHellmanTr31KeyBlock": {
+              "CertificateAuthorityPublicKeyIdentifier": "<CA key ARN>",
+              "KeyBlockHeaders": {...},
+              "PrivateKeyIdentifier": "<ECC private key ARN>",
+              "PublicKeyCertificate": "<base64 PEM cert of counterparty>",
+              "DerivationData": "<hex>",
+              "KeyAlgorithm": "AES_128",
+              "KeyDerivationFunction": "NIST_SP800",
+              "KeyDerivationHashAlgorithm": "SHA_256"
+            }
+          }
+          outgoing_key_material = {
+            "Tr31KeyBlock": {
+              "WrappingKeyIdentifier": "<KEK ARN or alias>"
+            }
+          }
+
+        key_check_value_algorithm: CMAC, ANSI_X9_24, HMAC, or SHA_1
 
         Args:
-            incoming_key_identifier: ARN or alias of the incoming wrapping key
-            outgoing_key_identifier: ARN or alias of the outgoing wrapping key
-            incoming_wrapped_key: The wrapped key material to translate
-            outgoing_key_material_type: Output format: Tr31KeyBlock or Tr34KeyBlock
+            incoming_key_material: ECDH-wrapped TR-31 key block (DiffieHellmanTr31KeyBlock)
+            outgoing_key_material: Target KEK-wrapped TR-31 output (Tr31KeyBlock)
+            key_check_value_algorithm: Optional KCV algorithm for the output key block
         """
-        return client().translate_key_material(
-            IncomingKeyIdentifier=incoming_key_identifier,
-            OutgoingKeyIdentifier=outgoing_key_identifier,
-            IncomingWrappedKey=incoming_wrapped_key,
-            OutgoingKeyMaterialType=outgoing_key_material_type,
-        )
+        params: dict = {
+            "IncomingKeyMaterial": incoming_key_material,
+            "OutgoingKeyMaterial": outgoing_key_material,
+        }
+        if key_check_value_algorithm:
+            params["KeyCheckValueAlgorithm"] = key_check_value_algorithm
+        return client().translate_key_material(**params)
 
     # ── AS2805 ───────────────────────────────────────────────────────────────
 
     @mcp.tool()
     def generate_as2805_kek_validation(
         key_identifier: str,
+        kek_validation_type: str,
+        random_key_send_variant_mask: str,
     ) -> dict:
         """
         Generate an AS2805 Key Encryption Key validation value.
-        Used in Australian payment network key exchange.
+        Used in Australian payment network node-to-node key exchange.
+
+        kek_validation_type:
+          KekValidationRequest  — initiating node generates a validation request
+          KekValidationResponse — responding node generates the validation response
+
+        random_key_send_variant_mask:
+          VARIANT_MASK_82C0 — standard AS2805 variant mask
+          VARIANT_MASK_82   — alternate AS2805 variant mask
 
         Args:
             key_identifier: ARN or alias of the AS2805 KEK
+            kek_validation_type: KekValidationRequest or KekValidationResponse
+            random_key_send_variant_mask: VARIANT_MASK_82C0 or VARIANT_MASK_82
         """
-        return client().generate_as2805_kek_validation(KeyIdentifier=key_identifier)
+        return client().generate_as2805_kek_validation(
+            KeyIdentifier=key_identifier,
+            KekValidationType=kek_validation_type,
+            RandomKeySendVariantMask=random_key_send_variant_mask,
+        )
 
     # ── Compliance Advisories ─────────────────────────────────────────────────
 
