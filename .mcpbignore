@@ -1,0 +1,16 @@
+.git/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+tests/
+*.egg-info/
+dist/
+.venv/
+.env
+*.mcpb
+node_modules/
+src/apc_agent/__pycache__/
+REQUIREMENTS.md
+CLAUDE.md
+.claude/

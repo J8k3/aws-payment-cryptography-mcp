@@ -1,0 +1,1827 @@
+{
+  "service": "AWS Payment Cryptography Data Plane",
+  "api_version": "2022-02-03",
+  "document_generated_on": "2026-05-14",
+  "intended_use": "Machine-consumable capability catalog for supported data-plane use cases and documented parameter permutations.",
+  "source": {
+    "title": "AWS Payment Cryptography Data Plane API Reference",
+    "url": "https://docs.aws.amazon.com/pdfs/payment-cryptography/latest/DataAPIReference/payment-cryptography-data-api.pdf",
+    "document_version_label": "API Version 2022-02-03",
+    "publisher": "Amazon Web Services"
+  },
+  "interpretation_rules": {
+    "use_case_definition": "A use case is either an explicitly documented operation variant or a documented cartesian permutation of mutually exclusive request branches and enum values.",
+    "comprehensiveness_boundary": [
+      "This catalog enumerates all documented operations in the data-plane API reference.",
+      "This catalog enumerates all documented union branches and all documented enum values that materially change behavior.",
+      "This catalog does not enumerate unbounded free-form values such as PANs, ciphertext, transaction data, KSNs, wrapped key blobs, or APDU payloads.",
+      "Where the documentation describes orthogonal dimensions instead of an explicit cartesian product, both the dimensions and any explicit compatibility rules are preserved."
+    ],
+    "fact_labels": {
+      "documented": "Directly stated in the API reference.",
+      "documented_with_internal_inconsistency": "Present in the API reference but contradicted elsewhere in the same document.",
+      "inferred_from_structure": "Derived from union structure or endpoint shape without an explicit prose statement for every combination."
+    }
+  },
+  "global_capabilities": {
+    "cross_account_use": {
+      "status": "documented",
+      "statement": "Each listed operation in this catalog states that cross-account use is supported when the key has a resource-based policy that grants access."
+    },
+    "dynamic_keys": {
+      "status": "documented",
+      "supported_operations": [
+        "DecryptData",
+        "EncryptData",
+        "ReEncryptData",
+        "TranslatePinData"
+      ],
+      "notes": [
+        "Dynamic keys are passed as TR-31 wrapped key blocks.",
+        "For symmetric data encryption operations, the key ARN refers to the key encryption key that protects the wrapped working key."
+      ]
+    },
+    "ecdh_key_exchange": {
+      "status": "documented",
+      "supported_operations": [
+        "GeneratePinData",
+        "TranslatePinData",
+        "TranslateKeyMaterial"
+      ]
+    }
+  },
+  "documentation_caveats": [
+    {
+      "id": "verify-pin-data-pin-block-format-inconsistency",
+      "status": "documented_with_internal_inconsistency",
+      "operation": "VerifyPinData",
+      "issue": "The field description prose says AWS Payment Cryptography supports ISO_FORMAT_0 and ISO_FORMAT_3, but the valid-values list includes ISO_FORMAT_0, ISO_FORMAT_1, ISO_FORMAT_3, and ISO_FORMAT_4.",
+      "recommended_machine_interpretation": {
+        "accepted_values_documented": [
+          "ISO_FORMAT_0",
+          "ISO_FORMAT_1",
+          "ISO_FORMAT_3",
+          "ISO_FORMAT_4"
+        ],
+        "prose_supported_subset": [
+          "ISO_FORMAT_0",
+          "ISO_FORMAT_3"
+        ]
+      }
+    },
+    {
+      "id": "symmetric-encryption-paddingtype-anomaly",
+      "status": "documented_with_internal_inconsistency",
+      "data_type": "SymmetricEncryptionAttributes",
+      "issue": "SymmetricEncryptionAttributes.PaddingType is documented with RSA-style values PKCS1, OAEP_SHA1, OAEP_SHA256, and OAEP_SHA512.",
+      "recommended_machine_interpretation": {
+        "preserve_documented_values": true,
+        "treat_as_confirmed_runtime_capability": false
+      }
+    }
+  ],
+  "shared_dimensions": {
+    "encryption_decryption_attributes": {
+      "type": "union",
+      "branches": {
+        "Asymmetric": {
+          "status": "documented",
+          "data_type": "AsymmetricEncryptionAttributes",
+          "fields": {
+            "PaddingType": {
+              "type": "enum",
+              "values": [
+                "PKCS1",
+                "OAEP_SHA1",
+                "OAEP_SHA256",
+                "OAEP_SHA512"
+              ]
+            }
+          }
+        },
+        "Symmetric": {
+          "status": "documented",
+          "data_type": "SymmetricEncryptionAttributes",
+          "fields": {
+            "Mode": {
+              "type": "enum",
+              "values": [
+                "ECB",
+                "CBC",
+                "CFB",
+                "CFB1",
+                "CFB8",
+                "CFB64",
+                "CFB128",
+                "OFB"
+              ]
+            },
+            "InitializationVector": {
+              "type": "hex_string",
+              "notes": [
+                "Optional.",
+                "If omitted, AWS Payment Cryptography defaults it to zero."
+              ]
+            },
+            "PaddingType": {
+              "type": "enum",
+              "status": "documented_with_internal_inconsistency",
+              "values": [
+                "PKCS1",
+                "OAEP_SHA1",
+                "OAEP_SHA256",
+                "OAEP_SHA512"
+              ]
+            }
+          }
+        },
+        "Dukpt": {
+          "status": "documented",
+          "data_type": "DukptEncryptionAttributes",
+          "fields": {
+            "DukptKeyDerivationType": {
+              "type": "enum",
+              "values": [
+                "TDES_2KEY",
+                "TDES_3KEY",
+                "AES_128",
+                "AES_192",
+                "AES_256"
+              ]
+            },
+            "DukptKeyVariant": {
+              "type": "enum",
+              "values": [
+                "BIDIRECTIONAL",
+                "REQUEST",
+                "RESPONSE"
+              ]
+            },
+            "KeySerialNumber": {
+              "type": "hex_string"
+            }
+          }
+        },
+        "Emv": {
+          "status": "documented",
+          "data_type": "EmvEncryptionAttributes",
+          "fields": {
+            "MajorKeyDerivationMode": {
+              "type": "enum",
+              "values": [
+                "EMV_OPTION_A",
+                "EMV_OPTION_B"
+              ]
+            },
+            "PanSequenceNumber": {
+              "type": "string"
+            },
+            "PrimaryAccountNumber": {
+              "type": "string"
+            },
+            "SessionDerivationData": {
+              "type": "hex_string"
+            },
+            "InitializationVector": {
+              "type": "hex_string",
+              "notes": [
+                "Optional.",
+                "If omitted, AWS Payment Cryptography defaults it to zero."
+              ]
+            },
+            "Mode": {
+              "type": "enum",
+              "values": [
+                "ECB",
+                "CBC"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mac_attributes": {
+      "type": "union",
+      "branches": {
+        "Algorithm": {
+          "status": "documented",
+          "mode": "direct_algorithm_selection",
+          "values": [
+            "ISO9797_ALGORITHM1",
+            "ISO9797_ALGORITHM3",
+            "CMAC",
+            "HMAC",
+            "HMAC_SHA224",
+            "HMAC_SHA256",
+            "HMAC_SHA384",
+            "HMAC_SHA512",
+            "AS2805_4_1"
+          ]
+        },
+        "DukptCmac": {
+          "status": "documented",
+          "data_type": "MacAlgorithmDukpt"
+        },
+        "DukptIso9797Algorithm1": {
+          "status": "documented",
+          "data_type": "MacAlgorithmDukpt"
+        },
+        "DukptIso9797Algorithm3": {
+          "status": "documented",
+          "data_type": "MacAlgorithmDukpt"
+        },
+        "EmvMac": {
+          "status": "documented",
+          "data_type": "MacAlgorithmEmv"
+        }
+      },
+      "embedded_dimensions": {
+        "MacAlgorithmDukpt": {
+          "DukptKeyVariant": [
+            "BIDIRECTIONAL",
+            "REQUEST",
+            "RESPONSE"
+          ],
+          "DukptDerivationType": [
+            "TDES_2KEY",
+            "TDES_3KEY",
+            "AES_128",
+            "AES_192",
+            "AES_256"
+          ]
+        },
+        "MacAlgorithmEmv": {
+          "MajorKeyDerivationMode": [
+            "EMV_OPTION_A",
+            "EMV_OPTION_B"
+          ],
+          "SessionKeyDerivationMode": [
+            "EMV_COMMON_SESSION_KEY",
+            "EMV2000",
+            "AMEX",
+            "MASTERCARD_SESSION_KEY",
+            "VISA"
+          ],
+          "SessionKeyDerivationValue": [
+            "ApplicationCryptogram",
+            "ApplicationTransactionCounter"
+          ]
+        }
+      }
+    },
+    "card_generation_attributes": {
+      "type": "union",
+      "values": [
+        "AmexCardSecurityCodeVersion1",
+        "AmexCardSecurityCodeVersion2",
+        "CardHolderVerificationValue",
+        "CardVerificationValue1",
+        "CardVerificationValue2",
+        "DynamicCardVerificationCode",
+        "DynamicCardVerificationValue"
+      ]
+    },
+    "card_verification_attributes": {
+      "type": "union",
+      "values": [
+        "AmexCardSecurityCodeVersion1",
+        "AmexCardSecurityCodeVersion2",
+        "CardHolderVerificationValue",
+        "CardVerificationValue1",
+        "CardVerificationValue2",
+        "DiscoverDynamicCardVerificationCode",
+        "DynamicCardVerificationCode",
+        "DynamicCardVerificationValue"
+      ]
+    },
+    "pin_generation_attributes": {
+      "type": "union",
+      "values": [
+        "Ibm3624NaturalPin",
+        "Ibm3624PinFromOffset",
+        "Ibm3624PinOffset",
+        "Ibm3624RandomPin",
+        "VisaPin",
+        "VisaPinVerificationValue"
+      ]
+    },
+    "pin_verification_attributes": {
+      "type": "union",
+      "values": [
+        "Ibm3624Pin",
+        "VisaPin"
+      ]
+    },
+    "translate_pin_formats": {
+      "type": "union",
+      "values": [
+        "As2805Format0",
+        "IsoFormat0",
+        "IsoFormat1",
+        "IsoFormat3",
+        "IsoFormat4"
+      ],
+      "compatibility_rules": [
+        {
+          "status": "documented",
+          "rule": "Formats that require PAN cannot be translated to a format that does not require PAN.",
+          "pan_requiring_formats": [
+            "As2805Format0",
+            "IsoFormat0",
+            "IsoFormat3",
+            "IsoFormat4"
+          ],
+          "no_pan_formats": [
+            "IsoFormat1"
+          ]
+        },
+        {
+          "status": "documented",
+          "rule": "AWS Payment Cryptography currently supports ISO PIN block 4 translation for PIN block built using legacy PAN length, defined as the right-most 12 digits excluding the check digit."
+        }
+      ]
+    },
+    "derivation_method_attributes": {
+      "type": "union",
+      "values": [
+        "Amex",
+        "Emv2000",
+        "EmvCommon",
+        "Mastercard",
+        "Visa"
+      ]
+    },
+    "session_key_derivation": {
+      "type": "union",
+      "values": [
+        "Amex",
+        "Emv2000",
+        "EmvCommon",
+        "Mastercard",
+        "Visa"
+      ]
+    },
+    "cryptogram_auth_response": {
+      "type": "union",
+      "values": [
+        "ArpcMethod1",
+        "ArpcMethod2"
+      ]
+    },
+    "re_encryption_attributes": {
+      "type": "union",
+      "values": [
+        "Dukpt",
+        "Symmetric"
+      ]
+    },
+    "as2805_kek_validation_type": {
+      "type": "union",
+      "values": [
+        "KekValidationRequest",
+        "KekValidationResponse"
+      ]
+    },
+    "ecdh_derivation_attributes": {
+      "type": "documented_dimension",
+      "KeyAlgorithm": [
+        "TDES_2KEY",
+        "TDES_3KEY",
+        "AES_128",
+        "AES_192",
+        "AES_256",
+        "HMAC_SHA224",
+        "HMAC_SHA256",
+        "HMAC_SHA384",
+        "HMAC_SHA512"
+      ],
+      "KeyDerivationFunction": [
+        "NIST_SP800",
+        "ANSI_X963"
+      ],
+      "KeyDerivationHashAlgorithm": [
+        "SHA_256",
+        "SHA_384",
+        "SHA_512"
+      ]
+    }
+  },
+  "operations": [
+    {
+      "name": "DecryptData",
+      "endpoint": "POST /keys/{KeyIdentifier}/decrypt",
+      "purpose": "Decrypt ciphertext to plaintext using symmetric, asymmetric, DUKPT, or EMV key schemes.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "CipherText",
+        "DecryptionAttributes"
+      ],
+      "optional_fields": [
+        "WrappedKey"
+      ],
+      "dynamic_key_support": true,
+      "use_cases": [
+        {
+          "id": "decrypt-asymmetric-rsa",
+          "status": "documented",
+          "variant_path": {
+            "DecryptionAttributes": "Asymmetric"
+          },
+          "behavioral_dimensions": {
+            "PaddingType": [
+              "PKCS1",
+              "OAEP_SHA1",
+              "OAEP_SHA256",
+              "OAEP_SHA512"
+            ]
+          }
+        },
+        {
+          "id": "decrypt-symmetric",
+          "status": "documented",
+          "variant_path": {
+            "DecryptionAttributes": "Symmetric"
+          },
+          "behavioral_dimensions": {
+            "Mode": [
+              "ECB",
+              "CBC",
+              "CFB",
+              "CFB1",
+              "CFB8",
+              "CFB64",
+              "CFB128",
+              "OFB"
+            ]
+          }
+        },
+        {
+          "id": "decrypt-dukpt",
+          "status": "documented",
+          "variant_path": {
+            "DecryptionAttributes": "Dukpt"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ],
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ]
+          }
+        },
+        {
+          "id": "decrypt-emv",
+          "status": "documented",
+          "variant_path": {
+            "DecryptionAttributes": "Emv"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "Mode": [
+              "ECB",
+              "CBC"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 3,
+        "union_type": "EncryptionDecryptionAttributes"
+      }
+    },
+    {
+      "name": "EncryptData",
+      "endpoint": "POST /keys/{KeyIdentifier}/encrypt",
+      "purpose": "Encrypt plaintext to ciphertext using symmetric, asymmetric, DUKPT, or EMV key schemes.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "PlainText",
+        "EncryptionAttributes"
+      ],
+      "optional_fields": [
+        "WrappedKey"
+      ],
+      "dynamic_key_support": true,
+      "use_cases": [
+        {
+          "id": "encrypt-asymmetric-rsa",
+          "status": "documented",
+          "variant_path": {
+            "EncryptionAttributes": "Asymmetric"
+          },
+          "behavioral_dimensions": {
+            "PaddingType": [
+              "PKCS1",
+              "OAEP_SHA1",
+              "OAEP_SHA256",
+              "OAEP_SHA512"
+            ]
+          }
+        },
+        {
+          "id": "encrypt-symmetric",
+          "status": "documented",
+          "variant_path": {
+            "EncryptionAttributes": "Symmetric"
+          },
+          "behavioral_dimensions": {
+            "Mode": [
+              "ECB",
+              "CBC",
+              "CFB",
+              "CFB1",
+              "CFB8",
+              "CFB64",
+              "CFB128",
+              "OFB"
+            ]
+          }
+        },
+        {
+          "id": "encrypt-dukpt",
+          "status": "documented",
+          "variant_path": {
+            "EncryptionAttributes": "Dukpt"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ],
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ]
+          }
+        },
+        {
+          "id": "encrypt-emv",
+          "status": "documented",
+          "variant_path": {
+            "EncryptionAttributes": "Emv"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "Mode": [
+              "ECB",
+              "CBC"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 9,
+        "union_type": "EncryptionDecryptionAttributes"
+      }
+    },
+    {
+      "name": "GenerateAs2805KekValidation",
+      "endpoint": "POST /as2805kekvalidation/generate",
+      "purpose": "Generate KEK validation request or response for AS2805 node-to-node initialization.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "KekValidationType",
+        "RandomKeySendVariantMask"
+      ],
+      "use_cases": [
+        {
+          "id": "generate-as2805-kek-validation-request",
+          "status": "documented",
+          "variant_path": {
+            "KekValidationType": "KekValidationRequest"
+          },
+          "behavioral_dimensions": {
+            "DeriveKeyAlgorithm": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256",
+              "HMAC_SHA224",
+              "HMAC_SHA256",
+              "HMAC_SHA384",
+              "HMAC_SHA512"
+            ],
+            "RandomKeySendVariantMask": [
+              "VARIANT_MASK_82C0",
+              "VARIANT_MASK_82"
+            ]
+          }
+        },
+        {
+          "id": "generate-as2805-kek-validation-response",
+          "status": "documented",
+          "variant_path": {
+            "KekValidationType": "KekValidationResponse"
+          },
+          "behavioral_dimensions": {
+            "RandomKeySendVariantMask": [
+              "VARIANT_MASK_82C0",
+              "VARIANT_MASK_82"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 15,
+        "union_type": "As2805KekValidationType"
+      }
+    },
+    {
+      "name": "GenerateCardValidationData",
+      "endpoint": "POST /cardvalidationdata/generate",
+      "purpose": "Generate card validation values such as CVV, CVV2, CSC, dCVV, or dCVC.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "PrimaryAccountNumber",
+        "GenerationAttributes"
+      ],
+      "optional_fields": [
+        "ValidationDataLength"
+      ],
+      "use_cases": [
+        {
+          "id": "generate-amex-csc-v1",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "AmexCardSecurityCodeVersion1"
+          }
+        },
+        {
+          "id": "generate-amex-csc-v2",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "AmexCardSecurityCodeVersion2"
+          }
+        },
+        {
+          "id": "generate-cardholder-verification-value",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "CardHolderVerificationValue"
+          }
+        },
+        {
+          "id": "generate-cvv",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "CardVerificationValue1"
+          }
+        },
+        {
+          "id": "generate-cvv2",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "CardVerificationValue2"
+          }
+        },
+        {
+          "id": "generate-dcvc",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "DynamicCardVerificationCode"
+          }
+        },
+        {
+          "id": "generate-dcvv",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "DynamicCardVerificationValue"
+          }
+        }
+      ],
+      "field_rules": [
+        {
+          "field": "ValidationDataLength",
+          "status": "documented",
+          "rule": "Default value is 3."
+        }
+      ],
+      "source_reference": {
+        "operation_page": 20,
+        "union_type": "CardGenerationAttributes"
+      }
+    },
+    {
+      "name": "GenerateMac",
+      "endpoint": "POST /mac/generate",
+      "purpose": "Generate MAC cryptograms for direct algorithm, DUKPT, or EMV MAC schemes.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "MessageData",
+        "GenerationAttributes"
+      ],
+      "optional_fields": [
+        "MacLength"
+      ],
+      "use_cases": [
+        {
+          "id": "generate-mac-direct-algorithm",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "Algorithm"
+          },
+          "behavioral_dimensions": {
+            "Algorithm": [
+              "ISO9797_ALGORITHM1",
+              "ISO9797_ALGORITHM3",
+              "CMAC",
+              "HMAC",
+              "HMAC_SHA224",
+              "HMAC_SHA256",
+              "HMAC_SHA384",
+              "HMAC_SHA512",
+              "AS2805_4_1"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-dukpt-cmac",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "DukptCmac"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-dukpt-iso9797-algorithm1",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "DukptIso9797Algorithm1"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-dukpt-iso9797-algorithm3",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "DukptIso9797Algorithm3"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-emv",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "EmvMac"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationMode": [
+              "EMV_COMMON_SESSION_KEY",
+              "EMV2000",
+              "AMEX",
+              "MASTERCARD_SESSION_KEY",
+              "VISA"
+            ],
+            "SessionKeyDerivationValue": [
+              "ApplicationCryptogram",
+              "ApplicationTransactionCounter"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 25,
+        "union_type": "MacAttributes"
+      }
+    },
+    {
+      "name": "GenerateMacEmvPinChange",
+      "endpoint": "POST /macemvpinchange/generate",
+      "purpose": "Generate issuer-script MAC and translated encrypted PIN block for EMV offline PIN change.",
+      "status": "documented",
+      "required_fields": [
+        "DerivationMethodAttributes",
+        "MessageData",
+        "NewEncryptedPinBlock",
+        "NewPinPekIdentifier",
+        "PinBlockFormat",
+        "SecureMessagingConfidentialityKeyIdentifier",
+        "SecureMessagingIntegrityKeyIdentifier"
+      ],
+      "use_cases": [
+        {
+          "id": "generate-mac-emv-pin-change-amex",
+          "status": "documented",
+          "variant_path": {
+            "DerivationMethodAttributes": "Amex"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-emv-pin-change-emv2000",
+          "status": "documented",
+          "variant_path": {
+            "DerivationMethodAttributes": "Emv2000"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-emv-pin-change-emv-common",
+          "status": "documented",
+          "variant_path": {
+            "DerivationMethodAttributes": "EmvCommon"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-emv-pin-change-mastercard",
+          "status": "documented",
+          "variant_path": {
+            "DerivationMethodAttributes": "Mastercard"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3"
+            ]
+          }
+        },
+        {
+          "id": "generate-mac-emv-pin-change-visa",
+          "status": "documented",
+          "variant_path": {
+            "DerivationMethodAttributes": "Visa"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 30,
+        "union_type": "DerivationMethodAttributes"
+      }
+    },
+    {
+      "name": "GeneratePinData",
+      "endpoint": "POST /pindata/generate",
+      "purpose": "Generate PIN-related data such as PIN, PVV, PIN block, and PIN offset.",
+      "status": "documented",
+      "required_fields": [
+        "EncryptionKeyIdentifier",
+        "GenerationAttributes",
+        "GenerationKeyIdentifier",
+        "PinBlockFormat"
+      ],
+      "optional_fields": [
+        "EncryptionWrappedKey",
+        "PinDataLength",
+        "PrimaryAccountNumber"
+      ],
+      "ecdh_support": true,
+      "use_cases": [
+        {
+          "id": "generate-pin-ibm3624-natural-pin",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "Ibm3624NaturalPin"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        },
+        {
+          "id": "generate-pin-ibm3624-pin-from-offset",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "Ibm3624PinFromOffset"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        },
+        {
+          "id": "generate-pin-ibm3624-pin-offset",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "Ibm3624PinOffset"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        },
+        {
+          "id": "generate-pin-ibm3624-random-pin",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "Ibm3624RandomPin"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        },
+        {
+          "id": "generate-pin-visa-pin",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "VisaPin"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        },
+        {
+          "id": "generate-pin-visa-pvv",
+          "status": "documented",
+          "variant_path": {
+            "GenerationAttributes": "VisaPinVerificationValue"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ]
+          }
+        }
+      ],
+      "field_rules": [
+        {
+          "field": "PinDataLength",
+          "status": "documented",
+          "values": {
+            "minimum": 4,
+            "maximum": 12
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 38,
+        "union_type": "PinGenerationAttributes"
+      }
+    },
+    {
+      "name": "ReEncryptData",
+      "endpoint": "POST /keys/{IncomingKeyIdentifier}/reencrypt",
+      "purpose": "Re-encrypt ciphertext from one encryption context to another using symmetric or DUKPT key schemes.",
+      "status": "documented",
+      "required_fields": [
+        "IncomingKeyIdentifier",
+        "CipherText",
+        "IncomingEncryptionAttributes",
+        "OutgoingEncryptionAttributes",
+        "OutgoingKeyIdentifier"
+      ],
+      "optional_fields": [
+        "IncomingWrappedKey",
+        "OutgoingWrappedKey"
+      ],
+      "dynamic_key_support": true,
+      "use_cases": [
+        {
+          "id": "reencrypt-symmetric-to-symmetric",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingEncryptionAttributes": "Symmetric",
+            "OutgoingEncryptionAttributes": "Symmetric"
+          }
+        },
+        {
+          "id": "reencrypt-symmetric-to-dukpt",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingEncryptionAttributes": "Symmetric",
+            "OutgoingEncryptionAttributes": "Dukpt"
+          }
+        },
+        {
+          "id": "reencrypt-dukpt-to-symmetric",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingEncryptionAttributes": "Dukpt",
+            "OutgoingEncryptionAttributes": "Symmetric"
+          }
+        },
+        {
+          "id": "reencrypt-dukpt-to-dukpt",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingEncryptionAttributes": "Dukpt",
+            "OutgoingEncryptionAttributes": "Dukpt"
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 45,
+        "union_type": "ReEncryptionAttributes"
+      }
+    },
+    {
+      "name": "TranslateKeyMaterial",
+      "endpoint": "POST /keymaterial/translate",
+      "purpose": "Translate transaction key material from ECDH-wrapped TR-31 input to KEK-wrapped TR-31 output without importing the key.",
+      "status": "documented",
+      "required_fields": [
+        "IncomingKeyMaterial",
+        "OutgoingKeyMaterial"
+      ],
+      "optional_fields": [
+        "KeyCheckValueAlgorithm"
+      ],
+      "use_cases": [
+        {
+          "id": "translate-key-material-ecdh-to-tr31-kek",
+          "status": "documented",
+          "variant_path": {
+            "IncomingKeyMaterial": "DiffieHellmanTr31KeyBlock",
+            "OutgoingKeyMaterial": "Tr31KeyBlock"
+          },
+          "behavioral_dimensions": {
+            "EcdhDerivedKeyAlgorithm": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256",
+              "HMAC_SHA224",
+              "HMAC_SHA256",
+              "HMAC_SHA384",
+              "HMAC_SHA512"
+            ],
+            "EcdhKeyDerivationFunction": [
+              "NIST_SP800",
+              "ANSI_X963"
+            ],
+            "EcdhHashAlgorithm": [
+              "SHA_256",
+              "SHA_384",
+              "SHA_512"
+            ],
+            "KeyCheckValueAlgorithm": [
+              "CMAC",
+              "ANSI_X9_24",
+              "HMAC",
+              "SHA_1"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 51,
+        "union_types": [
+          "IncomingKeyMaterial",
+          "OutgoingKeyMaterial"
+        ]
+      }
+    },
+    {
+      "name": "TranslatePinData",
+      "endpoint": "POST /pindata/translate",
+      "purpose": "Translate encrypted PIN blocks across ISO 9564 and AS2805 formats and across PEK, BDK/DUKPT, dynamic key, or ECDH protection contexts.",
+      "status": "documented",
+      "required_fields": [
+        "EncryptedPinBlock",
+        "IncomingKeyIdentifier",
+        "IncomingTranslationAttributes",
+        "OutgoingKeyIdentifier",
+        "OutgoingTranslationAttributes"
+      ],
+      "optional_fields": [
+        "IncomingAs2805Attributes",
+        "IncomingDukptAttributes",
+        "IncomingWrappedKey",
+        "OutgoingDukptAttributes",
+        "OutgoingWrappedKey"
+      ],
+      "transport_modes": {
+        "incoming": [
+          "static_pek_or_bdk",
+          "dukpt_bdk",
+          "dynamic_wrapped_pek",
+          "ecdh_derived_key"
+        ],
+        "outgoing": [
+          "static_pek_or_bdk",
+          "dukpt_bdk",
+          "dynamic_wrapped_pek",
+          "ecdh_derived_key"
+        ]
+      },
+      "use_cases": [
+        {
+          "id": "translate-pin-as2805format0-to-as2805format0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "As2805Format0",
+            "OutgoingTranslationAttributes": "As2805Format0"
+          }
+        },
+        {
+          "id": "translate-pin-as2805format0-to-isoformat0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "As2805Format0",
+            "OutgoingTranslationAttributes": "IsoFormat0"
+          }
+        },
+        {
+          "id": "translate-pin-as2805format0-to-isoformat1",
+          "status": "documented",
+          "variant_path": {
+            "IncomingTranslationAttributes": "As2805Format0",
+            "OutgoingTranslationAttributes": "IsoFormat1"
+          },
+          "compatibility": "not_supported_by_documented_rule"
+        },
+        {
+          "id": "translate-pin-as2805format0-to-isoformat3",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "As2805Format0",
+            "OutgoingTranslationAttributes": "IsoFormat3"
+          }
+        },
+        {
+          "id": "translate-pin-as2805format0-to-isoformat4",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "As2805Format0",
+            "OutgoingTranslationAttributes": "IsoFormat4"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat0-to-as2805format0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat0",
+            "OutgoingTranslationAttributes": "As2805Format0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat0-to-isoformat0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat0",
+            "OutgoingTranslationAttributes": "IsoFormat0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat0-to-isoformat1",
+          "status": "documented",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat0",
+            "OutgoingTranslationAttributes": "IsoFormat1"
+          },
+          "compatibility": "not_supported_by_documented_rule"
+        },
+        {
+          "id": "translate-pin-isoformat0-to-isoformat3",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat0",
+            "OutgoingTranslationAttributes": "IsoFormat3"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat0-to-isoformat4",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat0",
+            "OutgoingTranslationAttributes": "IsoFormat4"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat1-to-as2805format0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat1",
+            "OutgoingTranslationAttributes": "As2805Format0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat1-to-isoformat0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat1",
+            "OutgoingTranslationAttributes": "IsoFormat0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat1-to-isoformat1",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat1",
+            "OutgoingTranslationAttributes": "IsoFormat1"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat1-to-isoformat3",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat1",
+            "OutgoingTranslationAttributes": "IsoFormat3"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat1-to-isoformat4",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat1",
+            "OutgoingTranslationAttributes": "IsoFormat4"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat3-to-as2805format0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat3",
+            "OutgoingTranslationAttributes": "As2805Format0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat3-to-isoformat0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat3",
+            "OutgoingTranslationAttributes": "IsoFormat0"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat3-to-isoformat1",
+          "status": "documented",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat3",
+            "OutgoingTranslationAttributes": "IsoFormat1"
+          },
+          "compatibility": "not_supported_by_documented_rule"
+        },
+        {
+          "id": "translate-pin-isoformat3-to-isoformat3",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat3",
+            "OutgoingTranslationAttributes": "IsoFormat3"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat3-to-isoformat4",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat3",
+            "OutgoingTranslationAttributes": "IsoFormat4"
+          }
+        },
+        {
+          "id": "translate-pin-isoformat4-to-as2805format0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat4",
+            "OutgoingTranslationAttributes": "As2805Format0"
+          },
+          "notes": [
+            "Subject to the documented legacy PAN length caveat for ISO format 4."
+          ]
+        },
+        {
+          "id": "translate-pin-isoformat4-to-isoformat0",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat4",
+            "OutgoingTranslationAttributes": "IsoFormat0"
+          },
+          "notes": [
+            "Subject to the documented legacy PAN length caveat for ISO format 4."
+          ]
+        },
+        {
+          "id": "translate-pin-isoformat4-to-isoformat1",
+          "status": "documented",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat4",
+            "OutgoingTranslationAttributes": "IsoFormat1"
+          },
+          "compatibility": "not_supported_by_documented_rule",
+          "notes": [
+            "ISO format 4 also has a documented legacy PAN length caveat."
+          ]
+        },
+        {
+          "id": "translate-pin-isoformat4-to-isoformat3",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat4",
+            "OutgoingTranslationAttributes": "IsoFormat3"
+          },
+          "notes": [
+            "Subject to the documented legacy PAN length caveat for ISO format 4."
+          ]
+        },
+        {
+          "id": "translate-pin-isoformat4-to-isoformat4",
+          "status": "inferred_from_structure",
+          "variant_path": {
+            "IncomingTranslationAttributes": "IsoFormat4",
+            "OutgoingTranslationAttributes": "IsoFormat4"
+          },
+          "notes": [
+            "Subject to the documented legacy PAN length caveat for ISO format 4."
+          ]
+        }
+      ],
+      "embedded_dimensions": {
+        "IncomingDukptAttributes.DukptKeyDerivationType": [
+          "TDES_2KEY",
+          "TDES_3KEY",
+          "AES_128",
+          "AES_192",
+          "AES_256"
+        ],
+        "IncomingDukptAttributes.DukptKeyVariant": [
+          "BIDIRECTIONAL",
+          "REQUEST",
+          "RESPONSE"
+        ],
+        "OutgoingDukptAttributes.DukptKeyDerivationType": [
+          "TDES_2KEY",
+          "TDES_3KEY",
+          "AES_128",
+          "AES_192",
+          "AES_256"
+        ],
+        "OutgoingDukptAttributes.DukptKeyVariant": [
+          "BIDIRECTIONAL",
+          "REQUEST",
+          "RESPONSE"
+        ]
+      },
+      "source_reference": {
+        "operation_page": 55,
+        "union_type": "TranslationIsoFormats"
+      }
+    },
+    {
+      "name": "VerifyAuthRequestCryptogram",
+      "endpoint": "POST /cryptogram/verify",
+      "purpose": "Verify ARQC and optionally generate ARPC using method 1 or method 2.",
+      "status": "documented",
+      "required_fields": [
+        "AuthRequestCryptogram",
+        "KeyIdentifier",
+        "MajorKeyDerivationMode",
+        "SessionKeyDerivationAttributes",
+        "TransactionData"
+      ],
+      "optional_fields": [
+        "AuthResponseAttributes"
+      ],
+      "use_cases": [
+        {
+          "id": "verify-arqc-only",
+          "status": "documented",
+          "variant_path": {
+            "AuthResponseAttributes": null
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationAttributes": [
+              "Amex",
+              "Emv2000",
+              "EmvCommon",
+              "Mastercard",
+              "Visa"
+            ]
+          }
+        },
+        {
+          "id": "verify-arqc-and-generate-arpc-method1",
+          "status": "documented",
+          "variant_path": {
+            "AuthResponseAttributes": "ArpcMethod1"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationAttributes": [
+              "Amex",
+              "Emv2000",
+              "EmvCommon",
+              "Mastercard",
+              "Visa"
+            ]
+          }
+        },
+        {
+          "id": "verify-arqc-and-generate-arpc-method2",
+          "status": "documented",
+          "variant_path": {
+            "AuthResponseAttributes": "ArpcMethod2"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationAttributes": [
+              "Amex",
+              "Emv2000",
+              "EmvCommon",
+              "Mastercard",
+              "Visa"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 63,
+        "union_types": [
+          "SessionKeyDerivation",
+          "CryptogramAuthResponse"
+        ]
+      }
+    },
+    {
+      "name": "VerifyCardValidationData",
+      "endpoint": "POST /cardvalidationdata/verify",
+      "purpose": "Verify CVV, CVV2, CSC, dCVV, or dCVC.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "PrimaryAccountNumber",
+        "ValidationData",
+        "VerificationAttributes"
+      ],
+      "use_cases": [
+        {
+          "id": "verify-amex-csc-v1",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "AmexCardSecurityCodeVersion1"
+          }
+        },
+        {
+          "id": "verify-amex-csc-v2",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "AmexCardSecurityCodeVersion2"
+          }
+        },
+        {
+          "id": "verify-cardholder-verification-value",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "CardHolderVerificationValue"
+          }
+        },
+        {
+          "id": "verify-cvv",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "CardVerificationValue1"
+          }
+        },
+        {
+          "id": "verify-cvv2",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "CardVerificationValue2"
+          }
+        },
+        {
+          "id": "verify-discover-dcvc",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DiscoverDynamicCardVerificationCode"
+          }
+        },
+        {
+          "id": "verify-dcvc",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DynamicCardVerificationCode"
+          }
+        },
+        {
+          "id": "verify-dcvv",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DynamicCardVerificationValue"
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 69,
+        "union_type": "CardVerificationAttributes"
+      }
+    },
+    {
+      "name": "VerifyMac",
+      "endpoint": "POST /mac/verify",
+      "purpose": "Verify MAC cryptograms for direct algorithm, DUKPT, or EMV MAC schemes.",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "Mac",
+        "MessageData",
+        "VerificationAttributes"
+      ],
+      "optional_fields": [
+        "MacLength"
+      ],
+      "use_cases": [
+        {
+          "id": "verify-mac-direct-algorithm",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "Algorithm"
+          },
+          "behavioral_dimensions": {
+            "Algorithm": [
+              "ISO9797_ALGORITHM1",
+              "ISO9797_ALGORITHM3",
+              "CMAC",
+              "HMAC",
+              "HMAC_SHA224",
+              "HMAC_SHA256",
+              "HMAC_SHA384",
+              "HMAC_SHA512",
+              "AS2805_4_1"
+            ]
+          }
+        },
+        {
+          "id": "verify-mac-dukpt-cmac",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DukptCmac"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "verify-mac-dukpt-iso9797-algorithm1",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DukptIso9797Algorithm1"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "verify-mac-dukpt-iso9797-algorithm3",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "DukptIso9797Algorithm3"
+          },
+          "behavioral_dimensions": {
+            "DukptKeyVariant": [
+              "BIDIRECTIONAL",
+              "REQUEST",
+              "RESPONSE"
+            ],
+            "DukptDerivationType": [
+              "TDES_2KEY",
+              "TDES_3KEY",
+              "AES_128",
+              "AES_192",
+              "AES_256"
+            ]
+          }
+        },
+        {
+          "id": "verify-mac-emv",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "EmvMac"
+          },
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationMode": [
+              "EMV_COMMON_SESSION_KEY",
+              "EMV2000",
+              "AMEX",
+              "MASTERCARD_SESSION_KEY",
+              "VISA"
+            ],
+            "SessionKeyDerivationValue": [
+              "ApplicationCryptogram",
+              "ApplicationTransactionCounter"
+            ]
+          }
+        }
+      ],
+      "source_reference": {
+        "operation_page": 74,
+        "union_type": "MacAttributes"
+      }
+    },
+    {
+      "name": "VerifyPinData",
+      "endpoint": "POST /pindata/verify",
+      "purpose": "Verify PIN-related data such as PIN and PIN offset using IBM3624 or Visa PIN verification flows.",
+      "status": "documented",
+      "required_fields": [
+        "EncryptedPinBlock",
+        "EncryptionKeyIdentifier",
+        "PinBlockFormat",
+        "VerificationAttributes",
+        "VerificationKeyIdentifier"
+      ],
+      "optional_fields": [
+        "DukptAttributes",
+        "EncryptionWrappedKey",
+        "PinDataLength",
+        "PrimaryAccountNumber"
+      ],
+      "use_cases": [
+        {
+          "id": "verify-pin-ibm3624",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "Ibm3624Pin"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat_valid_values_list": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ],
+            "PinBlockFormat_prose_supported_values": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_3"
+            ]
+          }
+        },
+        {
+          "id": "verify-pin-visa",
+          "status": "documented",
+          "variant_path": {
+            "VerificationAttributes": "VisaPin"
+          },
+          "behavioral_dimensions": {
+            "PinBlockFormat_valid_values_list": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_1",
+              "ISO_FORMAT_3",
+              "ISO_FORMAT_4"
+            ],
+            "PinBlockFormat_prose_supported_values": [
+              "ISO_FORMAT_0",
+              "ISO_FORMAT_3"
+            ]
+          }
+        }
+      ],
+      "embedded_dimensions": {
+        "DukptAttributes.DukptDerivationType": [
+          "TDES_2KEY",
+          "TDES_3KEY",
+          "AES_128",
+          "AES_192",
+          "AES_256"
+        ]
+      },
+      "source_reference": {
+        "operation_page": 79,
+        "union_type": "PinVerificationAttributes"
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "manifest_version": "0.4",
+  "name": "aws-payment-cryptography-mcp",
+  "display_name": "AWS Payment Cryptography",
+  "version": "0.1.0",
+  "description": "MCP server connecting Claude to AWS Payment Cryptography — key lifecycle, cryptographic operations, and HSM migration tools.",
+  "long_description": "Gives Claude direct access to the AWS Payment Cryptography (APC) control plane and data plane. Covers key hierarchy design, DUKPT, TR-31/TR-34, PIN block translation, MAC generation, CVV, and ARQC verification. PCI PIN v3.1 compliance enforcement runs before every API call — hard stops on prohibited algorithms, legacy construct warnings, key usage validation. Also includes HSM migration analysis tools for Thales payShield 10K and Futurex Excrypt Enterprise SSP v.2 codebases.",
+  "author": {
+    "name": "Jacob Marks",
+    "email": "jacob.marks@gmail.com",
+    "url": "https://github.com/J8k3/aws-payment-cryptography-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/J8k3/aws-payment-cryptography-mcp.git"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "src/apc_agent/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "apc-agent"],
+      "env": {
+        "AWS_REGION": "${user_config.aws_region}"
+      }
+    }
+  },
+  "user_config": {
+    "aws_region": {
+      "type": "string",
+      "title": "AWS Region",
+      "description": "AWS region where your APC resources live (e.g. us-east-1)",
+      "required": true,
+      "default": "us-east-1"
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "keywords": ["aws", "payment-cryptography", "hsm", "pci", "pin", "dukpt", "tr31", "thales", "futurex"],
+  "license": "MIT"
+}
