@@ -1,5 +1,6 @@
 """MCP tools for HSM legacy code analysis and APC migration (R8)."""
 
+import json
 import re
 
 from mcp.server.fastmcp import FastMCP
@@ -214,6 +215,126 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         return {
             "commands_detected": len(detected),
             "detected": detected,
+            "migration_notes": migration_notes,
+            "coverage_status": IMPLEMENTATION_STATUS,
+        }
+
+    # Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy)
+    _PROXY_HANDLERS: dict[str, set[str]] = {
+        "futurex_excrypt": {"TPIN"},
+        "thales_payshield": {"CA", "CC", "CI", "G0", "C2", "C4", "M6", "M8", "CW", "CY", "B2"},
+    }
+
+    @mcp.tool()
+    def hsm_analyze_discovery_log(log_content: str) -> dict:
+        """
+        Analyze the contents of a discovery.jsonl file produced by apc-hsm-proxy
+        running in discovery mode. Returns per-command APC mappings and handler
+        generation guidance for the proxy.
+
+        Each line in the log is a JSON object with fields:
+          vendor  — "futurex_excrypt" or "thales_payshield"
+          cmd     — HSM command code, e.g. "TPIN" or "CA"
+          params  — Futurex: map of parameter codes to values (sensitive = "[REDACTED]")
+          payload_len — Thales: observed payload length in bytes
+
+        Args:
+            log_content: Full text of the discovery.jsonl file (newline-delimited JSON).
+        """
+        mapped = []
+        unknown = []
+        parse_errors = []
+
+        for i, line in enumerate(log_content.strip().splitlines(), start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as e:
+                parse_errors.append({"line": i, "error": str(e), "content": line[:80]})
+                continue
+
+            cmd = record.get("cmd", "").upper()
+            vendor = record.get("vendor", "unknown")
+            params = record.get("params") or {}
+            payload_len = record.get("payload_len")
+
+            matches = lookup_command(cmd)
+            mapping = get_apc_mapping(cmd)
+            handler_exists = cmd in _PROXY_HANDLERS.get(vendor, set())
+
+            entry = {
+                "cmd": cmd,
+                "vendor": vendor,
+                "handler_exists": handler_exists,
+                "params_observed": sorted(params.keys()) if params else None,
+                "payload_len": payload_len,
+            }
+
+            if matches:
+                m = matches[0]
+                entry.update({
+                    "known": True,
+                    "name": m.name,
+                    "category": m.category,
+                    "apc_operation": mapping[0] if mapping else None,
+                    "apc_key_type": mapping[1] if mapping else None,
+                    "confidence": m.confidence,
+                    "notes": m.notes,
+                })
+                mapped.append(entry)
+            else:
+                entry["known"] = False
+                entry["message"] = (
+                    f"'{cmd}' is not in the command registry. "
+                    "Check the Futurex HSM Reference Manual or Thales payShield Host Reference Manual "
+                    "for parameter layout, then add it to hsm_analysis.py."
+                )
+                unknown.append(entry)
+
+        needs_handler = [c for c in mapped if not c["handler_exists"]]
+        has_handler = [c for c in mapped if c["handler_exists"]]
+
+        migration_notes = []
+        categories = {c.get("category") for c in mapped if c.get("category")}
+        if "KEY_MGMT" in categories:
+            migration_notes.append(LMK_MIGRATION_NOTE)
+        if any("DUKPT" in (c.get("name") or "") for c in mapped):
+            migration_notes.append(DUKPT_MIGRATION_NOTE)
+        if any("Fixed" in (c.get("name") or "") or "ZPK" in (c.get("name") or "") for c in mapped):
+            migration_notes.append(FIXED_KEY_MIGRATION_NOTE)
+
+        next_steps = []
+        if has_handler:
+            codes = ", ".join(c["cmd"] for c in has_handler)
+            next_steps.append(f"Handlers already implemented in the proxy: {codes}. No action needed.")
+        if needs_handler:
+            for c in needs_handler:
+                next_steps.append(
+                    f"{c['cmd']} ({c.get('name', 'unknown')}) → implement src/handlers/"
+                    f"{'futurex' if 'futurex' in c['vendor'] else 'thales'}/"
+                    f"{c['cmd'].lower()}.rs calling APC {c.get('apc_operation', 'unknown')} "
+                    f"with key type {c.get('apc_key_type', 'unknown')}."
+                )
+        if unknown:
+            codes = ", ".join(c["cmd"] for c in unknown)
+            next_steps.append(
+                f"Unknown commands (not in registry): {codes}. "
+                "Look up in vendor documentation and add to hsm_analysis.py before implementing handlers."
+            )
+
+        return {
+            "commands_observed": len(mapped) + len(unknown),
+            "mapped_to_apc": len(mapped),
+            "handlers_already_exist": len(has_handler),
+            "handlers_needed": len(needs_handler),
+            "unknown_commands": len(unknown),
+            "parse_errors": len(parse_errors),
+            "commands": mapped,
+            "unknown": unknown,
+            "errors": parse_errors,
+            "next_steps": next_steps,
             "migration_notes": migration_notes,
             "coverage_status": IMPLEMENTATION_STATUS,
         }

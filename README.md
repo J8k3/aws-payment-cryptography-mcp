@@ -42,9 +42,19 @@ Create, describe, list, delete, import, export, and alias keys. Import and expor
 
 Encrypt and decrypt card data (AES, TDES, FF1/FF3-1 FPE). Translate PIN blocks between encryption zones. Generate and verify PINs, CVV/CVV2/iCVV, CMAC and HMAC MACs, and EMV ARQC. The data plane tools map directly to the APC API — no abstraction layer between what the agent calls and what APC does.
 
-### HSM Code Analysis
+### HSM Code Analysis and Migration
 
 The agent can read existing payment source code, detect Futurex Excrypt and Thales payShield command patterns, and map them to the equivalent APC API call with the correct key type and parameter mapping. Current coverage: Futurex (authoritative), Thales (reference quality), Atalla (not yet available).
+
+It also integrates with [apc-hsm-proxy](https://github.com/J8k3/aws-payment-cryptography-hsm-proxy) for teams that can't or won't refactor their applications. The proxy runs in discovery mode between the application and a real HSM, producing a structured `discovery.jsonl` log of every unique command the application sends. Feed that log to `hsm_analyze_discovery_log` and the agent returns a per-command APC mapping, identifies which proxy handlers already exist, and generates `next_steps` for each handler that needs to be written — including the target file path and APC operation to call.
+
+| Tool | What it does |
+|------|-------------|
+| `hsm_analyze_code` | Detect HSM vendor patterns in source code and map to APC |
+| `hsm_analyze_discovery_log` | Analyze a `discovery.jsonl` from apc-hsm-proxy; generate handler build plan |
+| `hsm_lookup_command` | Look up a specific command code and return its APC mapping |
+| `hsm_list_commands` | List all known commands, filterable by vendor or category |
+| `hsm_migration_notes` | Return migration guidance for LMK, DUKPT, and fixed-key patterns |
 
 ---
 
