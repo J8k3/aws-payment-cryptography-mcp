@@ -43,7 +43,8 @@ def register_hsm_tools(mcp: FastMCP) -> None:
                 "command_code": command_code,
                 "message": (
                     f"Command '{command_code}' not found. "
-                    "Atalla commands are not yet in the registry. "
+                    "If this is an Atalla command, coverage is directory quality — "
+                    "payment-critical commands are registered but parameter detail is not available. "
                     f"Coverage status: {IMPLEMENTATION_STATUS}"
                 ),
             }

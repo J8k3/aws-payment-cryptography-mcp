@@ -6,7 +6,7 @@ There are three reasons to use this:
 
 1. **You're building a new acquirer or processor integration on APC** and want an AI co-pilot that understands the domain — key hierarchies, DUKPT, TR-31/TR-34, PIN formats, compliance constraints — without reading documentation for every API call.
 
-2. **You have existing code that runs against a Thales payShield or Futurex KMES** and want to understand what it's doing before migrating to APC.
+2. **You have existing code that runs against a Thales payShield 10K or Futurex Excrypt Enterprise SSP v.2** and want to understand what it's doing before migrating to APC.
 
 3. **You're using [apc-hsm-proxy](https://github.com/J8k3/aws-payment-cryptography-hsm-proxy) to move an application to APC without refactoring it**, and need to build handlers for the specific commands your application sends.
 
@@ -75,7 +75,7 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 ## Workflow 2 — Migrating existing HSM code
 
-**Who it's for:** Developers migrating an application that currently sends commands to a Thales payShield or Futurex KMES, who need to understand what the code is doing before writing the APC replacement.
+**Who it's for:** Developers migrating an application that currently sends commands to a Thales payShield 10K or Futurex Excrypt Enterprise SSP v.2, who need to understand what the code is doing before writing the APC replacement.
 
 **What you do:** Show Claude the existing source code. It identifies every HSM operation in use, maps each one to the equivalent APC call with the correct key type, and flags anything with no direct equivalent or that requires architectural changes.
 
@@ -89,7 +89,7 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 **LMK key migration:** Keys stored as LMK-encrypted blobs in your application or database can't be imported into APC directly. They must be exported from the source HSM in TR-31 or TR-34 format first. Claude will surface this when it sees LMK references and walk through the import process using `get_parameters_for_import` and `import_key`.
 
-**Coverage:** Futurex Excrypt and Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales International (reference quality — EFTlab knowledge base), Atalla (not yet available).
+**Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K (reference quality — EFTlab knowledge base), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
 
 ---
 
