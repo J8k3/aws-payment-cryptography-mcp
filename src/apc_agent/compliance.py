@@ -266,7 +266,7 @@ PIN_FORMAT_TRANSLATION_MATRIX = {
     ("IsoFormat1", "IsoFormat3"): True,
     ("IsoFormat1", "IsoFormat4"): True,
     ("IsoFormat1", "IsoFormat1"): False,
-    ("IsoFormat1", "IsoFormat2"): True,   # IC card only
+    ("IsoFormat1", "IsoFormat2"): False,  # Format 2 is offline IC card only; not supported by APC TranslatePinData
     ("IsoFormat3", "IsoFormat0"): True,
     ("IsoFormat3", "IsoFormat3"): True,
     ("IsoFormat3", "IsoFormat4"): True,

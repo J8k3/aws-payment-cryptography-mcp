@@ -97,8 +97,8 @@ TR-34
   Preferred over raw RSA wrap (which has no payload signing or attribute binding).
 
 DUKPT (Derived Unique Key Per Transaction)
-  TDES DUKPT: X9.24-1:2009, IPEK-based, 10-byte KSN (24-bit Key Set ID + 19-bit terminal ID + 21-bit counter)
-  AES DUKPT: X9.24-3-2017, IK-based, 12-byte KSN (32-bit BDK ID + 32-bit derivation ID + 32-bit counter)
+  TDES DUKPT: X9.24-1:2009, IPEK-based, 10-byte KSN (59-bit key identifier + 21-bit encryption counter)
+  AES DUKPT: X9.24-3-2017, IK-based, 12-byte KSN (64-bit Initial Key ID + 32-bit transaction counter)
   New deployments must use AES DUKPT. TDES DUKPT is supported for migration paths only.
 
 ISO PIN Block Formats (ISO 9564-1)
@@ -108,9 +108,10 @@ ISO PIN Block Formats (ISO 9564-1)
   Format 3: Random padding variant. Discouraged for new work.
   Format 4: AES-based, includes PAN in encryption. REQUIRED for AES keys. Recommended for all new deployments.
 
-Legal PIN format translations (PCI PIN Req 3-3):
+Legal PIN format translations (PCI PIN Req 3-3) supported by APC TranslatePinData:
   0 → 0, 3, 4 ✓   |   1 → 0, 3, 4 ✓   |   3 → 0, 3, 4 ✓   |   4 → 0, 3, 4 ✓
-  0 → 1, 2 ✗      |   1 → 1 ✗ (no return) |   Format 2 = IC card only
+  0 → 1, 2 ✗      |   1 → 1, 2 ✗       |   3 → 1, 2 ✗       |   4 → 1, 2 ✗
+  Format 2 is offline IC card only and not supported by APC TranslatePinData.
   PAN must not change during any translation.
 
 ARQC / ARPC (EMV)

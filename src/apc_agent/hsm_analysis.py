@@ -5,12 +5,13 @@ Sources and confidence levels:
   Futurex Excrypt API:       AUTHORITATIVE — Futurex General Payment HSM Integration Guide (2024)
                              All Futurex commands are 4-character text codes (TPIN, ECHO, EMVA, etc.)
                              wrapped in bracket-delimited frames: [AOCCCC;field;...;]
-  Futurex International API: AUTHORITATIVE — same source (Thales payShield-compatible command codes)
+  Thales/Futurex             MIXED: Core PIN/MAC/CVV commands (CA, CC, CI, CW, CY, G0, M6, M8, C2, C4,
+  International shared:      KQ, GW) from Futurex Integration Guide — AUTHORITATIVE. Key management
+                             and PIN verify commands (DA, DC, EA, EC, A0, A6, A8, IA, BU, M0, M2)
+                             from EFTlab knowledge base — REFERENCE QUALITY (confidence="medium").
   Thales payShield Legacy:   AUTHORITATIVE — payShield 10K Legacy Host Commands (Thales payShield 10K Legacy Host Commands, 2019)
                              Official Thales documentation covering ~80 commands in 10 functional groups.
                              License PS10-LIC-LEGACY required on device.
-  Thales payShield Core:     REFERENCE QUALITY — EFTlab knowledge base (commands CA, CC, DA, DC,
-                             EA, EC, A0, A6, A8, M0, M2, KQ not in the legacy manual)
   Atalla (NCR):              DIRECTORY QUALITY — EFTlab command list (function names only, no wire detail)
                              Uses numeric command codes (31, 32, 33, 5D, 5E, 304, etc.).
                              Some of these codes were adopted by the Futurex Standard API for
@@ -252,7 +253,7 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "DUKPT MAC generation and verification.", "generate_mac", "TR31_B0_BASE_DERIVATION_KEY"),
     HsmCommand("Thales/Futurex", "International", "C2",
                "Generate MAC (AS2805)", "MAC",
-               "Australian payment network (Interac-style) MAC generation.",
+               "AS2805 MAC generation (Australian payment network standard).",
                "generate_mac", "TR31_M0_ISO_16609_MAC_KEY"),
     HsmCommand("Thales/Futurex", "International", "C4",
                "Verify MAC (AS2805)", "MAC",

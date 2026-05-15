@@ -71,7 +71,7 @@ class TestGetApcMapping:
 
     def test_confidence_field_is_valid_value(self):
         for match in get_apc_mapping("TPIN")["matches"]:
-            assert match["confidence"] in ("high", "medium")
+            assert match["confidence"] in ("high", "medium", "directory")
 
 
 class TestListCommandsByCategory:

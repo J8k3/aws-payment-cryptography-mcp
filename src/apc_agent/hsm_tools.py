@@ -177,29 +177,11 @@ def register_hsm_tools(mcp: FastMCP) -> None:
                         "confidence": first.confidence if first else None,
                     })
 
-        # Generic socket pattern sweep for anything missed
-        for pattern in HSM_SOCKET_PATTERNS:
-            for m in re.finditer(pattern, source_code, re.IGNORECASE):
-                code = m.group(1).upper()
-                key = f"generic:{code}"
-                if key in seen:
-                    continue
-                seen.add(key)
-                matches = lookup_command(code)
-                if matches:
-                    first = matches[0]
-                    detected.append({
-                        "detected_api": "unknown",
-                        "command_code": code,
-                        "match_context": m.group(0)[:80],
-                        "known": True,
-                        "name": first.name,
-                        "category": first.category,
-                        "apc_operation": first.apc_operation,
-                        "apc_key_type": first.apc_key_type,
-                        "notes": first.notes,
-                        "confidence": first.confidence,
-                    })
+        # Generic socket pattern sweep — detect HSM connection context without command extraction
+        hsm_context_found = any(
+            re.search(pattern, source_code, re.IGNORECASE)
+            for pattern in HSM_SOCKET_PATTERNS
+        )
 
         migration_notes = []
         categories_found = {d["category"] for d in detected if d.get("category")}
@@ -212,6 +194,7 @@ def register_hsm_tools(mcp: FastMCP) -> None:
 
         return {
             "commands_detected": len(detected),
+            "hsm_connection_patterns_found": hsm_context_found,
             "detected": detected,
             "migration_notes": migration_notes,
         }
