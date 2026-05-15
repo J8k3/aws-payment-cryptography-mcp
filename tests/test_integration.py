@@ -12,7 +12,7 @@ Prerequisites:
     AWS credentials in the default profile, APC endpoint in us-east-1.
 
 Run:
-    AWS_REGION=us-east-1 pytest tests/test_integration.py -v -s
+    INTEGRATION_TESTS=true AWS_REGION=us-east-1 pytest tests/test_integration.py -v -s
 """
 
 import base64
@@ -21,6 +21,8 @@ import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
 from apc_agent.server import mcp
+
+pytestmark = pytest.mark.integration
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 PAN = "4111111111111111"
@@ -50,6 +52,12 @@ async def _delete_key(arn: str) -> None:
         await _tool("delete_key", key_identifier=arn, delete_key_in_days=3)
     except Exception as exc:
         print(f"\n  WARNING: could not schedule deletion for {arn}: {exc}")
+
+
+@pytest.fixture(autouse=True)
+def require_real_aws():
+    if os.environ.get("INTEGRATION_TESTS") != "true":
+        pytest.skip("Set INTEGRATION_TESTS=true to run against real AWS")
 
 
 # ── Key Lifecycle ─────────────────────────────────────────────────────────────

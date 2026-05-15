@@ -27,3 +27,6 @@ dependencies = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "integration: requires real AWS credentials — set INTEGRATION_TESTS=true to run",
+]
