@@ -19,4 +19,8 @@ jobs:
       - name: Install dependencies
         run: pip install pytest pytest-asyncio "moto[payment-cryptography]" -e .
       - name: Run tests
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
         run: pytest -v
