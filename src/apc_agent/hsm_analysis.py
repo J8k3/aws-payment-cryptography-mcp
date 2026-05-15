@@ -3,14 +3,19 @@ HSM vendor command pattern recognition for code analysis and refactoring (R8).
 
 Sources and confidence levels:
   Futurex Excrypt API:       AUTHORITATIVE — Futurex General Payment HSM Integration Guide (2024)
-  Futurex Standard API:      AUTHORITATIVE — same source
-  Futurex International API: AUTHORITATIVE — same source (note: Thales-compatible command codes)
+                             All Futurex commands are 4-character text codes (TPIN, ECHO, EMVA, etc.)
+                             wrapped in bracket-delimited frames: [AOCCCC;field;...;]
+  Futurex International API: AUTHORITATIVE — same source (Thales payShield-compatible command codes)
   Thales payShield Legacy:   AUTHORITATIVE — payShield 10K Legacy Host Commands (PUGD0538-002, 2019)
                              Official Thales documentation covering ~80 commands in 10 functional groups.
                              License PS10-LIC-LEGACY required on device.
   Thales payShield Core:     REFERENCE QUALITY — EFTlab knowledge base (commands CA, CC, DA, DC,
                              EA, EC, A0, A6, A8, M0, M2, KQ not in the legacy manual)
-  Atalla:                    NOT YET AVAILABLE — do not implement pattern matching
+  Atalla (NCR):              DIRECTORY QUALITY — EFTlab command list (function names only, no wire detail)
+                             Uses numeric command codes (31, 32, 33, 5D, 5E, 304, etc.).
+                             Some of these codes were adopted by the Futurex Standard API for
+                             Atalla backward-compatibility, but are not seen in Excrypt deployments.
+                             Proxy support: not implemented — wire format undocumented.
 
 Wire format (Thales payShield 10K):
   TCP socket (clear or TLS); 2-byte big-endian length prefix; m-byte message header (set at
@@ -143,51 +148,6 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "and one-pass with AES. Core remote key loading command.",
                "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
                "Maps to APC get_parameters_for_import + import_key TR-34 flow."),
-]
-
-# ── Futurex Standard API ──────────────────────────────────────────────────────
-# Numeric command codes. No delimiters — fields at fixed offsets.
-
-FUTUREX_STANDARD_COMMANDS: list[HsmCommand] = [
-    HsmCommand("Futurex", "Standard", "31", "Translate PIN Block", "PIN",
-               "Standard PIN block translation.", "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
-    HsmCommand("Futurex", "Standard", "32", "Verify PIN", "PIN",
-               "PIN verification. Multiple modes: ANSI, Diebold, IBM3624, Visa, and DUKPT variants.",
-               "verify_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY"),
-    HsmCommand("Futurex", "Standard", "33", "Extended PIN Translation", "PIN",
-               "Extended PIN translation.", "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
-    HsmCommand("Futurex", "Standard", "335", "Translate PIN Block (variant)", "PIN",
-               "PIN block translation variant.", "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
-    HsmCommand("Futurex", "Standard", "346", "DUKPT PIN Translate", "PIN",
-               "DUKPT-specific PIN translation.", "translate_pin_data", "TR31_B0_BASE_DERIVATION_KEY"),
-    HsmCommand("Futurex", "Standard", "350", "EMV ARQC Validation", "ARQC",
-               "Validates an EMV ARQC.", "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS"),
-    HsmCommand("Futurex", "Standard", "56", "Generate MAC (≤512 bytes)", "MAC",
-               "MAC generation for messages up to 512 bytes.", "generate_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "57", "Generate MAC (>512 bytes)", "MAC",
-               "MAC generation for messages over 512 bytes.", "generate_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "5A", "Verify MAC (≤512 bytes)", "MAC",
-               "MAC verification for messages up to 512 bytes.", "verify_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "5B", "Verify MAC (>512 bytes)", "MAC",
-               "MAC verification for messages over 512 bytes.", "verify_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "5C", "Verify and Generate MAC (DUKPT)", "MAC",
-               "DUKPT MAC verify and generate.", "verify_mac", "TR31_B0_BASE_DERIVATION_KEY"),
-    HsmCommand("Futurex", "Standard", "304", "Verify CMAC using TDES", "MAC",
-               "CMAC verification.", "verify_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "305", "Generate CMAC using TDES", "MAC",
-               "CMAC generation.", "generate_mac", "TR31_M6_ISO_9797_5_CMAC_KEY"),
-    HsmCommand("Futurex", "Standard", "348", "Verify MAC (DUKPT BDK+KSN)", "MAC",
-               "Verifies MAC derived from DUKPT BDK and KSN.", "verify_mac", "TR31_B0_BASE_DERIVATION_KEY"),
-    HsmCommand("Futurex", "Standard", "386", "Generate MAC (DUKPT BDK+KSN)", "MAC",
-               "Generates MAC derived from DUKPT BDK and KSN.", "generate_mac", "TR31_B0_BASE_DERIVATION_KEY"),
-    HsmCommand("Futurex", "Standard", "5D", "Generate Card Verification Value (CVV)", "CVV",
-               "CVV generation.", "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY"),
-    HsmCommand("Futurex", "Standard", "5E", "Verify Card Verification Value (CVV)", "CVV",
-               "CVV verification.", "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY"),
-    HsmCommand("Futurex", "Standard", "388", "3DES DUKPT Encrypt/Decrypt Data", "P2PE",
-               "DUKPT data encryption/decryption (3DES).", "encrypt_data", "TR31_B0_BASE_DERIVATION_KEY"),
-    HsmCommand("Futurex", "Standard", "52", "Data Translate", "P2PE",
-               "Translates data between keys.", "re_encrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY"),
 ]
 
 # ── Futurex/Thales International Commands ────────────────────────────────────
@@ -891,7 +851,6 @@ ATALLA_COMMANDS: list[HsmCommand] = [
 
 ALL_COMMANDS: list[HsmCommand] = (
     FUTUREX_EXCRYPT_COMMANDS
-    + FUTUREX_STANDARD_COMMANDS
     + INTERNATIONAL_COMMANDS
     + THALES_LEGACY_COMMANDS
     + ATALLA_COMMANDS
@@ -911,14 +870,17 @@ FUTUREX_EXCRYPT_PATTERNS = [
     r'send\s*\(\s*["\[](TPIN|XPIN|EMVA|GMAC|VMAC|TPDD|VPIN|DCDK|ECDK)',
 ]
 
-# Standard API: numeric codes sent over socket
-FUTUREX_STANDARD_PATTERNS = [
+# Numeric codes: Atalla Standard API and Futurex Standard (Atalla-compatible).
+# Production Futurex deployments use Excrypt 4-char text codes — numeric codes
+# are most likely Atalla. Kept for completeness so Atalla codebases are recognized.
+NUMERIC_HSM_PATTERNS = [
     r'["\'](31|32|33|346|350|56|57|5A|5B|5C|304|305|5D|5E|388)["\']',
 ]
 
-# International / Thales: 2-char codes, fixed-length fields
-# Covers both Thales/Futurex shared codes (CA, CC, MA, etc.) and Thales Legacy-only codes
-INTERNATIONAL_PATTERNS = [
+# International / Thales: 2-char codes, fixed-length fields.
+# Covers Thales/Futurex International shared codes (CA, CC, MA, etc.) AND
+# Thales payShield Legacy-only codes (HC, HA, BI, GG, ME, MQ, etc.).
+INTERNATIONAL_AND_THALES_PATTERNS = [
     r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M6|M7|M8|M9|MA|MC|ME|MK|MM|MO|MQ|MS|MU|MW|A0|A6|A8|IA|BU|KQ|GW)',
     r'["\'](HC|HD|HA|HB|HE|HF|HG|HH|BI|BJ|AS|AT|FG|FH|GG|GH|GY|GZ)',  # Thales Legacy key gen
     r'["\'](AA|AB|AE|AF|AG|AH|AC|AD|AU|AV|AW|AX|FA|FB|FC|FD|FE|FF|GC|GD|GE|GF|GY|GZ|KC|KD|KA|KB)',  # Thales Legacy translate
@@ -1036,14 +998,3 @@ def list_commands_by_vendor(vendor: str) -> list[dict]:
     ]
 
 
-IMPLEMENTATION_STATUS = (
-    "Futurex Excrypt/Standard/International: AUTHORITATIVE — Futurex General Payment HSM Integration Guide (2024). "
-    "Thales payShield 10K Legacy Commands: AUTHORITATIVE — payShield 10K Legacy Host Commands "
-    "(PUGD0538-002, 2019). Covers 35 acquirer-relevant commands from the Legacy Key Management, "
-    "Legacy Message Encryption, Legacy DUKPT, and Legacy Message Integrity sections. "
-    "SEED, VisaCash, CEPS, and printer commands omitted as out-of-scope for acquirer/processor. "
-    "Thales payShield 10K Core Commands (CA, CC, DA, DC, EA, EC, A0, A6, A8, M0, M2, KQ): "
-    "REFERENCE QUALITY — EFTlab knowledge base (not in the Legacy manual). "
-    "Atalla (HPE/Micro Focus/NCR): DIRECTORY QUALITY — EFTlab command list (function names only, "
-    "no parameter detail or wire protocol). Proxy support not implemented for Atalla."
-)

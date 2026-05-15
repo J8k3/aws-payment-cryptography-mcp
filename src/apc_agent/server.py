@@ -34,6 +34,21 @@ _KB_PATH = Path(__file__).parent.parent.parent / "payment-knowledge-base.md"
 def payment_knowledge_base() -> str:
     return _KB_PATH.read_text(encoding="utf-8")
 
+_APC_USE_CASE_PATH = Path(__file__).parent.parent.parent / "aws-payment-cryptography-data-plane-use-cases.json"
+
+@mcp.resource(
+    "payment://apc-use-cases",
+    name="AWS Payment Cryptography supported use cases",
+    description=(
+        "Supportability analysis of AWS Payment Cryptography data plane operations, "
+        "derived from public API documentation. Authoritative source for which key "
+        "algorithms, union branches, and enum values are valid for each operation."
+    ),
+    mime_type="application/json",
+)
+def apc_use_cases() -> str:
+    return _APC_USE_CASE_PATH.read_text(encoding="utf-8")
+
 
 def main() -> None:
     mcp.run(transport="stdio")

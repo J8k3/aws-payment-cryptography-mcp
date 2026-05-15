@@ -8,10 +8,9 @@ from mcp.server.fastmcp import FastMCP
 from .hsm_analysis import (
     ALL_COMMANDS,
     FUTUREX_EXCRYPT_PATTERNS,
-    FUTUREX_STANDARD_PATTERNS,
+    NUMERIC_HSM_PATTERNS,
     HSM_SOCKET_PATTERNS,
-    IMPLEMENTATION_STATUS,
-    INTERNATIONAL_PATTERNS,
+    INTERNATIONAL_AND_THALES_PATTERNS,
     LMK_MIGRATION_NOTE,
     DUKPT_MIGRATION_NOTE,
     FIXED_KEY_MIGRATION_NOTE,
@@ -43,9 +42,9 @@ def register_hsm_tools(mcp: FastMCP) -> None:
                 "command_code": command_code,
                 "message": (
                     f"Command '{command_code}' not found. "
-                    "If this is an Atalla command, coverage is directory quality — "
-                    "payment-critical commands are registered but parameter detail is not available. "
-                    f"Coverage status: {IMPLEMENTATION_STATUS}"
+                    "Coverage: Futurex Excrypt (authoritative), Thales payShield Legacy/International "
+                    "(authoritative/reference quality), Atalla (directory quality — function names only). "
+                    "Numeric codes may be Atalla; check the Atalla NCR Payments documentation."
                 ),
             }
         return {
@@ -118,7 +117,6 @@ def register_hsm_tools(mcp: FastMCP) -> None:
 
         return {
             "count": len(cmds),
-            "coverage_status": IMPLEMENTATION_STATUS,
             "commands": [
                 {
                     "vendor": c.vendor,
@@ -150,8 +148,8 @@ def register_hsm_tools(mcp: FastMCP) -> None:
 
         pattern_sets = [
             ("Futurex_Excrypt", FUTUREX_EXCRYPT_PATTERNS),
-            ("Futurex_Standard", FUTUREX_STANDARD_PATTERNS),
-            ("International_Thales", INTERNATIONAL_PATTERNS),
+            ("Numeric_Atalla_or_Futurex_Standard", NUMERIC_HSM_PATTERNS),
+            ("International_and_Thales_Legacy", INTERNATIONAL_AND_THALES_PATTERNS),
         ]
 
         for api_name, patterns in pattern_sets:
@@ -216,12 +214,11 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             "commands_detected": len(detected),
             "detected": detected,
             "migration_notes": migration_notes,
-            "coverage_status": IMPLEMENTATION_STATUS,
         }
 
     # Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy)
     _PROXY_HANDLERS: dict[str, set[str]] = {
-        "futurex_excrypt": {"TPIN"},
+        "futurex_excrypt": {"ECHO", "TPIN"},
         "thales_payshield": {"CA", "CC", "CI", "G0", "C2", "C4", "M6", "M8", "CW", "CY", "B2"},
     }
 
@@ -335,7 +332,6 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             "errors": parse_errors,
             "next_steps": next_steps,
             "migration_notes": migration_notes,
-            "coverage_status": IMPLEMENTATION_STATUS,
         }
 
     @mcp.tool()
