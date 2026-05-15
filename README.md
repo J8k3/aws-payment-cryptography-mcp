@@ -128,14 +128,19 @@ pytest
 
 ```
 src/apc_agent/
-├── server.py          — FastMCP entry point; registers all tool groups
+├── server.py          — FastMCP entry point; registers all tool groups and the KB resource
 ├── control_plane.py   — Key lifecycle tools (payment-cryptography client)
 ├── data_plane.py      — Cryptographic operation tools (payment-cryptography-data client)
 ├── hsm_tools.py       — HSM analysis and discovery log MCP tools
 ├── hsm_analysis.py    — HSM command registry and regex patterns
 ├── system_prompt.py   — Domain knowledge injected as MCP instructions
 └── compliance.py      — PCI guard-rail logic: hard stops, warnings, key usage registry
+
+payment-knowledge-base.md                    — MCP resource: payment://knowledge-base
+aws-payment-cryptography-data-plane-use-cases.json  — APC data plane capability catalog (source of truth for tool implementation)
 ```
+
+The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. It covers card data, PIN blocks, card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, and constraint rules. The agent can read it on demand; it is not injected into the system prompt. Add new entries to `payment-knowledge-base.md` and update the Sources table at the bottom — no server restart required.
 
 ---
 
