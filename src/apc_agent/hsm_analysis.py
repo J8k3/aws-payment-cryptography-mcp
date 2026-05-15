@@ -5,9 +5,20 @@ Sources and confidence levels:
   Futurex Excrypt API:       AUTHORITATIVE — Futurex General Payment HSM Integration Guide (2024)
   Futurex Standard API:      AUTHORITATIVE — same source
   Futurex International API: AUTHORITATIVE — same source (note: Thales-compatible command codes)
-  Thales payShield:          REFERENCE QUALITY — EFTlab knowledge base (professionally validated,
-                             not official Thales documentation)
+  Thales payShield Legacy:   AUTHORITATIVE — payShield 10K Legacy Host Commands (PUGD0538-002, 2019)
+                             Official Thales documentation covering ~80 commands in 10 functional groups.
+                             License PS10-LIC-LEGACY required on device.
+  Thales payShield Core:     REFERENCE QUALITY — EFTlab knowledge base (commands CA, CC, DA, DC,
+                             EA, EC, A0, A6, A8, M0, M2, KQ not in the legacy manual)
   Atalla:                    NOT YET AVAILABLE — do not implement pattern matching
+
+Wire format (Thales payShield 10K):
+  TCP socket (clear or TLS); 2-byte big-endian length prefix; m-byte message header (set at
+  installation); 2-char command code; variable-length fields. Response: m-byte header; 2-char
+  response code; 2-char error code ('00' = success, '68' = command disabled); fields.
+  Key size encoding: 16H = single-DES/TDES; 'U' + 32H = double-length TDES key block;
+  'T' + 48H = triple-length; 'S' + n A = TR-31 key block. STX/ETX control characters
+  bracket the message when using asynchronous comms (not shown in field tables).
 
 Key insight: Futurex's International command set uses the same command codes as Thales payShield
 (CA, CC, CI, CW, CY, M6, M8, MA, etc.). Code that appears to target "Thales International" commands
@@ -343,6 +354,273 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                confidence="medium"),
 ]
 
+# ── Thales payShield 10K Legacy Commands ─────────────────────────────────────
+# Source: payShield 10K Legacy Host Commands (PUGD0538-002, 2019) — AUTHORITATIVE
+# These are Thales-specific commands NOT shared with Futurex International mode.
+# Commands shared with Futurex (CI, CK, CM, CW, CY, MA, MC, M6, M8, KQ, IA) remain
+# in INTERNATIONAL_COMMANDS above. This list covers commands unique to the payShield
+# Legacy command set that are relevant to acquirer/processor migration.
+# Out-of-scope sections skipped: SEED (Korean algorithm), VisaCash, CEPS (issuer/purse),
+# printer commands (OE, OC, TA), and LMK-rekey-only commands (AY).
+
+THALES_LEGACY_COMMANDS: list[HsmCommand] = [
+    # ── Key Generation ────────────────────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "HC",
+               "Generate a TMK, TPK or PVK", "KEY_MGMT",
+               "Generates a random terminal key (TMK, TPK, or PVK), returns it encrypted "
+               "under the current TMK/TPK/PVK (16H or U+32H or T+48H) and under LMK pair 14-15. "
+               "Response code: HD. Disabled by 'Enforce key type 002 separation' HSM setting.",
+               "create_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: create_key with TR31_P0_PIN_ENCRYPTION_KEY. No LMK concept — "
+               "key returned as APC ARN. TMK hierarchy replaced by TR-34/TR-31 remote key loading."),
+    HsmCommand("Thales", "Legacy", "HA",
+               "Generate a TAK", "KEY_MGMT",
+               "Generates a random Terminal Authentication Key (TAK) encrypted under a TMK "
+               "and under LMK pair 16-17. Response code: HB. Takes TMK (LMK pair 14-15) as input.",
+               "create_key", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "TAK used for CBC-MAC between host and terminal. "
+               "In APC: create_key with TR31_M3_ISO_9797_3_MAC_KEY or M6 (CMAC preferred). "
+               "No TMK→TAK wrapping concept — APC is the key custody boundary."),
+    HsmCommand("Thales", "Legacy", "BI",
+               "Generate a BDK", "KEY_MGMT",
+               "Generates a Base Derivation Key for DUKPT, returned under LMK pair 28-29 "
+               "and optionally under a ZMK. Response code: BJ.",
+               "create_key", "TR31_B0_BASE_DERIVATION_KEY",
+               "In APC: create_key with TR31_B0_BASE_DERIVATION_KEY. "
+               "AES_128 strongly preferred — TDES BDK prohibited for new deployments since Jan 2023."),
+    HsmCommand("Thales", "Legacy", "AS",
+               "Generate a CVK Pair", "KEY_MGMT",
+               "Generates a Visa CVK pair under LMK pair 14-15 variant 4. Response code: AT. "
+               "Returns CVK A (16H) + CVK B (16H), or unified CVK A/B (U+32H) with KCV. "
+               "Superseded by A0.",
+               "create_key", "TR31_C0_CARD_VERIFICATION_KEY",
+               "In APC: create_key with TR31_C0_CARD_VERIFICATION_KEY. "
+               "APC stores as a single key object; CVK A/B pair maps to one APC CVK."),
+    HsmCommand("Thales", "Legacy", "FG",
+               "Generate a Pair of PVKs", "KEY_MGMT",
+               "Generates a pair of PIN Verification Keys under LMK pair 14-15. Response code: FH. "
+               "Returns PVK A and PVK B separately, each with KCV.",
+               "create_key", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+               "In APC: create_key with TR31_V2_VISA_PIN_VERIFICATION_KEY (Visa PVV) "
+               "or TR31_V1_IBM3624_PIN_VERIFICATION_KEY (IBM offset method)."),
+    HsmCommand("Thales", "Legacy", "GG",
+               "Form a ZMK from Three ZMK Components", "KEY_MGMT",
+               "XORs three clear ZMK components (each entered by a separate custodian) "
+               "to form a Zone Master Key under LMK. Response code: GH. "
+               "Core dual/triple-control key ceremony command.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "In APC: ZMK ceremony is out-of-band; resulting KEK imported via import_key "
+               "using TR-34 (recommended) or TR-31. APC has no component-XOR ceremony command."),
+    HsmCommand("Thales", "Legacy", "GY",
+               "Form a ZMK from 2 to 9 ZMK Components", "KEY_MGMT",
+               "XORs 2 to 9 ZMK components to form a ZMK. Response code: GZ. "
+               "Flexible N-of-N variant of GG.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Same APC migration path as GG — TR-34/TR-31 import after out-of-band ceremony."),
+    # ── Key Translation / Export ───────────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "AA",
+               "Translate a TMK, TPK or PVK", "KEY_MGMT",
+               "Re-encrypts a TMK/TPK/PVK from encryption under one terminal key to another. "
+               "Response code: AB. Used to update a terminal key under a replacement TMK.",
+               "export_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: export_key with TR-31 wrapping. TMK hierarchy replaced by "
+               "TR-34 remote key loading; no equivalent of this TMK-based re-wrap flow."),
+    HsmCommand("Thales", "Legacy", "AE",
+               "Translate a TMK, TPK or PVK from LMK to Another TMK, TPK or PVK", "KEY_MGMT",
+               "Translates a stored key from LMK encryption to encryption under another terminal key. "
+               "Response code: AF. Replaces a terminal key from the HSM database. "
+               "Disabled by 'Enforce key type 002 separation' HSM setting.",
+               "export_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: export_key. No LMK database concept — keys are APC ARNs."),
+    HsmCommand("Thales", "Legacy", "AG",
+               "Translate a TAK from LMK to TMK Encryption", "KEY_MGMT",
+               "Translates a TAK from LMK to TMK encryption for delivery to a terminal. "
+               "Response code: AH. Superseded by A8 (Export Key).",
+               "export_key", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "In APC: export_key wrapping the MAC key under a KEK."),
+    HsmCommand("Thales", "Legacy", "AU",
+               "Translate a CVK Pair from LMK to ZMK Encryption", "KEY_MGMT",
+               "Exports a CVK pair from LMK to ZMK encryption for delivery to a network partner. "
+               "Response code: AV.",
+               "export_key", "TR31_C0_CARD_VERIFICATION_KEY",
+               "In APC: export_key with TR-31 block under ZMK/KEK."),
+    HsmCommand("Thales", "Legacy", "AW",
+               "Translate a CVK Pair from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a CVK pair from ZMK encryption into LMK. Response code: AX. "
+               "Used to receive CVK from a network partner.",
+               "import_key", "TR31_C0_CARD_VERIFICATION_KEY",
+               "In APC: import_key with TR-31 block under ZMK/KEK."),
+    HsmCommand("Thales", "Legacy", "FE",
+               "Translate a TMK, TPK or PVK from LMK to ZMK Encryption", "KEY_MGMT",
+               "Exports a terminal key from LMK protection to ZMK encryption. Response code: FF. "
+               "Used to distribute a terminal key to a network partner.",
+               "export_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: export_key with TR-31 block under ZMK/KEK."),
+    HsmCommand("Thales", "Legacy", "FC",
+               "Translate a TMK, TPK or PVK from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a terminal key from ZMK encryption into LMK. Response code: FD.",
+               "import_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: import_key with TR-31 block."),
+    HsmCommand("Thales", "Legacy", "AC",
+               "Translate a TAK", "KEY_MGMT",
+               "Re-encrypts a TAK between TMK encryptions. Response code: AD. "
+               "Used when rotating the TMK that protects a TAK.",
+               "export_key", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "In APC: export_key / import_key for key rotation. No TMK wrapping hierarchy."),
+    HsmCommand("Thales", "Legacy", "MG",
+               "Translate a TAK from LMK to ZMK Encryption", "KEY_MGMT",
+               "Exports a TAK from LMK protection to ZMK encryption. Response code: MH.",
+               "export_key", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "In APC: export_key with TR-31 block."),
+    HsmCommand("Thales", "Legacy", "MI",
+               "Translate a TAK from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a TAK from ZMK encryption into LMK. Response code: MJ.",
+               "import_key", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "In APC: import_key with TR-31 block."),
+    HsmCommand("Thales", "Legacy", "KC",
+               "Translate a ZPK", "KEY_MGMT",
+               "Re-encrypts a ZPK from one ZMK to another ZMK. Response code: KD. "
+               "Used for inter-network PIN key exchange when a ZPK crosses a zone boundary.",
+               "export_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: export_key under outbound ZMK/KEK. "
+               "TR-31 key block carries usage code P0 to enforce PIN-only use."),
+    HsmCommand("Thales", "Legacy", "GC",
+               "Translate a ZPK from LMK to ZMK Encryption", "KEY_MGMT",
+               "Exports a ZPK from LMK protection to ZMK encryption. Response code: GD.",
+               "export_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: export_key with TR-31 block under ZMK/KEK."),
+    HsmCommand("Thales", "Legacy", "FA",
+               "Translate a ZPK from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a ZPK from ZMK encryption into LMK. Response code: FB. "
+               "Used to receive a ZPK from a network partner.",
+               "import_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: import_key with TR-31 block. APC key ARN replaces LMK storage."),
+    HsmCommand("Thales", "Legacy", "GE",
+               "Translate a ZMK", "KEY_MGMT",
+               "Re-encrypts a ZMK using different key components. Response code: GF. "
+               "ZMK (Zone Master Key) is used for inter-zone key exchange.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "In APC: ZMK maps to KEK (TR31_K1). New ZMK establishment uses "
+               "get_parameters_for_import + import_key with TR-34."),
+    HsmCommand("Thales", "Legacy", "DW",
+               "Translate a BDK from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a BDK from ZMK encryption into LMK. Response code: DX. "
+               "Used when receiving a DUKPT BDK from an acquirer partner.",
+               "import_key", "TR31_B0_BASE_DERIVATION_KEY",
+               "In APC: import_key with TR-31 block (usage B0)."),
+    HsmCommand("Thales", "Legacy", "DY",
+               "Translate a BDK from LMK to ZMK Encryption", "KEY_MGMT",
+               "Exports a BDK from LMK protection to ZMK encryption. Response code: DZ. "
+               "Used when distributing a DUKPT BDK to a terminal management partner.",
+               "export_key", "TR31_B0_BASE_DERIVATION_KEY",
+               "In APC: export_key with TR-31 block (usage B0)."),
+    HsmCommand("Thales", "Legacy", "KA",
+               "Generate a Key Check Value (Not Double-Length ZMK)", "KEY_MGMT",
+               "Generates a KCV for a key under LMK. Response code: KB. "
+               "Not usable for double-length ZMKs.",
+               None, None,
+               "In APC: KCV is included in all create_key and import_key responses "
+               "(KeyCheckValue field). No separate APC call needed. "
+               "AES keys must use CMAC-based KCV — never ECB-zeros method."),
+    # ── Legacy Message Encryption ─────────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "HE",
+               "Encrypt Data Block", "ENCRYPT",
+               "Encrypts a 64-bit (16H) data block using a TAK under LMK pair 16-17 variant 0. "
+               "Response code: HF. Superseded by M0. Single 64-bit block only — not for "
+               "general data encryption.",
+               "encrypt_data", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "TAK is a MAC key (M-class), not an encryption key (D-class). "
+               "In APC: if the intent is PIN pad command authentication, model as generate_mac. "
+               "If general data encryption, use encrypt_data with TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY."),
+    HsmCommand("Thales", "Legacy", "HG",
+               "Decrypt Data Block", "ENCRYPT",
+               "Decrypts a 64-bit (16H) data block using a TAK under LMK pair 16-17 variant 0. "
+               "Response code: HH. Superseded by M2.",
+               "decrypt_data", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "Mirror of HE. Same APC key-type considerations apply."),
+    # ── Legacy DUKPT PIN Verification ─────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "CO",
+               "Verify a PIN Using the Diebold Method (DUKPT)", "PIN",
+               "Verifies a PIN using the Diebold method with original single-length DUKPT "
+               "key derivation from a double-length BDK. Response code: CP. "
+               "Takes BDK + Diebold table index (stored in user storage) + KSN (3H descriptor + "
+               "12-20H KSN) + PIN block (16H) + account number (12N) + PIN validation data (16H) "
+               "+ offset (4N). Superseded by GS (3DES DUKPT Diebold verify).",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Original single-length DUKPT (derives 56-bit working key from 112-bit BDK). "
+               "In APC: verify_pin_data with IncomingDukptAttributes. "
+               "Diebold method requires IncomingDukptAttributes.DukptKeyDerivationType=TDES_2KEY. "
+               "Migrate to AES DUKPT — TDES prohibited for new deployments since Jan 2023."),
+    HsmCommand("Thales", "Legacy", "CQ",
+               "Verify a PIN Using the Encrypted PIN Method (DUKPT)", "PIN",
+               "Verifies a PIN using the Encrypted PIN comparison method with DUKPT key derivation. "
+               "Response code: CR. Takes BDK + KSN + encrypted PIN block from terminal + "
+               "account number (12N) + reference PIN encrypted under LMK. Superseded by GU.",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Decrypts terminal PIN block using DUKPT-derived key, then compares against "
+               "host-stored PIN (encrypted under LMK). In APC: verify_pin_data; the reference "
+               "PIN is stored as APC's PinVerificationKeyArn data — never log either PIN value."),
+    # ── Legacy MAC ────────────────────────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "ME",
+               "Verify and Translate a MAC", "MAC",
+               "Verifies a MAC under one MAK and generates a new MAC under a different MAK "
+               "in a single command. Response code: MF. Used at network gateway boundaries.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: two separate calls — verify_mac (inbound MAK) + generate_mac (outbound MAK). "
+               "Both keys should be TR31_M3 or TR31_M6; CBC-MAC algorithm is a legacy construct."),
+    HsmCommand("Thales", "Legacy", "MQ",
+               "Generate MAC (MAB) for Large Message", "MAC",
+               "Generates a MAB (Message Authentication Block) for messages longer than 64 bytes "
+               "using multi-block CBC chaining. Response code: MR. Uses MAK (LMK pair 16-17).",
+               "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "CBC-MAC chaining across multiple blocks. In APC: generate_mac handles "
+               "variable-length messages internally. Migrate to CMAC (M6 key type) for new work."),
+    HsmCommand("Thales", "Legacy", "MS",
+               "Generate MAC (MAB) using ANSI X9.19 Method for Large Message", "MAC",
+               "Generates a Retail MAC (ANSI X9.19 / ISO 9797-1 Algorithm 3) for large messages: "
+               "single-DES encrypt all blocks except last, TDES-encrypt last block. Response code: MT.",
+               "generate_mac", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "ANSI X9.19 Retail MAC is a legacy construct — CBC-MAC with TDES final block. "
+               "In APC: generate_mac with GenerationAttributes.Algorithm=ISO_9797_ALGORITHM_3. "
+               "Migrate to CMAC where downstream system supports it."),
+    HsmCommand("Thales", "Legacy", "MK",
+               "Generate a Binary MAC", "MAC",
+               "Generates a MAC over binary (non-ASCII) message data. Response code: ML. "
+               "Functionally equivalent to MA but accepts arbitrary binary input.",
+               "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: generate_mac accepts binary data natively."),
+    HsmCommand("Thales", "Legacy", "MM",
+               "Verify a Binary MAC", "MAC",
+               "Verifies a MAC over binary message data. Response code: MN.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: verify_mac."),
+    HsmCommand("Thales", "Legacy", "MO",
+               "Verify and Translate a Binary MAC", "MAC",
+               "Verifies a binary MAC under one MAK and generates a new binary MAC under another. "
+               "Response code: MP. Gateway boundary re-MAC operation.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: verify_mac + generate_mac (two separate calls). "
+               "Both keys should be TR31_M3 or TR31_M6."),
+    HsmCommand("Thales", "Legacy", "MU",
+               "Generate a MAC on a Binary Message", "MAC",
+               "Generates a MAC over a variable-length binary message. Response code: MV.",
+               "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: generate_mac."),
+    HsmCommand("Thales", "Legacy", "MW",
+               "Verify a MAC on a Binary Message", "MAC",
+               "Verifies a MAC over a variable-length binary message. Response code: MX.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY",
+               "In APC: verify_mac."),
+    # ── UnionPay ──────────────────────────────────────────────────────────────
+    HsmCommand("Thales", "Legacy", "JS",
+               "ARQC Verification and/or ARPC Generation (UnionPay)", "ARQC",
+               "Verifies a UnionPay EMV Authorization Request Cryptogram and optionally generates "
+               "an ARPC. Response code: JT. Distinct from KQ (which is the core/International command).",
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "UnionPay-specific ARQC/ARPC. In APC: verify_auth_request_cryptogram with "
+               "TR31_E0 master key. UnionPay uses a slightly different derivation than Visa/Mastercard."),
+]
+
 # ── Atalla (HPE/Micro Focus/NCR) Commands ────────────────────────────────────
 # Source: EFTlab knowledge base — DIRECTORY QUALITY (function names only, no parameter detail)
 # Wire protocol: TCP socket, binary header, fixed-length fields — format not publicly documented.
@@ -615,6 +893,7 @@ ALL_COMMANDS: list[HsmCommand] = (
     FUTUREX_EXCRYPT_COMMANDS
     + FUTUREX_STANDARD_COMMANDS
     + INTERNATIONAL_COMMANDS
+    + THALES_LEGACY_COMMANDS
     + ATALLA_COMMANDS
 )
 
@@ -638,8 +917,12 @@ FUTUREX_STANDARD_PATTERNS = [
 ]
 
 # International / Thales: 2-char codes, fixed-length fields
+# Covers both Thales/Futurex shared codes (CA, CC, MA, etc.) and Thales Legacy-only codes
 INTERNATIONAL_PATTERNS = [
-    r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M6|M7|M8|M9|MA|MC|A0|A6|A8|IA|BU|KQ|GW)',
+    r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M6|M7|M8|M9|MA|MC|ME|MK|MM|MO|MQ|MS|MU|MW|A0|A6|A8|IA|BU|KQ|GW)',
+    r'["\'](HC|HD|HA|HB|HE|HF|HG|HH|BI|BJ|AS|AT|FG|FH|GG|GH|GY|GZ)',  # Thales Legacy key gen
+    r'["\'](AA|AB|AE|AF|AG|AH|AC|AD|AU|AV|AW|AX|FA|FB|FC|FD|FE|FF|GC|GD|GE|GF|GY|GZ|KC|KD|KA|KB)',  # Thales Legacy translate
+    r'["\'](MG|MH|MI|MJ|DW|DX|DY|DZ|CO|CP|CQ|CR|JS|JT)',  # Thales Legacy additional
     r'hsm_command\s*=\s*["\']([A-Z]{2})',
     r'cmd\s*=\s*["\']([A-Z]{2})',
     r'socket\.send.*["\']([A-Z]{2})\d',
@@ -742,7 +1025,7 @@ def list_commands_by_category(category: str) -> list[dict]:
 
 
 def list_commands_by_vendor(vendor: str) -> list[dict]:
-    """List all known commands for a vendor: Futurex, Thales, Thales/Futurex."""
+    """List all known commands for a vendor: Futurex, Thales, Thales/Futurex, Atalla."""
     return [
         {
             "api": c.api, "code": c.command_code,
@@ -755,7 +1038,12 @@ def list_commands_by_vendor(vendor: str) -> list[dict]:
 
 IMPLEMENTATION_STATUS = (
     "Futurex Excrypt/Standard/International: AUTHORITATIVE — Futurex General Payment HSM Integration Guide (2024). "
-    "Thales payShield 10K: REFERENCE QUALITY — EFTlab knowledge base. "
+    "Thales payShield 10K Legacy Commands: AUTHORITATIVE — payShield 10K Legacy Host Commands "
+    "(PUGD0538-002, 2019). Covers 35 acquirer-relevant commands from the Legacy Key Management, "
+    "Legacy Message Encryption, Legacy DUKPT, and Legacy Message Integrity sections. "
+    "SEED, VisaCash, CEPS, and printer commands omitted as out-of-scope for acquirer/processor. "
+    "Thales payShield 10K Core Commands (CA, CC, DA, DC, EA, EC, A0, A6, A8, M0, M2, KQ): "
+    "REFERENCE QUALITY — EFTlab knowledge base (not in the Legacy manual). "
     "Atalla (HPE/Micro Focus/NCR): DIRECTORY QUALITY — EFTlab command list (function names only, "
     "no parameter detail or wire protocol). Proxy support not implemented for Atalla."
 )
