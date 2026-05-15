@@ -1,0 +1,12 @@
+# Codex CLI project-level MCP configuration.
+# Registers the apc-agent MCP server for use in Codex sessions.
+#
+# For user-level registration (applies across all projects), copy this block
+# to ~/.codex/config.toml instead.
+#
+# AWS credentials are consumed via the standard boto3 chain:
+# IAM role → environment variables → ~/.aws/credentials.
+
+[mcp_servers.apc-agent]
+command = "apc-agent"
+env = { AWS_REGION = "us-east-1" }

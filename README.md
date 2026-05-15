@@ -21,9 +21,9 @@ pip install -e .
 apc-agent        # starts the MCP server over stdio
 ```
 
-**The MCP server is client-agnostic** — it speaks the standard Model Context Protocol over stdio and works with any MCP-compatible client. `CLAUDE.md` and `.claude/` are Claude Code convenience files committed for users of that tool; they are not required to run the server.
+**The MCP server is client-agnostic** — it speaks the standard Model Context Protocol over stdio and works with any MCP-compatible client. `CLAUDE.md` and `.claude/` are Claude Code convenience files; `.codex/` is the Codex CLI equivalent. Neither is required to run the server itself.
 
-The `.claude/settings.json` in this repo registers the server for Claude Code automatically. For Claude Desktop, add the same block to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+**Claude Code** — `.claude/settings.json` in this repo registers the server automatically. For Claude Desktop, add the same block to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -34,6 +34,20 @@ The `.claude/settings.json` in this repo registers the server for Claude Code au
     }
   }
 }
+```
+
+**Codex CLI** — `.codex/config.toml` in this repo registers the server automatically. For user-level registration (applies across all projects), add the same block to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.apc-agent]
+command = "apc-agent"
+env = { AWS_REGION = "us-east-1" }
+```
+
+Or register via the CLI:
+
+```bash
+codex mcp add apc-agent --env AWS_REGION=us-east-1 -- apc-agent
 ```
 
 AWS credentials are consumed via the standard boto3 chain: IAM role, `~/.aws/credentials`, or environment variables. Set `AWS_REGION` to the region where your APC resources live.
