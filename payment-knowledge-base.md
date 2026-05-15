@@ -190,15 +190,49 @@ entity_type: data_element
 canonical_name: Service Code
 aliases:
   - service_code
-summary: Three-digit card-service control value used in stripe and card-verification contexts.
+summary: Three-digit control value encoded in magnetic-stripe data and related card images that indicates acceptance conditions, cardholder-verification expectations, and authorization requirements.
 domain:
   - card_data
   - card_validation
+  - emv
 attributes:
   common_examples:
     stripe_cvv1: "201"
     card_not_present_cvv2: "000"
     chip_context_icvv_or_dcvv: "999"
+  length_digits: 3
+  encoding_locations:
+    - track1
+    - track2
+    - magnetic_stripe_image
+  digit_semantics:
+    first_position:
+      purpose: interchange_scope_and_chip_indicator
+      examples:
+        "1": international
+        "2": international_integrated_circuit_card
+        "5": national_use_only
+        "6": national_use_only_integrated_circuit_card
+        "7": private_label_or_proprietary
+    second_position:
+      purpose: authorization_processing_requirement
+      examples:
+        "0": normal_authorization
+        "2": positive_online_authorization_required
+    third_position:
+      purpose: cardholder_verification_expectation
+      examples:
+        "0": pin_required
+        "1": normal_cardholder_verification_no_restrictions
+        "2": goods_and_services_only_no_cash_back
+        "3": atm_only_pin_required
+        "5": pin_required_goods_and_services_only_no_cash_back
+        "6": prompt_for_pin_if_pin_pad_present
+        "7": prompt_for_pin_if_pin_pad_present_goods_and_services_only_no_cash_back
+constraints:
+  - Service code semantics primarily apply to magnetic-stripe-read processing rather than full chip processing.
+  - Values of 2 or 6 in the first position are commonly used to indicate integrated-circuit-card contexts.
+  - Not every syntactically possible three-digit combination is a valid network-approved service code.
 status: active
 ```
 
@@ -1270,6 +1304,145 @@ relationships:
 status: active
 ```
 
+### Full-Chip Data
+
+```yaml
+id: artifact.full-chip-data
+entity_type: artifact
+canonical_name: Full-Chip Data
+aliases:
+  - full_chip_data
+summary: EMV transaction data set that meets minimum chip requirements, supports online cryptographic validation, and records the card-terminal interaction performed during the transaction.
+domain:
+  - emv
+  - cryptography
+  - iso8583
+attributes:
+  defining_characteristics:
+    - conforms_to_emvco_minimum_requirements
+    - supports_online_cryptographic_validation
+    - records_card_and_terminal_interactions
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: message_field.iso8583-de55
+status: active
+```
+
+### Magnetic-Stripe Image
+
+```yaml
+id: artifact.magnetic-stripe-image
+entity_type: artifact
+canonical_name: Magnetic-Stripe Image
+aliases:
+  - magnetic_stripe_image
+summary: Minimum chip-resident payment data that replicates magnetic-stripe content needed to process an EMV-compliant transaction.
+domain:
+  - emv
+  - card_data
+attributes:
+  replicated_elements_commonly_include:
+    - pan_related_data
+    - expiration_date
+    - service_code
+    - discretionary_data_subset
+relationships:
+  - type: related_to
+    target_id: concept.service-code
+  - type: related_to
+    target_id: format.track2
+status: active
+```
+
+### Fallback Transaction
+
+```yaml
+id: operation.fallback-transaction
+entity_type: operation
+canonical_name: Fallback Transaction
+aliases:
+  - emv_fallback
+  - chip_fallback
+summary: Transaction that begins as a chip-read attempt but is completed using an alternate capture path because the terminal could not successfully read the chip.
+domain:
+  - emv
+  - iso8583
+  - card_validation
+attributes:
+  common_alternate_capture_paths:
+    - magnetic_stripe_read
+    - manual_entry
+relationships:
+  - type: related_to
+    target_id: artifact.full-chip-data
+  - type: related_to
+    target_id: artifact.magnetic-stripe-image
+  - type: related_to
+    target_id: format.track2
+constraints:
+  - Fallback should be distinguished from normal magnetic-stripe processing because the transaction originally began as a chip path.
+status: active
+```
+
+### Derivation Key Index
+
+```yaml
+id: data_element.derivation-key-index
+entity_type: data_element
+canonical_name: Derivation Key Index
+aliases:
+  - DKI
+summary: Numeric value personalized into a chip card to indicate which key should be used for authentication or encryption functions in scheme-specific EMV processing.
+domain:
+  - emv
+  - cryptography
+attributes:
+  common_role: key_selection_hint
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+status: active
+```
+
+### Unique Derivation Key
+
+```yaml
+id: key_type.unique-derivation-key
+entity_type: key_type
+canonical_name: Unique Derivation Key
+aliases:
+  - UDK
+summary: Scheme-specific key used in application-cryptogram generation and authentication flows.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+status: active
+```
+
+### Visa Chip Authenticate Service
+
+```yaml
+id: operation.visa-chip-authenticate-service
+entity_type: operation
+canonical_name: Visa Chip Authenticate Service
+summary: Visa service that authenticates an application cryptogram, returns the authentication result to a requesting party or stand-in processing, and may generate an authenticated response cryptogram.
+domain:
+  - emv
+  - cryptography
+  - iso8583
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: artifact.arpc
+status: active
+```
+
 ### ARPC
 
 ```yaml
@@ -2250,6 +2423,46 @@ domain:
 status: active
 ```
 
+### KDH
+
+```yaml
+id: glossary.kdh
+entity_type: glossary_term
+canonical_name: Key Distribution Host
+aliases:
+  - KDH
+summary: Sending-side role in remote key-distribution workflows that originates or exports key material toward a receiving device or service.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: glossary.krd
+  - type: related_to
+    target_id: key-block.tr34
+status: active
+```
+
+### KRD
+
+```yaml
+id: glossary.krd
+entity_type: glossary_term
+canonical_name: Key Receiving Device
+aliases:
+  - KRD
+summary: Receiving-side role in remote key-distribution workflows that imports or unwraps transported key material.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: glossary.kdh
+  - type: related_to
+    target_id: key-block.tr34
+status: active
+```
+
 ### TR-31 Key Block
 
 ```yaml
@@ -2262,6 +2475,14 @@ summary: Key block format used to transport symmetric working keys with metadata
 domain:
   - key_management
   - cryptography
+attributes:
+  common_contents:
+    - wrapped_symmetric_key
+    - usage_metadata
+    - algorithm_metadata
+    - mode_of_use_metadata
+constraints:
+  - Vendor-specific transport wrappers or indicator prefixes are not necessarily part of the portable TR-31 block and may need to be removed before import into another system.
 status: active
 ```
 
@@ -2277,6 +2498,52 @@ summary: Key transport format used for remote key loading and secure key exchang
 domain:
   - key_management
   - cryptography
+attributes:
+  common_roles:
+    - kdh
+    - krd
+  structural_layers:
+    - signed_data_wrapper
+    - enveloped_data_wrapper
+    - recipient_certificate_identification
+    - encrypted_ephemeral_or_transport_material
+    - encrypted_key_block
+  authentication_attributes_commonly_include:
+    - content_type
+    - random_nonce
+    - tr31_header
+    - message_digest
+relationships:
+  - type: related_to
+    target_id: glossary.kdh
+  - type: related_to
+    target_id: glossary.krd
+  - type: related_to
+    target_id: artifact.tr34-credential-id
+status: active
+```
+
+### TR-34 Credential ID
+
+```yaml
+id: artifact.tr34-credential-id
+entity_type: artifact
+canonical_name: TR-34 Credential Identifier
+aliases:
+  - TR-34 credential ID
+  - TR34 credential ID
+  - cred_id
+summary: Certificate identifier used in TR-34 structures to reference a signing or receiving certificate, commonly represented as the certificate issuer together with the certificate serial number.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  common_components:
+    - certificate_issuer
+    - certificate_serial_number
+relationships:
+  - type: related_to
+    target_id: key-block.tr34
 status: active
 ```
 
@@ -2297,6 +2564,22 @@ attributes:
     - zeros
     - cmac
     - hash
+status: active
+```
+
+### KCV Validation Rule
+
+```yaml
+id: rule.kcv-validation-after-transfer
+entity_type: constraint_rule
+canonical_name: KCV Validation After Key Transfer
+summary: Key transport and import workflows should compare key check values before and after transfer to confirm that the receiving side imported the intended key material.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - Compare KCVs across exporting and importing systems whenever both sides expose a compatible KCV method.
+  - Treat a KCV mismatch as evidence of translation, wrapping, integrity, or key-selection failure until proven otherwise.
 status: active
 ```
 
@@ -3487,6 +3770,50 @@ relationships:
 status: active
 ```
 
+### EMV Issuer Script
+
+```yaml
+id: operation.emv-issuer-script
+entity_type: operation
+canonical_name: EMV Issuer Script
+summary: Issuer-generated command sequence delivered through EMV messaging to instruct the card to perform post-authorization actions such as parameter changes or PIN-related updates.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: key-type.imk
+status: active
+```
+
+### Offline PIN Update
+
+```yaml
+id: operation.offline-pin-update
+entity_type: operation
+canonical_name: Offline PIN Update
+summary: Chip-card PIN change flow typically carried in an EMV issuer script and protected using issuer secure-messaging keys together with transaction context.
+domain:
+  - emv
+  - pin_processing
+  - cryptography
+attributes:
+  common_context_elements:
+    - atc
+    - arqc
+    - issuer_script_mac
+relationships:
+  - type: related_to
+    target_id: operation.emv-issuer-script
+  - type: related_to
+    target_id: operation.offline-enciphered-pin
+constraints:
+  - Offline PIN update is an issuer-side chip-management function rather than a normal acquirer PIN-translation flow.
+status: active
+```
+
 ### Offline Enciphered PIN
 
 ```yaml
@@ -3623,3 +3950,5 @@ that publish annual revisions).
 | 2026-05-14 | General Payment HSM Integration Guide | Futurex | public PDF, 34 pages, accessed 2026-05-14 | hsm, key_management, cryptography, pin_processing, emv |
 | 2026-05-14 | payShield 10K Legacy Host Commands | Thales | PUGD0538-002, Version V1, 2019 | hsm, key_management, cryptography |
 | 2026-05-14 | payShield 10K Installation and User Guide | Thales | PUGD0535-006, updated 15 January 2021 | hsm, key_management, cryptography |
+| 2026-05-15 | Security Rules and Procedures, Merchant Edition | Mastercard | 11 February 2025 | card_data, card_validation, emv |
+| 2026-05-15 | Visa Core Rules and Visa Product and Service Rules | Visa | 18 April 2026 public edition | emv, card_data, card_validation, cryptography |
