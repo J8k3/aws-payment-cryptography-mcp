@@ -160,6 +160,14 @@ The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. 
 
 ---
 
+## Development Note
+
+This project was built with AI-assisted development. AI was used to accelerate implementation, testing, documentation, and research synthesis. Architecture, scope, source selection, review, and final publish decisions were made by the author.
+
+Because this project touches payment-cryptography topics, claims in the code and documentation were reviewed against authoritative vendor and AWS documentation where possible. Remaining limitations and uncertainty are called out explicitly.
+
+---
+
 ## Authoritative References
 
 All APC API behavior in this codebase is derived from these sources.
