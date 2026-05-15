@@ -1,5 +1,11 @@
 # AWS Payment Cryptography MCP Server
 
+[![CI](https://github.com/J8k3/aws-payment-cryptography-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/J8k3/aws-payment-cryptography-mcp/actions/workflows/ci.yml)
+[![Release](https://github.com/J8k3/aws-payment-cryptography-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/J8k3/aws-payment-cryptography-mcp/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/J8k3/aws-payment-cryptography-mcp)](https://github.com/J8k3/aws-payment-cryptography-mcp/releases)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 An MCP server for [AWS Payment Cryptography (APC)](https://docs.aws.amazon.com/payment-cryptography/latest/userguide/what-is.html). Gives AI coding assistants direct access to the APC control plane (key lifecycle) and data plane (cryptographic operations), along with embedded knowledge of payment standards, HSM vendor command sets, and PCI PIN v3.1 compliance requirements. This tool is for development and testing purposes only and should not be used directly within a production system. It is designed to accelerate the 'Proof of Concept' phase and migration analysis by providing a domain-aware interface for AWS Payment Cryptography. Works with Claude Code, Codex CLI, and any MCP-compatible client.
 
 There are three reasons to use this:
@@ -12,13 +18,14 @@ There are three reasons to use this:
 
 Issuer functions — card personalization, IMK/CMK derivation, issuer script processing — are out of scope. A small number of issuer-adjacent APC operations (PIN generation schemes, EMV secure messaging) are exposed for completeness but are not the focus. This is a template, not a production system.
 
---- 
-### Architecture & Trust Boundaries
+---
+
+## Architecture & Trust Boundaries
 
 ```mermaid
 graph LR
     subgraph "Trust Boundary"
-        A[AI Client] <--> B[MCP Server] <--> C[Local Config]
+        A[AI Client] <--> B[MCP Server] --> C[Local Config]
     end
     B -- "Boto3" --> D[AWS APC] --> E[HSM Tier]
     A -- "Prompts" --> F[LLM API]
@@ -180,7 +187,7 @@ The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. 
 
 **Production Data:** Never use this tool with production cryptographic keys, real Primary Account Numbers (PANs), or live PIN blocks.
 
-**Data Leakage:** This tool interfaces with Large Language Models (LLMs). Any data provided in a prompt—including key metadata, command logs, or test identifiers—may be sent to the LLM provider. Ensure all data used with this server is strictly for development or synthetic testing.
+**Data Handling:** This tool interfaces with Large Language Models (LLMs). Any data provided in a prompt—including key metadata, command logs, or test identifiers—may be sent to the LLM provider. Ensure all data used with this server is strictly for development or synthetic testing.
 
 **Credential Safety:** The server uses the standard boto3 credential chain. Ensure your environment is configured with the least-privilege IAM permissions required for payment-cryptography actions.
 
