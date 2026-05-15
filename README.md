@@ -1,6 +1,6 @@
 # AWS Payment Cryptography MCP Server
 
-An MCP server for [AWS Payment Cryptography (APC)](https://docs.aws.amazon.com/payment-cryptography/latest/userguide/what-is.html). Gives AI coding assistants direct access to the APC control plane (key lifecycle) and data plane (cryptographic operations), along with embedded knowledge of payment standards, HSM vendor command sets, and PCI PIN v3.1 compliance requirements. Works with Claude Code, Codex CLI, and any MCP-compatible client.
+An MCP server for [AWS Payment Cryptography (APC)](https://docs.aws.amazon.com/payment-cryptography/latest/userguide/what-is.html). Gives AI coding assistants direct access to the APC control plane (key lifecycle) and data plane (cryptographic operations), along with embedded knowledge of payment standards, HSM vendor command sets, and PCI PIN v3.1 compliance requirements. This tool is for development and testing purposes only and should not be used directly within a production system. It is designed to accelerate the 'Proof of Concept' phase and migration analysis by providing a domain-aware interface for AWS Payment Cryptography. Works with Claude Code, Codex CLI, and any MCP-compatible client.
 
 There are three reasons to use this:
 
@@ -12,6 +12,20 @@ There are three reasons to use this:
 
 Issuer functions — card personalization, IMK/CMK derivation, issuer script processing — are out of scope. A small number of issuer-adjacent APC operations (PIN generation schemes, EMV secure messaging) are exposed for completeness but are not the focus. This is a template, not a production system.
 
+--- 
+### Architecture & Trust Boundaries
+
+```mermaid
+graph LR
+    subgraph "Trust Boundary"
+        A[AI Client] <--> B[MCP Server] <--> C[Local Config]
+    end
+    B -- "Boto3" --> D[AWS APC] --> E[HSM Tier]
+    A -- "Prompts" --> F[LLM API]
+    
+    style F fill:#f96,stroke:#333
+    style D fill:#9cf,stroke:#333
+```
 ---
 
 ## Setup
@@ -157,6 +171,18 @@ aws-payment-cryptography-data-plane-use-cases.json  — APC data plane capabilit
 ```
 
 The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. It covers card data, PIN blocks, card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, and constraint rules. The agent reads it on demand; it is not injected into the system prompt. Add new entries to `payment-knowledge-base.md` and update the Sources table at the bottom — no server restart required.
+
+---
+
+## Security & Privacy
+
+**Production Data:** Never use this tool with production cryptographic keys, real Primary Account Numbers (PANs), or live PIN blocks.
+
+**Data Leakage:** This tool interfaces with Large Language Models (LLMs). Any data provided in a prompt—including key metadata, command logs, or test identifiers—may be sent to the LLM provider. Ensure all data used with this server is strictly for development or synthetic testing.
+
+**Credential Safety:** The server uses the standard boto3 credential chain. Ensure your environment is configured with the least-privilege IAM permissions required for payment-cryptography actions.
+
+**No Plaintext Keys:** This tool does not support and will never prompt for plaintext key material (Clear Components). All key operations must be performed using encrypted tokens or service-managed keys within AWS Payment Cryptography.
 
 ---
 
