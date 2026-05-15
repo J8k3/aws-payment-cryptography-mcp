@@ -6,7 +6,7 @@ Sources and confidence levels:
                              All Futurex commands are 4-character text codes (TPIN, ECHO, EMVA, etc.)
                              wrapped in bracket-delimited frames: [AOCCCC;field;...;]
   Futurex International API: AUTHORITATIVE — same source (Thales payShield-compatible command codes)
-  Thales payShield Legacy:   AUTHORITATIVE — payShield 10K Legacy Host Commands (PUGD0538-002, 2019)
+  Thales payShield Legacy:   AUTHORITATIVE — payShield 10K Legacy Host Commands (Thales payShield 10K Legacy Host Commands, 2019)
                              Official Thales documentation covering ~80 commands in 10 functional groups.
                              License PS10-LIC-LEGACY required on device.
   Thales payShield Core:     REFERENCE QUALITY — EFTlab knowledge base (commands CA, CC, DA, DC,
@@ -315,7 +315,7 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
 ]
 
 # ── Thales payShield 10K Legacy Commands ─────────────────────────────────────
-# Source: payShield 10K Legacy Host Commands (PUGD0538-002, 2019) — AUTHORITATIVE
+# Source: payShield 10K Legacy Host Commands (Thales payShield 10K Legacy Host Commands, 2019) — AUTHORITATIVE
 # These are Thales-specific commands NOT shared with Futurex International mode.
 # Commands shared with Futurex (CI, CK, CM, CW, CY, MA, MC, M6, M8, KQ, IA) remain
 # in INTERNATIONAL_COMMANDS above. This list covers commands unique to the payShield

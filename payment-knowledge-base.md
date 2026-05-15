@@ -4102,7 +4102,7 @@ that publish annual revisions).
 | 2026-05-14 | Reference lists: EMV tags, AIDs, RIDs, ATRs, APDU responses, CA public keys, issuer test keys, HSM commands | Various open tooling | — | emv, hsm |
 | 2026-05-14 | Wikipedia enrichment: DUKPT, ISO 9564, EMV, ISO 8583, contactless, ATR, ISO/IEC 7816 | Wikimedia Foundation | live pages accessed 2026-05-14 | pin_processing, key_management, emv, iso8583, cryptography |
 | 2026-05-14 | General Payment HSM Integration Guide | Futurex | public PDF, 34 pages, accessed 2026-05-14 | hsm, key_management, cryptography, pin_processing, emv |
-| 2026-05-14 | payShield 10K Legacy Host Commands | Thales | PUGD0538-002, Version V1, 2019 | hsm, key_management, cryptography |
-| 2026-05-14 | payShield 10K Installation and User Guide | Thales | PUGD0535-006, updated 15 January 2021 | hsm, key_management, cryptography |
+| 2026-05-14 | payShield 10K Legacy Host Commands | Thales | Version V1, 2019 | hsm, key_management, cryptography |
+| 2026-05-14 | payShield 10K Installation and User Guide | Thales | updated 15 January 2021 | hsm, key_management, cryptography |
 | 2026-05-15 | Security Rules and Procedures, Merchant Edition | Mastercard | 11 February 2025 | card_data, card_validation, emv |
 | 2026-05-15 | Visa Core Rules and Visa Product and Service Rules | Visa | 18 April 2026 public edition | emv, card_data, card_validation, cryptography |
