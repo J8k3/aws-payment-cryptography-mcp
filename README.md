@@ -10,7 +10,7 @@ There are three reasons to use this:
 
 3. **You're using [apc-hsm-proxy](https://github.com/J8k3/aws-payment-cryptography-hsm-proxy) to move an application to APC without refactoring it**, and need to build handlers for the specific commands your application sends.
 
-Issuer functions — card personalization, IMK/CMK derivation, issuer script processing — are out of scope and the agent will refuse them. This is a template, not a production system.
+Issuer functions — card personalization, IMK/CMK derivation, issuer script processing — are out of scope. A small number of issuer-adjacent APC operations (PIN generation schemes, EMV secure messaging) are exposed for completeness but are not the focus. This is a template, not a production system.
 
 ---
 
@@ -69,7 +69,7 @@ Card Data Protection
 
 Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — requires explicit confirmation. The agent explains why the modern approach is preferred, asks whether you've confirmed the downstream system doesn't support it, then helps implement the legacy path correctly with a documented code comment and a notice that a QSA exception may be required.
 
-**Compliance enforcement** runs before every APC call and is not configurable off. Hard stops: single DES, RSA < 2048 bits, fixed TDEA PIN keys (prohibited since January 2023), PAN mismatch during PIN translation, PIN blocks in logs, key usage mismatches against TR-31 codes. AES key check values always use CMAC — never the ECB-zeros method.
+**Compliance enforcement** is built into the tool layer and is not configurable off. Hard stops enforced in code: illegal PIN format translation pairs (PCI PIN Req 3-3), AES keys with non-CMAC KCV (PCI PIN Annex C), unknown TR-31 key usage codes. Legacy construct warnings (Format 0, CBC-MAC, retail MAC) require explicit confirmation before proceeding. PAN identity during PIN translation and algorithm-level prohibitions (single DES, RSA < 2048) are enforced by APC at the API level — calls with prohibited parameters are rejected by the service.
 
 ---
 
@@ -89,7 +89,7 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 **LMK key migration:** Keys stored as LMK-encrypted blobs in your application or database can't be imported into APC directly. They must be exported from the source HSM in TR-31 or TR-34 format first. Claude will surface this when it sees LMK references and walk through the import process using `get_parameters_for_import` and `import_key`.
 
-**Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K (reference quality — EFTlab knowledge base), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
+**Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K (authoritative — official Thales Legacy Host Commands manual PUGD0538-002), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
 
 ---
 
@@ -119,7 +119,7 @@ The discovery log is the handoff between the two tools. Because it deduplicates 
 
 ```bash
 pip install pytest pytest-asyncio "moto[payment-cryptography]"
-pytest
+python -m pytest
 ```
 
 ---

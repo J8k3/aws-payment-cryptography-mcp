@@ -4,8 +4,6 @@ import boto3
 from mcp.server.fastmcp import FastMCP
 
 from .compliance import (
-    Severity,
-    check_key_operation_compatibility,
     get_key_usage_info,
     list_key_usages,
 )

@@ -16,8 +16,6 @@ from .hsm_analysis import (
     DUKPT_MIGRATION_NOTE,
     FIXED_KEY_MIGRATION_NOTE,
     get_apc_mapping,
-    list_commands_by_category,
-    list_commands_by_vendor,
     lookup_command,
 )
 
@@ -36,7 +34,9 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         Returns dict with command metadata and APC mapping, or a not-found message.
         Coverage: Futurex (authoritative), Thales International (reference quality), Atalla (not available).
         """
-        results = lookup_command(command_code, api)
+        results = lookup_command(command_code)
+        if api:
+            results = [c for c in results if c.api.lower() == api.lower()]
         if not results:
             return {
                 "found": False,
@@ -77,18 +77,18 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             command_code: The HSM command code, e.g. "TPIN", "CA", "31"
         """
         mapping = get_apc_mapping(command_code)
-        if mapping is None:
+        if "error" in mapping:
             return {
                 "found": False,
                 "command_code": command_code,
                 "message": f"No APC mapping found for '{command_code}'.",
             }
-        apc_op, apc_key = mapping
+        first = mapping["matches"][0]
         return {
             "found": True,
             "command_code": command_code,
-            "apc_operation": apc_op,
-            "apc_key_type": apc_key,
+            "apc_operation": first["apc_operation"],
+            "apc_key_type": first["apc_key_type"],
         }
 
     @mcp.tool()
@@ -106,12 +106,13 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         Returns a list of commands with their APC mappings.
         """
         if category and vendor:
-            by_cat = {c.command_code for c in list_commands_by_category(category)}
-            cmds = [c for c in list_commands_by_vendor(vendor) if c.command_code in by_cat]
+            cmds = [c for c in ALL_COMMANDS
+                    if c.category.upper() == category.upper()
+                    and vendor.lower() in c.vendor.lower()]
         elif category:
-            cmds = list_commands_by_category(category)
+            cmds = [c for c in ALL_COMMANDS if c.category.upper() == category.upper()]
         elif vendor:
-            cmds = list_commands_by_vendor(vendor)
+            cmds = [c for c in ALL_COMMANDS if vendor.lower() in c.vendor.lower()]
         else:
             cmds = ALL_COMMANDS
 
@@ -162,22 +163,20 @@ def register_hsm_tools(mcp: FastMCP) -> None:
                         continue
                     seen.add(key)
 
-                    # Look up the command — try with api hint derived from api_name
-                    api_hint = api_name.split("_")[1] if "_" in api_name else None
                     matches = lookup_command(code)
-                    mapping = get_apc_mapping(code)
+                    first = matches[0] if matches else None
 
                     detected.append({
                         "detected_api": api_name,
                         "command_code": code,
                         "match_context": m.group(0)[:80],
                         "known": bool(matches),
-                        "name": matches[0].name if matches else None,
-                        "category": matches[0].category if matches else None,
-                        "apc_operation": mapping[0] if mapping else None,
-                        "apc_key_type": mapping[1] if mapping else None,
-                        "notes": matches[0].notes if matches else None,
-                        "confidence": matches[0].confidence if matches else None,
+                        "name": first.name if first else None,
+                        "category": first.category if first else None,
+                        "apc_operation": first.apc_operation if first else None,
+                        "apc_key_type": first.apc_key_type if first else None,
+                        "notes": first.notes if first else None,
+                        "confidence": first.confidence if first else None,
                     })
 
         # Generic socket pattern sweep for anything missed
@@ -190,18 +189,18 @@ def register_hsm_tools(mcp: FastMCP) -> None:
                 seen.add(key)
                 matches = lookup_command(code)
                 if matches:
-                    mapping = get_apc_mapping(code)
+                    first = matches[0]
                     detected.append({
                         "detected_api": "unknown",
                         "command_code": code,
                         "match_context": m.group(0)[:80],
                         "known": True,
-                        "name": matches[0].name,
-                        "category": matches[0].category,
-                        "apc_operation": mapping[0] if mapping else None,
-                        "apc_key_type": mapping[1] if mapping else None,
-                        "notes": matches[0].notes,
-                        "confidence": matches[0].confidence,
+                        "name": first.name,
+                        "category": first.category,
+                        "apc_operation": first.apc_operation,
+                        "apc_key_type": first.apc_key_type,
+                        "notes": first.notes,
+                        "confidence": first.confidence,
                     })
 
         migration_notes = []
@@ -262,7 +261,6 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             payload_len = record.get("payload_len")
 
             matches = lookup_command(cmd)
-            mapping = get_apc_mapping(cmd)
             handler_exists = cmd in _PROXY_HANDLERS.get(vendor, set())
 
             entry = {
@@ -274,15 +272,15 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             }
 
             if matches:
-                m = matches[0]
+                first = matches[0]
                 entry.update({
                     "known": True,
-                    "name": m.name,
-                    "category": m.category,
-                    "apc_operation": mapping[0] if mapping else None,
-                    "apc_key_type": mapping[1] if mapping else None,
-                    "confidence": m.confidence,
-                    "notes": m.notes,
+                    "name": first.name,
+                    "category": first.category,
+                    "apc_operation": first.apc_operation,
+                    "apc_key_type": first.apc_key_type,
+                    "confidence": first.confidence,
+                    "notes": first.notes,
                 })
                 mapped.append(entry)
             else:
