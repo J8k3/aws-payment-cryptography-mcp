@@ -42,5 +42,5 @@
     }
   },
   "keywords": ["aws", "payment-cryptography", "hsm", "pci", "pin", "dukpt", "tr31", "thales", "futurex"],
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
