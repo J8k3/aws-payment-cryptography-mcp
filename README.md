@@ -1,6 +1,6 @@
-# AWS Payment Cryptography Claude Agent
+# AWS Payment Cryptography MCP Server
 
-An MCP server that connects Claude to [AWS Payment Cryptography (APC)](https://docs.aws.amazon.com/payment-cryptography/latest/userguide/what-is.html). Gives Claude direct access to the APC control plane (key lifecycle) and data plane (cryptographic operations), along with embedded knowledge of payment standards, HSM vendor command sets, and PCI PIN v3.1 compliance requirements.
+An MCP server for [AWS Payment Cryptography (APC)](https://docs.aws.amazon.com/payment-cryptography/latest/userguide/what-is.html). Gives AI coding assistants direct access to the APC control plane (key lifecycle) and data plane (cryptographic operations), along with embedded knowledge of payment standards, HSM vendor command sets, and PCI PIN v3.1 compliance requirements. Works with Claude Code, Codex CLI, and any MCP-compatible client.
 
 There are three reasons to use this:
 
@@ -58,15 +58,15 @@ AWS credentials are consumed via the standard boto3 chain: IAM role, `~/.aws/cre
 
 **Who it's for:** Payment engineers and solutions architects building a new acquirer or processor system on AWS, starting from scratch or greenfield on APC.
 
-**What you do:** Describe your architecture in plain language. Claude calls APC directly, explains every decision, and checks compliance before making any API call. You get working code and a key hierarchy — not just documentation references.
+**What you do:** Describe your architecture in plain language. The AI calls APC directly, explains every decision, and checks compliance before making any API call. You get working code and a key hierarchy — not just documentation references.
 
 **How it works:**
 
-1. Install the MCP server and connect it to Claude Code or Claude Desktop.
+1. Install the MCP server and connect it to your AI client (Claude Code, Codex CLI, etc.).
 2. Describe what you're building. Example: *"I need AES DUKPT for a fleet of POS terminals. PIN blocks should go to ISO Format 4, translated over a ZPK to my network processor, with CMAC on ISO 8583 field 64."*
-3. Claude creates the keys in APC, explains the hierarchy, writes the integration code, and flags any compliance issues before calling any API.
+3. The AI creates the keys in APC, explains the hierarchy, writes the integration code, and flags any compliance issues before calling any API.
 
-The agent's default for a new acquirer integration:
+The default for a new acquirer integration:
 
 ```
 Terminal / POI
@@ -93,17 +93,17 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 **Who it's for:** Developers migrating an application that currently sends commands to a Thales payShield 10K or Futurex Excrypt Enterprise SSP v.2, who need to understand what the code is doing before writing the APC replacement.
 
-**What you do:** Show Claude the existing source code. It identifies every HSM operation in use, maps each one to the equivalent APC call with the correct key type, and flags anything with no direct equivalent or that requires architectural changes.
+**What you do:** Show the AI your existing source code. It identifies every HSM operation in use, maps each one to the equivalent APC call with the correct key type, and flags anything with no direct equivalent or that requires architectural changes.
 
 **How it works:**
 
-1. Connect the MCP server to Claude Code and open the relevant source files.
-2. Ask Claude to analyze them. Example: *"What HSM operations does this code use and what are the APC equivalents?"*
-3. Claude calls `hsm_analyze_code`, which scans for Futurex Excrypt bracket-delimited commands (`[TPIN;...]`) and Thales two-char command codes (`CA`, `G0`, `M6`, etc.) in the source, then looks each one up in the command registry.
+1. Connect the MCP server to your AI client and open the relevant source files.
+2. Ask it to analyze them. Example: *"What HSM operations does this code use and what are the APC equivalents?"*
+3. The AI calls `hsm_analyze_code`, which scans for Futurex Excrypt bracket-delimited commands (`[TPIN;...]`) and Thales two-char command codes (`CA`, `G0`, `M6`, etc.) in the source, then looks each one up in the command registry.
 4. For each command detected: the APC operation to call, the required key type (TR-31 usage code), a confidence level, and migration notes.
-5. Claude writes the refactored code using the APC SDK and validates it against the compliance rules.
+5. The AI writes the refactored code using the APC SDK and validates it against the compliance rules.
 
-**LMK key migration:** Keys stored as LMK-encrypted blobs in your application or database can't be imported into APC directly. They must be exported from the source HSM in TR-31 or TR-34 format first. Claude will surface this when it sees LMK references and walk through the import process using `get_parameters_for_import` and `import_key`.
+**LMK key migration:** Keys stored as LMK-encrypted blobs in your application or database can't be imported into APC directly. They must be exported from the source HSM in TR-31 or TR-34 format first. The server surfaces this when it detects LMK references and guides the import process using `get_parameters_for_import` and `import_key`.
 
 **Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K (authoritative — official Thales Legacy Host Commands manual PUGD0538-002), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
 
@@ -113,21 +113,21 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 **Who it's for:** Teams using [apc-hsm-proxy](https://github.com/J8k3/aws-payment-cryptography-hsm-proxy) — where the application is a black box, third-party, or can't be refactored, so a protocol translation layer handles the HSM-to-APC conversion instead.
 
-**What you do:** Run the proxy in discovery mode to observe what commands your application actually sends, then use this agent to build handlers for those specific commands.
+**What you do:** Run the proxy in discovery mode to observe what commands your application actually sends, then use this server to build handlers for those specific commands.
 
 **How it works:**
 
-1. Configure apc-hsm-proxy with `discover.enabled: true`, `hsm_host` pointing at your real HSM, and `log_file: discovery.jsonl`. Start the proxy between your application and the real HSM. The proxy forwards all commands transparently while writing one JSON record per unique command code to `discovery.jsonl` — command code, vendor, and parameter names (key blocks and PIN blocks are redacted).
+1. Configure apc-hsm-proxy with `discover.enabled: true`, `hsm_host` pointing at your real HSM, and `log_file: discovery.jsonl`. Start the proxy between your application and the real HSM. The proxy forwards unhandled commands to the real HSM while writing one JSON record per unique command code to `discovery.jsonl` — command code, vendor, and parameter names (key blocks and PIN blocks are redacted).
 
 2. Run your application through a representative set of transactions. Stop the proxy. Open `discovery.jsonl` — it will have one entry per distinct command your application sent.
 
-3. In a Claude Code session with the MCP server connected, read `discovery.jsonl` and call `hsm_analyze_discovery_log` with its contents. The tool returns: which commands already have proxy handlers, which need to be built, the APC operation and key type for each, and the exact file path and handler structure to implement for each one.
+3. In an AI coding session with the MCP server connected, read `discovery.jsonl` and call `hsm_analyze_discovery_log` with its contents. The tool returns: which commands already have proxy handlers, which need to be built, the APC operation and key type for each, and the exact file path and handler structure to implement for each one.
 
-4. Claude writes the Rust handler for each command modeled on the existing handlers in the proxy's `src/handlers/<vendor>/` directory. You add the file, register it in `mod.rs`, and rebuild the proxy.
+4. The AI writes the Rust handler for each command modeled on the existing handlers in the proxy's `src/handlers/<vendor>/` directory. You add the file, register it in `mod.rs`, and rebuild the proxy.
 
 5. Disable discovery mode (`discover.enabled: false`) and test with the real application. The proxy now routes the handled commands to APC and returns error 68 for anything unrecognized.
 
-The discovery log is the handoff between the two tools. Because it deduplicates — writing once per command code, not once per transaction — it stays small and works directly as source context in a Claude Code session.
+The discovery log is the handoff between the two tools. Because it deduplicates — writing once per command code, not once per transaction — it stays small and works directly as source context in an AI coding session.
 
 ---
 
@@ -156,7 +156,7 @@ payment-knowledge-base.md                    — MCP resource: payment://knowled
 aws-payment-cryptography-data-plane-use-cases.json  — APC data plane capability catalog (source of truth for tool implementation)
 ```
 
-The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. It covers card data, PIN blocks, card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, and constraint rules. The agent can read it on demand; it is not injected into the system prompt. Add new entries to `payment-knowledge-base.md` and update the Sources table at the bottom — no server restart required.
+The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. It covers card data, PIN blocks, card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, and constraint rules. The agent reads it on demand; it is not injected into the system prompt. Add new entries to `payment-knowledge-base.md` and update the Sources table at the bottom — no server restart required.
 
 ---
 
