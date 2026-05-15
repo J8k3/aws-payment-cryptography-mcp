@@ -332,6 +332,25 @@ attributes:
 status: active
 ```
 
+### PIN Block Format 2
+
+```yaml
+id: format.pin-block-format-2
+entity_type: format
+canonical_name: PIN Block Format 2
+aliases:
+  - ISO-2
+  - ISO 9564-1 Format 2
+summary: PIN-block format intended for local offline use, especially smart-card-oriented contexts.
+domain:
+  - pin_processing
+  - cryptography
+attributes:
+  pan_required: false
+  offline_local_use_only: true
+status: active
+```
+
 ### PIN Block Format 3
 
 ```yaml
@@ -592,6 +611,70 @@ attributes:
 status: active
 ```
 
+### Smart Card
+
+```yaml
+id: concept.smart-card
+entity_type: concept
+canonical_name: Smart Card
+aliases:
+  - chip card
+  - integrated circuit card
+  - ICC
+summary: Card with an integrated circuit capable of storing data and performing controlled cryptographic or application operations.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.emv-standard
+status: active
+```
+
+### ISO/IEC 7816
+
+```yaml
+id: concept.iso7816
+entity_type: concept
+canonical_name: ISO/IEC 7816
+aliases:
+  - ISO 7816
+summary: Standard family for contact smart cards covering physical characteristics, electrical interface, transmission protocols, and interchange commands.
+domain:
+  - emv
+  - cryptography
+attributes:
+  notable_parts:
+    - Part 1 Physical Characteristics
+    - Part 2 Contact Dimensions and Location
+    - Part 3 Electrical Interface and Transmission Protocols
+    - Part 4 Organization, Security, and Commands for Interchange
+relationships:
+  - type: related_to
+    target_id: concept.smart-card
+status: active
+```
+
+### APDU
+
+```yaml
+id: format.apdu
+entity_type: format
+canonical_name: Application Protocol Data Unit
+aliases:
+  - APDU
+summary: Smart-card command/response message format used for interchange with integrated circuit cards, including EMV card interactions.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.iso7816
+  - type: related_to
+    target_id: artifact.apdu-response
+status: active
+```
+
 ### EMV Tag
 
 ```yaml
@@ -791,6 +874,226 @@ attributes:
 status: active
 ```
 
+### Practical EMV Tag Catalog
+
+```yaml
+id: reference-list.practical-emv-tag-catalog
+entity_type: reference_list
+canonical_name: Practical EMV Tag Catalog
+summary: High-value EMV tags commonly used in transaction decoding, issuer-host integration, and EMV troubleshooting.
+domain:
+  - emv
+attributes:
+  tags:
+    - tag: "4F"
+      name: Application Identifier
+      aliases:
+        - AID
+      category: application_selection
+      typical_meaning: Identifies the payment application selected on the card.
+    - tag: "50"
+      name: Application Label
+      category: application_selection
+      typical_meaning: Human-readable application label.
+    - tag: "57"
+      name: Track 2 Equivalent Data
+      category: card_data
+      typical_meaning: EMV representation of track 2 style card data.
+    - tag: "5A"
+      name: Application Primary Account Number
+      aliases:
+        - PAN
+      category: card_data
+      typical_meaning: Card account number in EMV data.
+    - tag: "5F24"
+      name: Application Expiration Date
+      category: card_data
+      typical_meaning: Expiration date of the application.
+    - tag: "5F25"
+      name: Application Effective Date
+      category: card_data
+      typical_meaning: Date from which the application becomes valid.
+    - tag: "5F28"
+      name: Issuer Country Code
+      category: issuer_data
+      typical_meaning: Issuer country identifier.
+    - tag: "5F2A"
+      name: Transaction Currency Code
+      category: transaction_context
+      typical_meaning: Currency code used for the transaction.
+    - tag: "5F34"
+      name: Application PAN Sequence Number
+      category: card_data
+      typical_meaning: Distinguishes cards sharing the same PAN.
+    - tag: "5F36"
+      name: Transaction Currency Exponent
+      category: transaction_context
+      typical_meaning: Currency decimal scaling information.
+    - tag: "82"
+      name: Application Interchange Profile
+      aliases:
+        - AIP
+      category: terminal_card_capabilities
+      typical_meaning: Card application capabilities expressed as a bit map.
+    - tag: "84"
+      name: Dedicated File Name
+      aliases:
+        - DDF Name
+      category: application_selection
+      typical_meaning: Name of a directory or application file.
+    - tag: "8A"
+      name: Authorisation Response Code
+      category: online_processing
+      typical_meaning: Issuer or host response code reflected into EMV processing.
+    - tag: "8C"
+      name: Card Risk Management Data Object List 1
+      aliases:
+        - CDOL1
+      category: data_object_lists
+      typical_meaning: Data objects required by the card for first action analysis.
+    - tag: "8D"
+      name: Card Risk Management Data Object List 2
+      aliases:
+        - CDOL2
+      category: data_object_lists
+      typical_meaning: Data objects required by the card for second action analysis.
+    - tag: "8E"
+      name: Cardholder Verification Method List
+      aliases:
+        - CVM List
+      category: cardholder_verification
+      typical_meaning: Ordered list of cardholder verification methods supported by the application.
+    - tag: "8F"
+      name: Certification Authority Public Key Index
+      category: offline_data_authentication
+      typical_meaning: Selects the certification authority public key used for issuer certificate validation.
+    - tag: "90"
+      name: Issuer Public Key Certificate
+      category: offline_data_authentication
+      typical_meaning: Certificate binding the issuer public key to the issuer.
+    - tag: "92"
+      name: Issuer Public Key Remainder
+      category: offline_data_authentication
+      typical_meaning: Remaining bytes of the issuer public key when not fully encoded in the certificate.
+    - tag: "93"
+      name: Signed Static Application Data
+      aliases:
+        - SSAD
+      category: offline_data_authentication
+      typical_meaning: Signed static application data used in static data authentication.
+    - tag: "94"
+      name: Application File Locator
+      aliases:
+        - AFL
+      category: application_processing
+      typical_meaning: Record map telling the terminal what application data to read.
+    - tag: "95"
+      name: Terminal Verification Results
+      aliases:
+        - TVR
+      category: risk_and_decisioning
+      typical_meaning: Bit map of terminal-side checks and results.
+    - tag: "97"
+      name: Transaction Certificate Data Object List
+      aliases:
+        - TDOL
+      category: data_object_lists
+      typical_meaning: Data objects to be included when generating a transaction certificate.
+    - tag: "9A"
+      name: Transaction Date
+      category: transaction_context
+      typical_meaning: Date of the transaction.
+    - tag: "9B"
+      name: Transaction Status Information
+      aliases:
+        - TSI
+      category: risk_and_decisioning
+      typical_meaning: Bit map indicating which transaction functions were performed.
+    - tag: "9C"
+      name: Transaction Type
+      category: transaction_context
+      typical_meaning: Indicates purchase, cash, refund, and related transaction types.
+    - tag: "9F02"
+      name: Amount, Authorised
+      category: transaction_context
+      typical_meaning: Primary authorised amount.
+    - tag: "9F03"
+      name: Amount, Other
+      category: transaction_context
+      typical_meaning: Cashback or secondary amount.
+    - tag: "9F10"
+      name: Issuer Application Data
+      aliases:
+        - IAD
+      category: issuer_data
+      typical_meaning: Issuer-controlled EMV data used in host and card risk logic.
+    - tag: "9F1A"
+      name: Terminal Country Code
+      category: terminal_context
+      typical_meaning: Country code of the terminal.
+    - tag: "9F1E"
+      name: Interface Device Serial Number
+      category: terminal_context
+      typical_meaning: Terminal or interface serial number.
+    - tag: "9F26"
+      name: Application Cryptogram
+      category: cryptograms
+      typical_meaning: Card-generated cryptogram such as ARQC, TC, or AAC.
+    - tag: "9F27"
+      name: Cryptogram Information Data
+      aliases:
+        - CID
+      category: cryptograms
+      typical_meaning: Indicates the type of cryptogram returned by the card.
+    - tag: "9F33"
+      name: Terminal Capabilities
+      category: terminal_context
+      typical_meaning: Bit map of terminal-supported input, CVM, and security features.
+    - tag: "9F34"
+      name: Cardholder Verification Method Results
+      aliases:
+        - CVMR
+      category: cardholder_verification
+      typical_meaning: Result of the CVM processing path chosen during the transaction.
+    - tag: "9F35"
+      name: Terminal Type
+      category: terminal_context
+      typical_meaning: Encoded description of terminal environment and capabilities.
+    - tag: "9F36"
+      name: Application Transaction Counter
+      aliases:
+        - ATC
+      category: cryptograms
+      typical_meaning: Card-side transaction counter incremented by the application.
+    - tag: "9F37"
+      name: Unpredictable Number
+      aliases:
+        - UN
+      category: cryptograms
+      typical_meaning: Terminal-generated nonce used in cryptogram generation.
+    - tag: "9F41"
+      name: Transaction Sequence Counter
+      category: terminal_context
+      typical_meaning: Terminal-side transaction sequencing value.
+    - tag: "9F53"
+      name: Transaction Category Code
+      category: transaction_context
+      typical_meaning: Additional transaction classification metadata.
+    - tag: "9F66"
+      name: Terminal Transaction Qualifiers
+      aliases:
+        - TTQ
+      category: contactless
+      typical_meaning: Contactless terminal capability and requirement map.
+    - tag: "9F6C"
+      name: Card Transaction Qualifiers
+      aliases:
+        - CTQ
+      category: contactless
+      typical_meaning: Contactless card-side qualifier map.
+status: active
+```
+
 ## EMV Reference Data
 
 ### AID
@@ -879,6 +1182,17 @@ summary: Smart-card reset response used to identify card communication character
 domain:
   - emv
   - reference_data
+  - cryptography
+attributes:
+  communication_purposes:
+    - proposed_communication_parameters
+    - card_nature_and_state
+  common_variants:
+    - cold_atr
+    - warm_atr
+relationships:
+  - type: related_to
+    target_id: concept.iso7816
 status: active
 ```
 
@@ -1080,6 +1394,38 @@ relationships:
 status: active
 ```
 
+### Contactless Payment
+
+```yaml
+id: operation.contactless-payment
+entity_type: operation
+canonical_name: Contactless Payment
+aliases:
+  - tap_to_pay
+summary: Payment interaction performed in close proximity using a contactless card, device, or tokenized mobile wallet over short-range radio technology.
+domain:
+  - emv
+  - card_validation
+  - cryptography
+attributes:
+  transport_technologies:
+    - RFID
+    - NFC
+  related_standards:
+    - ISO_IEC_14443
+  common_form_factors:
+    - contactless_card
+    - key_fob
+    - smartphone
+    - wearable
+relationships:
+  - type: related_to
+    target_id: concept.smart-card
+  - type: related_to
+    target_id: concept.tokenization
+status: active
+```
+
 ## ISO 8583 and Payment Messaging
 
 ### ISO 8583 Message
@@ -1223,6 +1569,395 @@ attributes:
 status: active
 ```
 
+### Processing Code
+
+```yaml
+id: message_field.iso8583-de3
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 3
+aliases:
+  - DE3
+  - Processing Code
+summary: Transaction processing classifier used to indicate the operational intent of a message.
+domain:
+  - iso8583
+status: active
+```
+
+### Transaction Amount
+
+```yaml
+id: message_field.iso8583-de4
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 4
+aliases:
+  - DE4
+  - Amount Transaction
+summary: Transaction amount field used to carry the financial amount of the request or advice.
+domain:
+  - iso8583
+status: active
+```
+
+### Transmission Date and Time
+
+```yaml
+id: message_field.iso8583-de7
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 7
+aliases:
+  - DE7
+  - Transmission Date and Time
+summary: Network transmission timestamp used for routing, ordering, and host-side processing.
+domain:
+  - iso8583
+status: active
+```
+
+### STAN
+
+```yaml
+id: message_field.iso8583-de11
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 11
+aliases:
+  - DE11
+  - STAN
+  - System Trace Audit Number
+summary: Trace number used to correlate requests, responses, reversals, and audit events.
+domain:
+  - iso8583
+status: active
+```
+
+### Local Transaction Time
+
+```yaml
+id: message_field.iso8583-de12
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 12
+aliases:
+  - DE12
+  - Local Transaction Time
+summary: Local terminal transaction time, commonly encoded as hhmmss.
+domain:
+  - iso8583
+status: active
+```
+
+### Local Transaction Date
+
+```yaml
+id: message_field.iso8583-de13
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 13
+aliases:
+  - DE13
+  - Local Transaction Date
+summary: Local terminal transaction date, commonly encoded as MMDD.
+domain:
+  - iso8583
+status: active
+```
+
+### Expiration Date Field
+
+```yaml
+id: message_field.iso8583-de14
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 14
+aliases:
+  - DE14
+  - Expiration Date
+summary: Card expiration date field carried in transaction messages.
+domain:
+  - iso8583
+relationships:
+  - type: related_to
+    target_id: concept.expiry-date
+status: active
+```
+
+### Merchant Category Code
+
+```yaml
+id: message_field.iso8583-de18
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 18
+aliases:
+  - DE18
+  - Merchant Type
+  - Merchant Category Code
+  - MCC
+summary: Merchant classification field used for network processing, routing, risk, and reporting.
+domain:
+  - iso8583
+status: active
+```
+
+### POS Entry Mode
+
+```yaml
+id: message_field.iso8583-de22
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 22
+aliases:
+  - DE22
+  - POS Entry Mode
+summary: Field describing how card data was captured and what verification or terminal capabilities applied.
+domain:
+  - iso8583
+  - emv
+attributes:
+  frequently_encodes:
+    - card_reading_method
+    - cardholder_verification_method
+    - terminal_capabilities
+status: active
+```
+
+### Response Code
+
+```yaml
+id: message_field.iso8583-de39
+entity_type: message_field
+canonical_name: ISO 8583 Data Element 39
+aliases:
+  - DE39
+  - Response Code
+summary: Outcome code used by hosts and networks to indicate approval, denial, or processing conditions.
+domain:
+  - iso8583
+attributes:
+  example_values:
+    "00": approved
+    "05": do_not_honor
+    "14": invalid_card_number
+status: active
+```
+
+### ISO 8583 Field Definition Model
+
+```yaml
+id: concept.iso8583-field-model
+entity_type: concept
+canonical_name: ISO 8583 Field Definition Model
+summary: Message-field model where each data element has a meaning, content type, and fixed or variable length, while networks may overlay private usage.
+domain:
+  - iso8583
+attributes:
+  common_content_types:
+    - n
+    - a
+    - an
+    - b
+  common_length_styles:
+    - fixed
+    - llvar
+    - lllvar
+status: active
+```
+
+### ISO 8583 Versioning
+
+```yaml
+id: concept.iso8583-versioning
+entity_type: concept
+canonical_name: ISO 8583 Versioning
+summary: Evolution of the ISO 8583 standard across 1987, 1993, and 2003 releases with stable message framing but shifting field definitions and usage.
+domain:
+  - iso8583
+attributes:
+  major_versions:
+    - "1987"
+    - "1993"
+    - "2003"
+  message_capacity:
+    original_standard: up_to_128_data_elements
+    later_releases: up_to_192_data_elements
+status: active
+```
+
+### Practical ISO 8583 Field Dictionary
+
+```yaml
+id: reference-list.practical-iso8583-field-dictionary
+entity_type: reference_list
+canonical_name: Practical ISO 8583 Field Dictionary
+summary: High-value ISO 8583 fields commonly needed for parsing, message mapping, switching, authorization, and payment troubleshooting.
+domain:
+  - iso8583
+attributes:
+  fields:
+    - de: "1"
+      name: Secondary Bitmap
+      category: message_structure
+      typical_meaning: Extends the message field map beyond the primary 64 elements.
+    - de: "2"
+      name: Primary Account Number
+      aliases:
+        - PAN
+      category: card_data
+      typical_meaning: Card account number used in routing and authorization.
+    - de: "3"
+      name: Processing Code
+      category: transaction_classification
+      typical_meaning: Indicates transaction function such as purchase, withdrawal, transfer, or refund.
+    - de: "4"
+      name: Amount, Transaction
+      category: financial_amount
+      typical_meaning: Primary financial amount of the message.
+    - de: "7"
+      name: Transmission Date and Time
+      category: timing
+      typical_meaning: Network transmission timestamp.
+    - de: "11"
+      name: System Trace Audit Number
+      aliases:
+        - STAN
+      category: correlation
+      typical_meaning: Trace number used for request/response matching and audit.
+    - de: "12"
+      name: Local Transaction Time
+      category: timing
+      typical_meaning: Local terminal transaction time.
+    - de: "13"
+      name: Local Transaction Date
+      category: timing
+      typical_meaning: Local terminal transaction date.
+    - de: "14"
+      name: Expiration Date
+      category: card_data
+      typical_meaning: Expiration date of the card used in the transaction.
+    - de: "18"
+      name: Merchant Category Code
+      aliases:
+        - MCC
+      category: merchant_context
+      typical_meaning: Merchant business classification.
+    - de: "22"
+      name: POS Entry Mode
+      category: terminal_context
+      typical_meaning: Indicates card capture method and verification context.
+    - de: "23"
+      name: Card Sequence Number
+      category: card_data
+      typical_meaning: Distinguishes cards sharing the same PAN.
+    - de: "25"
+      name: POS Condition Code
+      category: terminal_context
+      typical_meaning: Indicates transaction condition such as normal presentment or recurring context.
+    - de: "32"
+      name: Acquiring Institution Identification Code
+      category: routing
+      typical_meaning: Identifies the acquirer or acquiring institution.
+    - de: "35"
+      name: Track 2 Data
+      category: card_data
+      typical_meaning: Track 2 or track 2 equivalent content used in magstripe and fallback flows.
+    - de: "37"
+      name: Retrieval Reference Number
+      aliases:
+        - RRN
+      category: correlation
+      typical_meaning: End-to-end reference value used for retrieval and reconciliation.
+    - de: "38"
+      name: Authorization Identification Response
+      category: authorization
+      typical_meaning: Approval or authorization identifier returned by the issuer or network.
+    - de: "39"
+      name: Response Code
+      category: authorization
+      typical_meaning: Outcome code indicating approval, denial, or processing status.
+    - de: "41"
+      name: Card Acceptor Terminal Identification
+      aliases:
+        - Terminal ID
+      category: terminal_context
+      typical_meaning: Identifies the accepting terminal.
+    - de: "42"
+      name: Card Acceptor Identification Code
+      aliases:
+        - Merchant ID
+      category: merchant_context
+      typical_meaning: Identifies the merchant or accepting entity.
+    - de: "43"
+      name: Card Acceptor Name and Location
+      category: merchant_context
+      typical_meaning: Human-readable merchant name and location record.
+    - de: "49"
+      name: Transaction Currency Code
+      category: financial_amount
+      typical_meaning: Currency of the transaction amount.
+    - de: "52"
+      name: PIN Data
+      category: pin_processing
+      typical_meaning: Encrypted PIN-related data, commonly an encrypted PIN block.
+    - de: "53"
+      name: Security Related Control Information
+      category: cryptography
+      typical_meaning: Security control metadata such as key-set or algorithm context.
+    - de: "55"
+      name: ICC System Related Data
+      aliases:
+        - DE55
+      category: emv
+      typical_meaning: BER-TLV EMV payload carried between terminal and host.
+    - de: "60"
+      name: Reserved National
+      category: private_or_national_use
+      typical_meaning: Network- or country-specific extension field.
+    - de: "61"
+      name: Reserved Private
+      category: private_or_national_use
+      typical_meaning: Private network extension field.
+    - de: "62"
+      name: Reserved Private
+      category: private_or_national_use
+      typical_meaning: Private network extension field.
+    - de: "63"
+      name: Reserved Private
+      category: private_or_national_use
+      typical_meaning: Private network extension field.
+    - de: "64"
+      name: Message Authentication Code
+      aliases:
+        - MAC
+      category: cryptography
+      typical_meaning: Primary MAC protecting message authenticity and integrity.
+    - de: "70"
+      name: Network Management Information Code
+      category: network_management
+      typical_meaning: Indicates the network-management function being performed.
+    - de: "90"
+      name: Original Data Elements
+      category: reversal_and_reconciliation
+      typical_meaning: Carries original message references used in reversals and follow-on processing.
+    - de: "95"
+      name: Replacement Amounts
+      category: financial_amount
+      typical_meaning: Adjusted or replacement financial amounts.
+    - de: "100"
+      name: Receiving Institution Identification Code
+      category: routing
+      typical_meaning: Identifies the receiving institution for the message.
+    - de: "102"
+      name: Account Identification 1
+      category: account_context
+      typical_meaning: Primary account reference used in transfers and account-linked flows.
+    - de: "103"
+      name: Account Identification 2
+      category: account_context
+      typical_meaning: Secondary account reference used in transfers and paired-account flows.
+    - de: "128"
+      name: Message Authentication Code
+      aliases:
+        - Secondary MAC
+      category: cryptography
+      typical_meaning: End-of-message MAC used in extended-bitmap variants.
+status: active
+```
+
 ### Card-Present and Card-Not-Present
 
 ```yaml
@@ -1349,8 +2084,138 @@ domain:
   - key_management
   - cryptography
 relationships:
-  - type: derives_from
+  - type: related_to
     target_id: algorithm.dukpt
+status: active
+```
+
+### IPEK
+
+```yaml
+id: key-type.ipek
+entity_type: key_type
+canonical_name: Initial PIN Encryption Key
+aliases:
+  - IPEK
+  - IK
+summary: Device initialization key derived from a base derivation key and injected into a DUKPT-capable device to seed future transaction keys.
+domain:
+  - key_management
+  - pin_processing
+  - cryptography
+relationships:
+  - type: derives_from
+    target_id: key-type.bdk
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### KSN
+
+```yaml
+id: artifact.ksn
+entity_type: artifact
+canonical_name: Key Serial Number
+aliases:
+  - KSN
+summary: DUKPT transaction identifier that carries device and transaction-counter information needed to regenerate the transaction key on the receiving side.
+domain:
+  - key_management
+  - cryptography
+  - pin_processing
+attributes:
+  canonical_size_bits: 80
+  typical_components:
+    - key_set_id
+    - device_identifier
+    - transaction_counter
+  transaction_counter_size_bits: 21
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### Future Key
+
+```yaml
+id: key-type.future-key
+entity_type: key_type
+canonical_name: Future Key
+aliases:
+  - future_key
+summary: Pre-derived device-resident DUKPT key material consumed to derive a one-time transaction key and then invalidated.
+domain:
+  - key_management
+  - cryptography
+  - pin_processing
+relationships:
+  - type: derives_from
+    target_id: key-type.ipek
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### Transaction Key
+
+```yaml
+id: key-type.transaction-key
+entity_type: key_type
+canonical_name: Transaction Key
+aliases:
+  - session_key
+  - one_time_key
+summary: One-time or transaction-scoped working key derived for a single DUKPT operation.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: derives_from
+    target_id: key-type.future-key
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### Transaction Counter
+
+```yaml
+id: data_element.dukpt-transaction-counter
+entity_type: data_element
+canonical_name: DUKPT Transaction Counter
+aliases:
+  - transaction_counter
+summary: Device-side counter component of the DUKPT derivation state used to ensure unique per-transaction keys.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  size_bits: 21
+  approximate_capacity: over_1000000_transactions
+relationships:
+  - type: related_to
+    target_id: artifact.ksn
+status: active
+```
+
+### Device Identifier in DUKPT
+
+```yaml
+id: data_element.dukpt-device-identifier
+entity_type: data_element
+canonical_name: DUKPT Device Identifier
+aliases:
+  - TRSM_ID
+  - device_id
+summary: Device-unique identifier component carried in the KSN to distinguish one originating device from another within a derivation domain.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: artifact.ksn
 status: active
 ```
 
@@ -1477,7 +2342,7 @@ entity_type: algorithm
 canonical_name: Derived Unique Key Per Transaction
 aliases:
   - DUKPT
-summary: Derivation scheme that produces transaction-specific keys from a base derivation key and key serial number.
+summary: Key-management scheme that produces transaction-specific working keys from a base derivation key and device transaction state.
 domain:
   - key_management
   - cryptography
@@ -1485,6 +2350,66 @@ attributes:
   core_inputs:
     - BDK
     - KSN
+  key_management_not_encryption: true
+  historical_block_cipher_family: TDES
+  current_recommended_family: AES
+  receiver_state_model: stateless_except_for_bdk_selection
+  originator_state_model:
+    - transaction_counter
+    - future_keys
+    - device_identifier
+  common_uses:
+    - PIN_encryption
+    - message_authentication
+    - transaction_data_encryption
+relationships:
+  - type: related_to
+    target_id: key-type.bdk
+  - type: related_to
+    target_id: key-type.ipek
+  - type: related_to
+    target_id: artifact.ksn
+  - type: related_to
+    target_id: key-type.future-key
+  - type: related_to
+    target_id: key-type.transaction-key
+status: active
+```
+
+### Master/Session Key Management
+
+```yaml
+id: algorithm.master-session
+entity_type: algorithm
+canonical_name: Master/Session Key Management
+aliases:
+  - Master/Session
+summary: Older key-management approach in which each device is initialized with a unique master key and transaction data is protected with session keys derived under that device context.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### Tamper-Resistant Security Module
+
+```yaml
+id: concept.trsm
+entity_type: concept
+canonical_name: Tamper-Resistant Security Module
+aliases:
+  - TRSM
+summary: Security module designed to protect sensitive cryptographic key material within a tamper-resistant boundary.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: key-type.bdk
 status: active
 ```
 
@@ -1516,6 +2441,24 @@ summary: Public-key key-agreement method used to derive shared secrets for short
 domain:
   - key_management
   - cryptography
+status: active
+```
+
+### Master/Session Key Management
+
+```yaml
+id: algorithm.master-session
+entity_type: algorithm
+canonical_name: Master/Session Key Management
+aliases:
+  - Master/Session
+summary: Older key-management approach in which each device is initialized with a unique master key and transaction data is protected with session keys derived under that device context.
+domain:
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
 status: active
 ```
 
@@ -1595,6 +2538,279 @@ status: active
 
 ## HSM Command Families
 
+## Payment HSM Model
+
+### Payment HSM
+
+```yaml
+id: concept.payment-hsm
+entity_type: concept
+canonical_name: Payment Hardware Security Module
+aliases:
+  - payment_hsm
+  - payment HSM
+summary: Specialized hardware security module used to protect payment keys and execute payment cryptographic operations under controlled security boundaries.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  primary_roles:
+    - key_protection
+    - key_generation
+    - key_translation
+    - PIN_processing
+    - card_verification
+    - EMV_cryptography
+    - MAC_processing
+status: active
+```
+
+### Issuing HSM
+
+```yaml
+id: concept.issuing-hsm
+entity_type: concept
+canonical_name: Issuing HSM
+summary: Payment HSM role focused on card issuance, issuer-side PIN generation, issuer EMV key management, card verification value generation, and related provisioning functions.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  primary_use_cases:
+    - pin_generation
+    - pvv_generation
+    - pin_offset_generation
+    - emv_issuer_key_generation
+    - card_verification_value_generation
+relationships:
+  - type: related_to
+    target_id: concept.payment-hsm
+status: active
+```
+
+### Acquiring HSM
+
+```yaml
+id: concept.acquiring-hsm
+entity_type: concept
+canonical_name: Acquiring HSM
+summary: Payment HSM role focused on transaction processing between merchants, acquirers, switches, and networks, including PIN translation, PIN verification, CVV validation, and MAC processing.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  primary_use_cases:
+    - pin_translation
+    - pin_verification
+    - cvv_validation
+    - emv_validation
+    - mac_generation
+    - mac_verification
+    - remote_key_loading
+relationships:
+  - type: related_to
+    target_id: concept.payment-hsm
+status: active
+```
+
+### HSM Security Domain Separation
+
+```yaml
+id: rule.payment-hsm-domain-separation
+entity_type: constraint_rule
+canonical_name: Payment HSM Domain Separation
+summary: Payment issuing and payment acquiring responsibilities are often separated across different HSM deployments for security and compliance reasons.
+domain:
+  - hsm
+  - key_management
+constraints:
+  - Issuing and acquiring functions should be modeled as distinct operational domains.
+  - Key domains, users, and ceremonies often differ between issuing and acquiring environments.
+status: active
+```
+
+### Local Master Key
+
+```yaml
+id: key-type.lmk
+entity_type: key_type
+canonical_name: Local Master Key
+aliases:
+  - LMK
+summary: HSM-internal master protection key family used to protect keys under local storage and internal host-command workflows.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  scope: internal_to_hsm_or_cluster
+status: active
+```
+
+### Master File Key
+
+```yaml
+id: key-type.mfk
+entity_type: key_type
+canonical_name: Master File Key
+aliases:
+  - MFK
+summary: Major HSM protection key used as a foundational control point for securing device-resident key material and operational state.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+status: active
+```
+
+### Platform Master Key
+
+```yaml
+id: key-type.pmk
+entity_type: key_type
+canonical_name: Platform Master Key
+aliases:
+  - PMK
+summary: HSM platform-level master key used in some product families for broader key-protection or platform-management contexts.
+domain:
+  - hsm
+  - key_management
+status: active
+```
+
+### Futurex Token Key
+
+```yaml
+id: key-type.ftk
+entity_type: key_type
+canonical_name: Token Master Key
+aliases:
+  - FTK
+summary: Token-related master key concept used in token issuance or token security contexts in some payment HSM environments.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+status: active
+```
+
+### M of N Key Ceremony
+
+```yaml
+id: operation.m-of-n-key-ceremony
+entity_type: operation
+canonical_name: M of N Key Ceremony
+aliases:
+  - M_of_N
+  - split knowledge ceremony
+summary: Operational process in which a key or key component set is generated, loaded, or reconstructed using a threshold number of authorized key custodians.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  security_principles:
+    - split_knowledge
+    - dual_control
+    - threshold_reconstruction
+status: active
+```
+
+### Key Share
+
+```yaml
+id: artifact.key-share
+entity_type: artifact
+canonical_name: Key Share
+aliases:
+  - key component
+summary: Fragment of a key used in split-knowledge loading or reconstruction ceremonies.
+domain:
+  - hsm
+  - key_management
+relationships:
+  - type: related_to
+    target_id: operation.m-of-n-key-ceremony
+status: active
+```
+
+### Trusted Management Device
+
+```yaml
+id: concept.trusted-management-device
+entity_type: concept
+canonical_name: Trusted Management Device
+aliases:
+  - TMD
+summary: Dedicated device or management path used to administer an HSM and participate in sensitive management or key-transfer workflows.
+domain:
+  - hsm
+  - key_management
+status: active
+```
+
+### Generic Payment HSM Operation Families
+
+```yaml
+id: concept.payment-hsm-operation-families
+entity_type: concept
+canonical_name: Payment HSM Operation Families
+summary: Normalized families of operations exposed by payment HSMs regardless of vendor command syntax.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  families:
+    - generate_key
+    - import_key
+    - export_key
+    - translate_key
+    - derive_key
+    - generate_pin
+    - verify_pin
+    - translate_pin
+    - generate_pvv
+    - generate_pin_offset
+    - generate_cvv
+    - verify_cvv
+    - generate_mac
+    - verify_mac
+    - emv_key_derivation
+    - emv_certificate_generation
+    - emv_validation
+    - remote_key_loading
+    - secure_messaging
+status: active
+```
+
+### Vendor Command Crosswalk Record Shape
+
+```yaml
+id: concept.vendor-command-crosswalk
+entity_type: concept
+canonical_name: Vendor Command Crosswalk
+summary: Mapping layer between canonical payment-HSM operations and vendor-specific host commands.
+domain:
+  - hsm
+  - key_management
+attributes:
+  record_shape:
+    vendor: string
+    command_name: string
+    command_code_request: string
+    command_code_response: string
+    canonical_operation_family: string
+    key_types:
+      - string
+    notes:
+      - string
+status: active
+```
+
 ### HSM Command Reference
 
 ```yaml
@@ -1611,6 +2827,201 @@ attributes:
     - Atalla
     - SafeNet
     - Thales
+    - Futurex
+status: active
+```
+
+### Futurex Payment HSM
+
+```yaml
+id: concept.futurex-payment-hsm
+entity_type: concept
+canonical_name: Futurex Payment HSM
+summary: Futurex payment-HSM family supporting issuing and acquiring payment use cases through Futurex-specific command and management interfaces.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.payment-hsm
+status: active
+```
+
+### Futurex Issuing Use Cases
+
+```yaml
+id: concept.futurex-issuing-use-cases
+entity_type: concept
+canonical_name: Futurex Issuing Use Cases
+summary: Futurex-documented issuer-side use-case grouping for payment HSM integration.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  use_cases:
+    - pin_and_offset_generation
+    - emv_key_generation_and_derivation
+    - mobile_payment_token_issuance
+    - cvv_generation
+relationships:
+  - type: related_to
+    target_id: concept.issuing-hsm
+status: active
+```
+
+### Futurex Acquiring Use Cases
+
+```yaml
+id: concept.futurex-acquiring-use-cases
+entity_type: concept
+canonical_name: Futurex Acquiring Use Cases
+summary: Futurex-documented acquirer-side use-case grouping for payment HSM integration.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  use_cases:
+    - pin_translation_and_verification
+    - emv_validation
+    - mobile_payment_acceptance
+    - cvv_validation
+    - mac_generation_and_verification
+    - remote_key_loading
+    - atm_network
+    - point_to_point_encryption
+relationships:
+  - type: related_to
+    target_id: concept.acquiring-hsm
+status: active
+```
+
+### Generic Vendor Command Crosswalk Examples
+
+```yaml
+id: command-crosswalk.generic-generate-bdk
+entity_type: command
+canonical_name: Generate Base Derivation Key
+summary: Canonical operation for generating a base derivation key within a payment HSM.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  canonical_operation_family: generate_key
+  key_types:
+    - BDK
+  vendor_examples:
+    - vendor: Thales
+      command_name: Generate a BDK
+      command_code_request: BI
+      command_code_response: BJ
+    - vendor: Futurex
+      command_name: vendor_specific_not_normalized_here
+      command_code_request: null
+      command_code_response: null
+status: active
+```
+
+```yaml
+id: command-crosswalk.generic-generate-pvv
+entity_type: command
+canonical_name: Generate Visa PIN Verification Value
+summary: Canonical operation for producing a PVV from issuer-side PIN verification inputs.
+domain:
+  - hsm
+  - key_management
+  - pin_processing
+attributes:
+  canonical_operation_family: generate_pvv
+  key_types:
+    - PVK
+  vendor_examples:
+    - vendor: Thales
+      command_name: Generate Visa PIN Verification Value
+      command_code_request: DG
+      command_code_response: null
+    - vendor: Futurex
+      command_name: Visa PIN Verification Value workflow
+      command_code_request: null
+      command_code_response: null
+status: active
+```
+
+```yaml
+id: command-crosswalk.generic-generate-pin-offset
+entity_type: command
+canonical_name: Generate IBM 3624 PIN Offset
+summary: Canonical operation for generating an IBM 3624 PIN offset from validation data and issuer PIN controls.
+domain:
+  - hsm
+  - key_management
+  - pin_processing
+attributes:
+  canonical_operation_family: generate_pin_offset
+  key_types:
+    - PVK
+  vendor_examples:
+    - vendor: Thales
+      command_name: Generate IBM 3624 PIN Offset
+      command_code_request: BK
+      command_code_response: BL
+    - vendor: Futurex
+      command_name: GOFF
+      command_code_request: GOFF
+      command_code_response: null
+status: active
+```
+
+```yaml
+id: command-crosswalk.generic-derive-dukpt-ipek
+entity_type: command
+canonical_name: Derive DUKPT Initial Key
+summary: Canonical operation for deriving the device initialization key used by DUKPT-capable devices.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+attributes:
+  canonical_operation_family: derive_key
+  key_types:
+    - BDK
+    - IPEK
+  vendor_examples:
+    - vendor: Thales
+      command_name: Derive DUKPT Initial PIN Encryption Key
+      command_code_request: 38C
+      command_code_response: null
+    - vendor: Futurex
+      command_name: vendor_specific_not_normalized_here
+      command_code_request: null
+      command_code_response: null
+status: active
+```
+
+```yaml
+id: command-crosswalk.generic-generate-emv-mac
+entity_type: command
+canonical_name: Generate EMV Message Authentication Code
+summary: Canonical operation for generating a MAC used in EMV data protection or secure messaging contexts.
+domain:
+  - hsm
+  - key_management
+  - cryptography
+  - emv
+attributes:
+  canonical_operation_family: generate_mac
+  vendor_examples:
+    - vendor: Thales
+      command_name: EMV Message Authentication Code Generation
+      command_code_request: 352
+      command_code_response: null
+    - vendor: Futurex
+      command_name: EMVM
+      command_code_request: EMVM
+      command_code_response: null
 status: active
 ```
 
@@ -1761,6 +3172,22 @@ status: active
 
 ## Cross-Cutting Constraint Rules
 
+### DUKPT Versus Encryption Rule
+
+```yaml
+id: rule.dukpt-is-key-management
+entity_type: constraint_rule
+canonical_name: DUKPT Is Key Management, Not Encryption
+summary: DUKPT should be modeled separately from the ciphers and MAC algorithms used with the derived keys.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - DUKPT governs derivation and key lifecycle, not the ciphertext format by itself.
+  - Derived keys may be used for PIN encryption, data encryption, or MAC generation depending on the implementation.
+status: active
+```
+
 ### PCI Data Classification Rule
 
 ```yaml
@@ -1792,6 +3219,73 @@ domain:
 constraints:
   - PAN truncation is a standard protective pattern for display and receipts.
   - Tokenization and format-preserving encryption are common mitigation patterns for operational systems.
+status: active
+```
+
+### DUKPT Security Boundary Rule
+
+```yaml
+id: rule.dukpt-security-boundary
+entity_type: constraint_rule
+canonical_name: DUKPT Security Boundary
+summary: In DUKPT, compromise scope depends heavily on which level of key material is exposed.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - Exposure of a transaction key should not reveal past or future transaction keys.
+  - Exposure of one device state should not implicitly compromise other devices in the same fleet.
+  - Exposure of the base derivation key can compromise all devices and transactions in that derivation domain.
+status: active
+```
+
+### DUKPT KSN Rule
+
+```yaml
+id: rule.dukpt-ksn-usage
+entity_type: constraint_rule
+canonical_name: DUKPT KSN Usage
+summary: DUKPT decryption or verification requires both the protected data and the associated key serial number.
+domain:
+  - key_management
+  - cryptography
+  - pin_processing
+constraints:
+  - The KSN identifies the device context and transaction counter position used for derivation.
+  - Receiver-side systems use the KSN to regenerate the same working key without storing per-device session state.
+status: active
+```
+
+### DUKPT Transaction Lifecycle Rule
+
+```yaml
+id: rule.dukpt-transaction-lifecycle
+entity_type: constraint_rule
+canonical_name: DUKPT Transaction Lifecycle
+summary: DUKPT devices consume derivation state as transactions occur and do not reuse one-time transaction keys.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - A device retrieves key material from its future-key set for a transaction.
+  - The transaction counter advances after use.
+  - The consumed key material is invalidated and new future keys may be generated.
+status: active
+```
+
+### ISO 9564 PIN-Protection Rule
+
+```yaml
+id: rule.iso9564-pin-protection
+entity_type: constraint_rule
+canonical_name: ISO 9564 PIN Protection
+summary: PINs should be encoded into PIN blocks and encrypted with approved algorithms when transmitted through interoperable financial systems.
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - Common approved encryption families include TDES, RSA, and AES.
+  - PIN and associated card material must be handled under strict separation and protection controls.
 status: active
 ```
 
@@ -1846,6 +3340,245 @@ constraints:
 status: active
 ```
 
+## EMV Security Model
+
+### EMV Transaction Flow
+
+```yaml
+id: operation.emv-transaction-flow
+entity_type: operation
+canonical_name: EMV Transaction Flow
+summary: Canonical sequence of terminal and card processing steps used during an EMV transaction.
+domain:
+  - emv
+  - cryptography
+attributes:
+  typical_steps:
+    - application_selection
+    - initiate_application_processing
+    - read_application_data
+    - processing_restrictions
+    - offline_data_authentication
+    - cardholder_verification
+    - terminal_risk_management
+    - terminal_action_analysis
+    - card_action_analysis
+    - online_authorization_if_required
+    - issuer_script_processing
+status: active
+```
+
+### Offline Data Authentication
+
+```yaml
+id: operation.emv-offline-data-authentication
+entity_type: operation
+canonical_name: EMV Offline Data Authentication
+aliases:
+  - ODA
+summary: Card-authentication stage in which the terminal validates card authenticity using public-key mechanisms before or without host involvement.
+domain:
+  - emv
+  - cryptography
+attributes:
+  methods:
+    - SDA
+    - DDA
+    - CDA
+status: active
+```
+
+### SDA
+
+```yaml
+id: operation.emv-sda
+entity_type: operation
+canonical_name: Static Data Authentication
+aliases:
+  - SDA
+summary: EMV offline data authentication method that validates issuer-signed card data but does not by itself prevent card cloning.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: operation.emv-offline-data-authentication
+status: active
+```
+
+### DDA
+
+```yaml
+id: operation.emv-dda
+entity_type: operation
+canonical_name: Dynamic Data Authentication
+aliases:
+  - DDA
+summary: EMV offline data authentication method using card-generated dynamic cryptographic proof to resist cloning.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: operation.emv-offline-data-authentication
+status: active
+```
+
+### CDA
+
+```yaml
+id: operation.emv-cda
+entity_type: operation
+canonical_name: Combined Data Authentication
+aliases:
+  - CDA
+summary: EMV authentication method combining dynamic authentication with application cryptogram generation to provide stronger transaction assurance.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: operation.emv-offline-data-authentication
+  - type: related_to
+    target_id: artifact.arqc
+status: active
+```
+
+### Cardholder Verification Method
+
+```yaml
+id: concept.cvm
+entity_type: concept
+canonical_name: Cardholder Verification Method
+aliases:
+  - CVM
+summary: Method used in EMV and payment flows to assess whether the person presenting the card is the legitimate cardholder.
+domain:
+  - emv
+  - pin_processing
+  - card_validation
+attributes:
+  common_methods:
+    - signature
+    - offline_plaintext_pin
+    - offline_enciphered_pin
+    - online_pin
+    - no_cvm
+relationships:
+  - type: related_to
+    target_id: data_element.emv-tag-8e
+status: active
+```
+
+### Offline Plaintext PIN
+
+```yaml
+id: operation.offline-plaintext-pin
+entity_type: operation
+canonical_name: Offline Plaintext PIN Verification
+summary: Cardholder verification method in which the terminal presents the PIN to the card for local verification without issuer-host involvement.
+domain:
+  - emv
+  - pin_processing
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.cvm
+status: active
+```
+
+### Offline Enciphered PIN
+
+```yaml
+id: operation.offline-enciphered-pin
+entity_type: operation
+canonical_name: Offline Enciphered PIN Verification
+summary: Cardholder verification method in which the PIN is enciphered for card-side verification during offline EMV processing.
+domain:
+  - emv
+  - pin_processing
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.cvm
+status: active
+```
+
+### Online PIN
+
+```yaml
+id: operation.online-pin
+entity_type: operation
+canonical_name: Online PIN Verification
+summary: Cardholder verification method in which the PIN is protected and verified by issuer-side or host-side systems.
+domain:
+  - emv
+  - pin_processing
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.cvm
+  - type: related_to
+    target_id: artifact.encrypted-pin-block
+status: active
+```
+
+### No CVM
+
+```yaml
+id: operation.no-cvm
+entity_type: operation
+canonical_name: No Cardholder Verification Method
+aliases:
+  - no_cvm
+summary: Transaction path in which no explicit cardholder verification step is required by the card, terminal, or risk rules.
+domain:
+  - emv
+  - card_validation
+relationships:
+  - type: related_to
+    target_id: concept.cvm
+status: active
+```
+
+### Terminal Risk Management
+
+```yaml
+id: operation.emv-terminal-risk-management
+entity_type: operation
+canonical_name: EMV Terminal Risk Management
+summary: Terminal-side decision stage that evaluates whether a transaction should proceed offline, go online, or be declined based on local risk checks.
+domain:
+  - emv
+  - cryptography
+  - iso8583
+attributes:
+  common_checks:
+    - offline_ceiling_limit
+    - random_online_selection
+    - hot_card_list
+relationships:
+  - type: related_to
+    target_id: data_element.emv-tag-95
+status: active
+```
+
+### Terminal Action Analysis
+
+```yaml
+id: operation.emv-terminal-action-analysis
+entity_type: operation
+canonical_name: EMV Terminal Action Analysis
+summary: EMV decision stage using terminal and issuer action codes together with prior results to choose offline approval, online authorization, or offline decline.
+domain:
+  - emv
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: data_element.emv-tag-95
+status: active
+```
+
 ### EMV Implementation Rule
 
 ```yaml
@@ -1886,3 +3619,7 @@ that publish annual revisions).
 | 2026-05-14 | ISO 8583 parser, bitmap, PIN-block, and EMV-reference tool analysis | Various open tooling | — | iso8583, emv |
 | 2026-05-14 | PIN, CVV, PVV, KCV, MAC, DES/3DES, AES, HMAC, and PAN tooling analysis | Various open tooling | — | card_validation, key_management |
 | 2026-05-14 | Reference lists: EMV tags, AIDs, RIDs, ATRs, APDU responses, CA public keys, issuer test keys, HSM commands | Various open tooling | — | emv, hsm |
+| 2026-05-14 | Wikipedia enrichment: DUKPT, ISO 9564, EMV, ISO 8583, contactless, ATR, ISO/IEC 7816 | Wikimedia Foundation | live pages accessed 2026-05-14 | pin_processing, key_management, emv, iso8583, cryptography |
+| 2026-05-14 | General Payment HSM Integration Guide | Futurex | public PDF, 34 pages, accessed 2026-05-14 | hsm, key_management, cryptography, pin_processing, emv |
+| 2026-05-14 | payShield 10K Legacy Host Commands | Thales | PUGD0538-002, Version V1, 2019 | hsm, key_management, cryptography |
+| 2026-05-14 | payShield 10K Installation and User Guide | Thales | PUGD0535-006, updated 15 January 2021 | hsm, key_management, cryptography |
