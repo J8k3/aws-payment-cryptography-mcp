@@ -87,12 +87,61 @@ domain:
   - iso8583
 attributes:
   common_lengths:
+    - 8_to_19_digits
     - 13
     - 16
     - 19
+  structure:
+    leading_component: issuer_identification_number
+    trailing_component: account_identifier
+    final_component: luhn_check_digit
 relationships:
   - type: related_to
     target_id: algorithm.luhn
+  - type: related_to
+    target_id: concept.iin
+status: active
+```
+
+### Major Industry Identifier
+
+```yaml
+id: concept.mii
+entity_type: data_element
+canonical_name: Major Industry Identifier
+aliases:
+  - MII
+summary: Leading digit of a payment card number indicating the broad industry category of the issuer.
+domain:
+  - card_data
+relationships:
+  - type: related_to
+    target_id: concept.pan
+status: active
+```
+
+### Issuer Identification Number
+
+```yaml
+id: concept.iin
+entity_type: data_element
+canonical_name: Issuer Identification Number
+aliases:
+  - IIN
+  - BIN
+summary: Leading portion of a payment card number used to identify the issuing institution or program.
+domain:
+  - card_data
+attributes:
+  common_lengths:
+    - 6
+    - 8
+  standard_family: ISO_IEC_7812
+relationships:
+  - type: related_to
+    target_id: concept.mii
+  - type: related_to
+    target_id: concept.pan
 status: active
 ```
 
@@ -441,6 +490,38 @@ attributes:
 status: active
 ```
 
+### Card Security Code Family
+
+```yaml
+id: concept.card-security-code-family
+entity_type: concept
+canonical_name: Card Security Code Family
+aliases:
+  - CSC
+  - CVC
+  - CVV
+  - CID
+summary: Family of printed or electronically generated card security values used primarily in card-not-present and anti-fraud contexts.
+domain:
+  - card_validation
+  - card_data
+attributes:
+  common_form_factors:
+    - printed_three_digit
+    - printed_four_digit
+    - electronically_generated_dynamic_value
+relationships:
+  - type: related_to
+    target_id: artifact.cvv1
+  - type: related_to
+    target_id: artifact.cvv2
+  - type: related_to
+    target_id: artifact.icvv
+  - type: related_to
+    target_id: artifact.dcvv
+status: active
+```
+
 ### iCVV
 
 ```yaml
@@ -730,6 +811,47 @@ relationships:
 status: active
 ```
 
+### EMVCo
+
+```yaml
+id: concept.emvco
+entity_type: concept
+canonical_name: EMVCo
+summary: Industry body that manages EMV specifications and related payment technology standards such as EMV 3-D Secure.
+domain:
+  - emv
+  - reference_data
+relationships:
+  - type: related_to
+    target_id: concept.emv-standard
+  - type: related_to
+    target_id: operation.three-d-secure
+status: active
+```
+
+### EMV Standard
+
+```yaml
+id: concept.emv-standard
+entity_type: concept
+canonical_name: EMV Standard
+aliases:
+  - EMV
+summary: Technical standard family for integrated-circuit payment cards, terminals, and related transaction processing.
+domain:
+  - emv
+attributes:
+  common_books:
+    - Book 1 Interface Requirements
+    - Book 2 Security and Key Management
+    - Book 3 Application Specification
+    - Book 4 Cardholder, Attendant, and Acquirer Interface Requirements
+relationships:
+  - type: related_to
+    target_id: concept.emvco
+status: active
+```
+
 ### RID
 
 ```yaml
@@ -925,6 +1047,39 @@ domain:
 status: active
 ```
 
+### 3-D Secure
+
+```yaml
+id: operation.three-d-secure
+entity_type: operation
+canonical_name: 3-D Secure
+aliases:
+  - 3DS
+  - 3D Secure
+  - EMV 3-D Secure
+summary: Authentication protocol for online card transactions involving merchant/acquirer, issuer, and interoperability domains.
+domain:
+  - card_validation
+  - cryptography
+  - iso8583
+attributes:
+  three_domains:
+    - acquirer_domain
+    - issuer_domain
+    - interoperability_domain
+  major_generations:
+    - 3DS1
+    - 3DS2
+relationships:
+  - type: related_to
+    target_id: artifact.cavv
+  - type: related_to
+    target_id: artifact.aav
+  - type: related_to
+    target_id: artifact.aevv
+status: active
+```
+
 ## ISO 8583 and Payment Messaging
 
 ### ISO 8583 Message
@@ -1065,6 +1220,30 @@ attributes:
     - clearing
     - settlement
     - network_management
+status: active
+```
+
+### Card-Present and Card-Not-Present
+
+```yaml
+id: concept.transaction-channel-context
+entity_type: concept
+canonical_name: Transaction Channel Context
+summary: High-level distinction between transactions where the card is physically present and those where it is not.
+domain:
+  - iso8583
+  - card_validation
+attributes:
+  channels:
+    - card_present
+    - card_not_present
+relationships:
+  - type: related_to
+    target_id: artifact.cvv1
+  - type: related_to
+    target_id: artifact.cvv2
+  - type: related_to
+    target_id: operation.three-d-secure
 status: active
 ```
 
@@ -1253,6 +1432,40 @@ attributes:
     - zeros
     - cmac
     - hash
+status: active
+```
+
+### Format-Preserving Encryption
+
+```yaml
+id: algorithm.format-preserving-encryption
+entity_type: algorithm
+canonical_name: Format-Preserving Encryption
+aliases:
+  - FPE
+summary: Encryption approach that preserves the original data format, commonly discussed for protecting payment identifiers such as PANs.
+domain:
+  - cryptography
+  - card_data
+relationships:
+  - type: related_to
+    target_id: concept.pan
+status: active
+```
+
+### Tokenization
+
+```yaml
+id: concept.tokenization
+entity_type: concept
+canonical_name: Tokenization
+summary: Replacement of a sensitive payment identifier with a surrogate token for storage, display, or transmission.
+domain:
+  - card_data
+  - cryptography
+relationships:
+  - type: related_to
+    target_id: concept.pan
 status: active
 ```
 
@@ -1548,6 +1761,40 @@ status: active
 
 ## Cross-Cutting Constraint Rules
 
+### PCI Data Classification Rule
+
+```yaml
+id: rule.pci-data-classification
+entity_type: constraint_rule
+canonical_name: PCI Data Classification
+summary: Payment data should be classified into cardholder data and sensitive authentication data because handling rules differ materially.
+domain:
+  - card_data
+  - pin_processing
+  - cryptography
+constraints:
+  - Cardholder data includes PAN and may include cardholder name, expiration date, and service code.
+  - Sensitive authentication data includes full track data, card verification codes, and PIN or PIN-block data.
+  - Sensitive authentication data requires stricter storage controls than ordinary cardholder data.
+status: active
+```
+
+### PAN Display Rule
+
+```yaml
+id: rule.pan-display-protection
+entity_type: constraint_rule
+canonical_name: PAN Display Protection
+summary: Full PAN should not be unnecessarily displayed, printed, or stored in clear form.
+domain:
+  - card_data
+  - cryptography
+constraints:
+  - PAN truncation is a standard protective pattern for display and receipts.
+  - Tokenization and format-preserving encryption are common mitigation patterns for operational systems.
+status: active
+```
+
 ### PAN Dependency Rule for PIN-Block Formats
 
 ```yaml
@@ -1579,6 +1826,7 @@ constraints:
   - CVV2 is associated with card-not-present contexts.
   - iCVV is associated with chip contexts.
   - dCVV and dCVC are dynamic and transaction-linked or context-linked.
+  - Printed card security codes should not be treated as equivalent to EMV-generated dynamic values.
 status: active
 ```
 
@@ -1595,6 +1843,21 @@ constraints:
   - Tags may be primitive or constructed.
   - TLV structures may be nested.
   - EMV data often appears inside ISO 8583 DE55 for host interchange.
+status: active
+```
+
+### EMV Implementation Rule
+
+```yaml
+id: rule.emv-common-vs-scheme-specific
+entity_type: constraint_rule
+canonical_name: EMV Common Versus Scheme-Specific Layers
+summary: EMV includes both common cross-scheme specifications and scheme-specific implementations or programs.
+domain:
+  - emv
+constraints:
+  - Common EMV concepts should be modeled separately from network-specific implementations.
+  - Certification and brand overlays should be represented as scheme variants rather than replacing canonical EMV records.
 status: active
 ```
 
