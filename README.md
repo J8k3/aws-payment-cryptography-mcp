@@ -64,6 +64,8 @@ Or register via the CLI:
 codex mcp add apc-agent --env AWS_REGION=us-east-1 -- apc-agent
 ```
 
+**Kiro** — [![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=apc-agent&config=%7B%22command%22%3A%22apc-agent%22%2C%22env%22%3A%7B%22AWS_REGION%22%3A%22us-east-1%22%7D%7D)
+
 AWS credentials are consumed via the standard boto3 chain: IAM role, `~/.aws/credentials`, or environment variables. Set `AWS_REGION` to the region where your APC resources live.
 
 ---
