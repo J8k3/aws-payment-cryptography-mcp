@@ -1611,9 +1611,15 @@ status: active
 - ISO 8583 field dictionary
 - PIN-block method catalog with aliases and examples
 
-## Current Source Families Used to Seed This KB
+## Sources
 
-- EMV/TLV decoder and cryptography tool families
-- PIN, CVV, PVV, KCV, MAC, DES/3DES, AES, HMAC, and PAN tooling families
-- ISO 8583 parser, bitmap, cryptogram, PIN-block, and EMV-reference tool families
-- reference lists for EMV tags, AIDs, RIDs, ATRs, APDU responses, CA public keys, issuer test keys, and HSM commands
+When adding records derived from a new source, add a row here. Include enough detail
+to re-derive the same records later (document version and date matter for standards
+that publish annual revisions).
+
+| Ingested | Source | Publisher | Version / Edition | Domains |
+|----------|--------|-----------|-------------------|---------|
+| 2026-05-14 | EMV/TLV, cryptography, and PIN-block tool family analysis | Various open tooling | — | card_data, pin_processing, cryptography, emv |
+| 2026-05-14 | ISO 8583 parser, bitmap, PIN-block, and EMV-reference tool analysis | Various open tooling | — | iso8583, emv |
+| 2026-05-14 | PIN, CVV, PVV, KCV, MAC, DES/3DES, AES, HMAC, and PAN tooling analysis | Various open tooling | — | card_validation, key_management |
+| 2026-05-14 | Reference lists: EMV tags, AIDs, RIDs, ATRs, APDU responses, CA public keys, issuer test keys, HSM commands | Various open tooling | — | emv, hsm |

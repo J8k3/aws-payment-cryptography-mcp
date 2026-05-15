@@ -1,5 +1,7 @@
 """MCP server entry point for the AWS Payment Cryptography agent."""
 
+from pathlib import Path
+
 from mcp.server.fastmcp import FastMCP
 
 from .control_plane import register_control_plane_tools
@@ -15,6 +17,22 @@ mcp = FastMCP(
 register_control_plane_tools(mcp)
 register_data_plane_tools(mcp)
 register_hsm_tools(mcp)
+
+_KB_PATH = Path(__file__).parent.parent.parent / "payment-knowledge-base.md"
+
+
+@mcp.resource(
+    "payment://knowledge-base",
+    name="Payment Knowledge Base",
+    description=(
+        "Vendor-neutral reference for payment domain concepts: card data, PIN blocks, "
+        "card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, "
+        "cryptographic algorithms, and cross-cutting constraint rules."
+    ),
+    mime_type="text/markdown",
+)
+def payment_knowledge_base() -> str:
+    return _KB_PATH.read_text(encoding="utf-8")
 
 
 def main() -> None:
