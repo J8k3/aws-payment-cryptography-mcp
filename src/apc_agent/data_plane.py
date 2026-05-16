@@ -404,10 +404,13 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         ISO 8583 field 64 (primary MAC) or field 128 (secondary MAC).
 
         generation_attributes examples:
-          CMAC:       {"Algorithm": "CMAC"}
-          ISO 9797-1 Alg 1 (CBC-MAC): {"Algorithm": "ISO_9797_1_ALGO_1"}
-          ISO 9797-1 Alg 3 (Retail):  {"Algorithm": "ISO_9797_1_ALGO_3_NO_PADDING"}
-          HMAC-SHA256: {"Algorithm": "HMAC_SHA_256"}
+          CMAC:                        {"Algorithm": "CMAC"}
+          ISO 9797-1 Alg 1 (CBC-MAC): {"Algorithm": "ISO9797_ALGORITHM1"}
+          ISO 9797-1 Alg 3 (Retail):  {"Algorithm": "ISO9797_ALGORITHM3"}
+          HMAC-SHA256:                 {"Algorithm": "HMAC_SHA256"}
+          DUKPT CMAC:                  {"DukptCmac": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "AES_128"}}
+          DUKPT Alg 1:                 {"DukptIso9797Algorithm1": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "TDES_2KEY"}}
+          DUKPT Alg 3:                 {"DukptIso9797Algorithm3": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "TDES_2KEY"}}
 
         Args:
             key_identifier: ARN or alias of MAC key (M0, M1, M3, M6, or M7)

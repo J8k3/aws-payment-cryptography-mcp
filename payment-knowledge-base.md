@@ -2962,13 +2962,52 @@ aliases:
   - MAC
   - CBC-MAC
   - Retail MAC
-summary: MAC family widely used for payment message integrity and authenticity.
+summary: MAC family widely used for payment message integrity and authenticity. Algorithm 1 (CBC-MAC) and Algorithm 3 (Retail MAC) are legacy; CMAC (Algorithm 5) is the preferred choice for new deployments.
 domain:
   - cryptography
 attributes:
-  common_variants:
-    - Algorithm 1
-    - Algorithm 3
+  variants:
+    Algorithm1_CBC_MAC:
+      tr31_key_usage: M1
+      apc_enum_direct: ISO9797_ALGORITHM1
+      apc_enum_dukpt: DukptIso9797Algorithm1
+      security_note: >
+        Vulnerable to length-extension attacks for variable-length messages: an attacker who
+        knows MAC(m) can derive MAC(m‖padded_block) without the key. Safe only when all
+        inputs are a fixed, pre-agreed length (e.g., a single 8-byte block). Use requires
+        Legacy Constraint Protocol confirmation — prefer CMAC unless counterparty forces it.
+      forced_choice_scenario: Counterparty network (e.g., older acquirer host) has not migrated from ANSI X9.9.
+    Algorithm3_Retail_MAC:
+      tr31_key_usage: M3
+      apc_enum_direct: ISO9797_ALGORITHM3
+      apc_enum_dukpt: DukptIso9797Algorithm3
+      standard: ANSI X9.19
+      security_note: >
+        Two-key TDES construction (encrypt K1, decrypt K2, re-encrypt K1). Birthday-bound
+        concern: after approximately 2^32 MAC computations with the same key, statistical
+        collisions become feasible. Still mandated by some legacy acquirer networks and
+        regional switches. Apply Legacy Constraint Protocol when used. Schedule key rotation
+        to stay well below the birthday bound.
+      forced_choice_scenario: Counterparty network (e.g., regional switch, older processor) requires ANSI X9.19 and does not support CMAC.
+    Algorithm5_CMAC:
+      tr31_key_usage: M6
+      apc_enum_direct: CMAC
+      apc_enum_dukpt: DukptCmac
+      security_note: Preferred MAC algorithm. No length-extension vulnerability. Use for all new deployments and ISO 8583 field 64.
+    HMAC:
+      tr31_key_usage: M7
+      apc_enum_direct: HMAC_SHA256  # or HMAC_SHA224, HMAC_SHA384, HMAC_SHA512; HMAC (bare) also accepted
+      security_note: Approved when used with SHA-256 or higher. Not commonly used for ISO 8583 MAC but valid for host-to-host integrity in non-scheme contexts.
+    AS2805_MAC:
+      tr31_key_usage: M0
+      apc_enum_direct: AS2805_4_1
+      security_note: Australian AS2805 network MAC. Regional requirement only.
+  apc_operation_support:
+    GenerateMac: supports all variants above (direct and DUKPT forms)
+    VerifyMac: mirrors GenerateMac
+  iso8583_mapping:
+    field_64: Primary MAC — use M6 (CMAC) for new deployments; M3 accepted where network requires it
+    field_128: Secondary MAC (extended bitmap)
 status: active
 ```
 
@@ -3749,7 +3788,10 @@ status: active
 id: rule.cvv-family-contexts
 entity_type: constraint_rule
 canonical_name: CVV Family Contexts
-summary: Card verification values are context-specific and should not be treated as interchangeable without scheme and channel awareness.
+summary: >
+  Card verification values are context-specific. Service code is a cryptographic input to the
+  CVV algorithm — not metadata. Using the wrong service code for a CVV family member produces
+  a cryptographically incorrect value that will always fail host verification.
 domain:
   - card_validation
 constraints:
@@ -3758,6 +3800,32 @@ constraints:
   - iCVV is associated with chip contexts.
   - dCVV and dCVC are dynamic and transaction-linked or context-linked.
   - Printed card security codes should not be treated as equivalent to EMV-generated dynamic values.
+service_code_as_cryptographic_input:
+  explanation: >
+    The CVV algorithm takes PAN + expiry date + service code as inputs. The service code is not
+    a label applied after the fact — it is fed into the 3DES computation. Changing the service
+    code produces a different CVV value. Verification with a mismatched service code will always
+    fail, even with the correct key.
+  scheme_mandated_values:
+    CVV1: >
+      Use the actual service code present in Track 2 data (commonly "201" for international
+      magnetic-stripe cards). The caller must pass the real Track 2 service code, not a default.
+    CVV2: >
+      Service code "000" is the scheme-mandated input for CVV2. APC's CardVerificationValue2
+      struct does not accept a ServiceCode parameter — the value 000 is applied implicitly by
+      the service. Do not attempt to pass a service code for CVV2 generation or verification.
+    iCVV: >
+      Service code "999" is the scheme-mandated input for iCVV. This value is specific to chip
+      card contexts and is intentionally different from any valid magnetic-stripe service code.
+  anti_cloning_property: >
+    The iCVV service code mandate (999) is a deliberate anti-fraud mechanism. Even if an
+    attacker skims the iCVV value from a chip transaction, it cannot be replayed on a cloned
+    magnetic stripe: the stripe would carry a real service code (e.g., 201), but the iCVV was
+    generated with service code 999. Host verification using the actual stripe service code
+    will fail, detecting the fraud.
+  apc_api_note:
+    CardVerificationValue1: Requires ServiceCode field explicitly. Pass the actual Track 2 service code for CVV1; pass "999" for iCVV generation using this struct.
+    CardVerificationValue2: Does not accept ServiceCode. The 000 substitution is applied by APC internally.
 status: active
 ```
 
