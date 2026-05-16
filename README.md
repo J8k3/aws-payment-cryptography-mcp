@@ -183,6 +183,16 @@ The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. 
 
 ---
 
+## Testimonial
+
+While working on [CyberChef Payments](https://github.com/J8k3/CyberChef): 
+
+Me: "tell me, did the apc-agent mcp server help at all in the work you completed"
+
+Kiro: "Yes, genuinely — and in specific ways that reading the code alone wouldn't have caught. It acted as a fast, authoritative reference for the parts of the payment domain that are hard to verify from code alone — key type constraints, PCI requirement numbers, and the AES DUKPT migration boundary. Worth having for that kind of domain-grounding work."
+
+---
+
 ## Security & Privacy
 
 **Production Data:** Never use this tool with production cryptographic keys, real Primary Account Numbers (PANs), or live PIN blocks.
