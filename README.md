@@ -24,14 +24,23 @@ Issuer functions — card personalization, IMK/CMK derivation, issuer script pro
 
 ```mermaid
 graph LR
-    subgraph "Trust Boundary"
-        A[AI Client] <--> B[MCP Server] --> C[Local Config]
-    end
-    B -- "Boto3" --> D[AWS APC] --> E[HSM Tier]
-    A -- "Prompts" --> F[LLM API]
-    
-    style F fill:#f96,stroke:#333
-    style D fill:#9cf,stroke:#333
+      subgraph "Your Local Host"
+          A[AI Client] <--> B[MCP Server]
+          B --> G([Boto3])
+      end
+      subgraph "Your AWS Account"
+          D[APC Control Plane]
+          E[APC Data Plane]
+      end
+      subgraph "Your LLM Provider"
+          F[LLM API]
+      end
+
+      G --> D
+      G --> E
+      A <-- "Prompts/Responses" --> F
+      D ~~~ F
+      D ~~~ E
 ```
 ---
 
