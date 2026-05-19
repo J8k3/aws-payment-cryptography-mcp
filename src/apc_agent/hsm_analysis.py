@@ -18,13 +18,73 @@ Sources and confidence levels:
                              Atalla backward-compatibility, but are not seen in Excrypt deployments.
                              Proxy support: not implemented — wire format undocumented.
 
+Wire format (Futurex Excrypt):
+  TCP socket with mTLS; commands wrapped in [ ] delimiters, AO prefix prepended to the
+  4-character command code on the wire: [AO<CCCC>;<field_id><value>;...;]
+  Field identifiers are 2-char alphanumeric codes immediately followed by the value with
+  no separator. Common field IDs from whitepaper examples:
+    AW = wrapping mode (1 = 3DES MFK)
+    AX = inbound key (cryptogram or TR-31 key block for TPIN/GKBL)
+    BT = outbound key
+    AL = PIN block (in) / translated PIN block (out)
+    AK = PAN (TPIN) or key block header target (GKBL)
+    AS = source key type (1 = cryptogram)
+    BG = key data (cryptogram body)
+    BB = output key block (response)
+    AE = error code / KCV (response)
+  Application code typically passes the 4-char code without AO prefix to the API client,
+  which prepends AO before sending. Futurex HSMs automatically pad shorter key blocks to
+  at least 3DES length. Key block settings (ANSI TR-31, cryptogram disable) are controlled
+  in Excrypt Manager → Extended Options → Key Block Policy.
+
 Wire format (Thales payShield 10K):
   TCP socket (clear or TLS); 2-byte big-endian length prefix; m-byte message header (set at
-  installation); 2-char command code; variable-length fields. Response: m-byte header; 2-char
-  response code; 2-char error code ('00' = success, '68' = command disabled); fields.
+  installation, commonly 4 bytes '0000'); 2-char command code; variable-length fields.
+  Response: m-byte header; 2-char response code (command letter + next letter, e.g. NC→ND);
+  2-char error code ('00' = success, '68' = command disabled); fields.
   Key size encoding: 16H = single-DES/TDES; 'U' + 32H = double-length TDES key block;
   'T' + 48H = triple-length; 'S' + n A = TR-31 key block. STX/ETX control characters
   bracket the message when using asynchronous comms (not shown in field tables).
+  Simulated firmware version: 4.8.3 (KeyLab payShield 10K simulator, v1.1.2).
+
+  Common host command response/error codes (2-digit hex after response command code):
+    00 = No error (success)
+    01 = Verification failure (PIN/MAC/CVV mismatch or key parity import error)
+    04 = Invalid key type
+    05 = Invalid key length
+    10 = Source key parity error
+    11 = Destination key parity error or key all zeros
+    15 = Invalid input data
+    20 = PIN block error
+    21 = No LMK loaded
+    24 = Invalid PAN
+    26 = Invalid expiry date
+    30 = Invalid ARQC
+    32 = Invalid transaction data
+    68 = Command disabled (Function Blocking — enable in HSM settings)
+
+  Console commands (physical keyboard on HSM, offline/maintenance mode only — not host commands):
+    vt  = View Table (show LMK table and key change storage)
+    GT  = Generate Test LMK (quick setup for dev/test environments)
+    GK  = Generate Keys (component of production LMK setup ceremony)
+    LK  = Load Keys (second step of production LMK load; GK then LK)
+  Console prompt reflects mode: Offline> / Online> / Maintenance>
+
+  Key type codes (3-digit, used in key generation/translation commands):
+    000 = ZMK (Zone Master Key)    LMK pair 04-05
+    001 = ZPK (Zone PIN Key)       LMK pair 06-07
+    002 = PVK / TMK / TPK          LMK pair 14-15
+    003 = TAK (Terminal Auth Key)  LMK pair 16-17
+    006 = WWK                      LMK pair 22-23
+    008 = ZAK                      LMK pair 26-27
+    009 = BDK (DUKPT)              LMK pair 28-29
+
+  Key scheme designators (key length/format prefix on encrypted key value):
+    Z = single-length DES (deprecated)
+    U = double-length TDES variant (most common legacy)
+    T = triple-length TDES variant
+    X = double-length TDES ANSI (X9.24 format)
+    Y = triple-length TDES ANSI
 
 Key insight: Futurex's International command set uses the same command codes as Thales payShield
 (CA, CC, CI, CW, CY, M6, M8, MA, etc.). Code that appears to target "Thales International" commands
@@ -68,7 +128,10 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "Translates a PIN block between encryption keys. Core acquirer operation.",
                "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
                "Most common PIN routing command in Futurex Excrypt deployments. "
-               "Supports DUKPT, ZPK, and PEK key types."),
+               "Supports DUKPT, ZPK, and PEK key types. "
+               "Wire fields: AW=wrapping mode, AX=inbound PEK (cryptogram or TR-31 block), "
+               "BT=outbound PEK, AL=PIN block, AK=PAN. "
+               "Example: [AOTPIN;AW1;AX<inbound_pek>;BT<outbound_pek>;AL<pin_block>;AK<pan>;]"),
     HsmCommand("Futurex", "Excrypt", "XPIN", "Extended PIN Translation", "PIN",
                "Extended PIN translation supporting additional schemes (IBM4736, PINPad, ANSI to ANSI).",
                "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
@@ -149,6 +212,45 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "and one-pass with AES. Core remote key loading command.",
                "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
                "Maps to APC get_parameters_for_import + import_key TR-34 flow."),
+    HsmCommand("Futurex", "Excrypt", "GPGS", "General Purpose Generate Symmetric Key", "KEY_MGMT",
+               "Generates a symmetric key (TDES or AES) under the HSM master file key. "
+               "Returns the key as a raw cryptogram (legacy) with no MAC or binding metadata. "
+               "Used for one-time symmetric key generation outside of DUKPT or TR-31 flows.",
+               "create_key", None,
+               "Wire example: [AOGPGS;CT3;FS1;] → [AOGPGS;AE5AAE;BG<24-byte-hex-cryptogram>;RT1;]. "
+               "The 24-byte BG field is a TDES cryptogram — length reveals the algorithm, "
+               "usage/type are stored only in a separate key database (no binding). "
+               "Migrate generated keys through GKBL immediately to obtain a TR-31 key block "
+               "for PCI PIN 18-3 compliance. "
+               "Source: Futurex TR-31 Key Block Implementation Whitepaper (2024)."),
+    HsmCommand("Futurex", "Excrypt", "GKBL", "Translate Cryptogram to TR-31 Key Block", "KEY_MGMT",
+               "Translates an existing cryptogram into a TR-31 key block, or generates a new key "
+               "directly as a TR-31 key block. Core PCI PIN 18-3 migration command — attaches "
+               "key usage, algorithm, mode-of-use, and exportability to the key value via the "
+               "header, providing both confidentiality and integrity. "
+               "Must be enabled via Excrypt Manager → Function Blocking tab.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Wire example (cryptogram → key block): "
+               "[AOGKBL;AS1;BG<cryptogram>;AKA0088P0TE00E0000;] → [AOGKBL;BB<key_block>;AE<kcv>;]. "
+               "TR-31 key block header fields (example 'A0088P0TE00E0000'): "
+               "  pos 0     — version: A=Key Variant Binding (DEPRECATED, do not use for new keys), "
+               "                        B=TDEA Key Derivation Binding, "
+               "                        C=TDEA Key Variant Binding, "
+               "                        D=AES Key Derivation Binding (REQUIRED for PCI P2PE Req 12-5); "
+               "  pos 1-4   — total key block length in ASCII decimal (e.g. '0088'); "
+               "  pos 5-6   — key usage (TR-31 code, e.g. P0=PIN encryption, M6=CMAC, "
+               "                          C0=CVK, B0=BDK, K1=KEK, D0=data encryption); "
+               "  pos 7     — algorithm: A=AES, T=Triple-DES, D=DES (prohibited); "
+               "  pos 8     — mode of use: E=encrypt/wrap only, N=no restriction, "
+               "                            X=derive keys, G=generate/verify MAC; "
+               "  pos 9-10  — key version (00=not a component, 01-99=component index); "
+               "  pos 11    — exportability: E=exportable under KEK, N=non-exportable, S=sensitive; "
+               "  pos 12-13 — number of optional blocks (00=none); "
+               "  pos 14-15 — reserved by TR-31 spec (00). "
+               "Version D (AES) is required for PCI P2PE compliance (Req 12-5); versions B/C use TDES MFK. "
+               "Futurex HSMs pad shorter key blocks to at least 3DES length automatically. "
+               "After migration, only key blocks should be stored — disable cryptograms in Key Block Policy. "
+               "Source: Futurex TR-31 Key Block Implementation Whitepaper (2024)."),
 ]
 
 # ── Futurex/Thales International Commands ────────────────────────────────────
@@ -198,6 +300,39 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     HsmCommand("Thales/Futurex", "International", "JG",
                "Translate PIN from LMK to ZPK Encryption", "PIN",
                "Translates from LMK to ZPK.", "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
+    HsmCommand("Thales/Futurex", "International", "JA",
+               "Generate Random PIN", "PIN",
+               "Generates a random PIN of specified length for a given PAN. "
+               "Returns the PIN encrypted under LMK. Response code: JB.",
+               "generate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Wire params (thales-bogr): PAN (12N), PIN length (2N). "
+               "In APC: generate_pin_data returns a PIN block encrypted under the specified PEK; "
+               "APC has no LMK concept — the output key is the APC PEK ARN. "
+               "EFTlab + thales-bogr sources — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "BA",
+               "Encrypt Clear PIN to LMK-Encrypted PIN Block", "PIN",
+               "Accepts a clear PIN and account number, returns a PIN block encrypted under LMK. "
+               "Used to bring a clear PIN into HSM custody. Response code: BB.",
+               "generate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Wire params (thales-bogr): PIN format (7-char, e.g. 01 = ISO Format 1), "
+               "account number. Clear PIN must never appear in logs — this command is the "
+               "boundary where clear PINs enter HSM custody. "
+               "In APC: generate_pin_data. Clear PIN input is not supported by APC directly; "
+               "use generate_pin_data with PIN entered at a PCI PTS-certified device. "
+               "EFTlab + thales-bogr sources — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "NG",
+               "Decrypt PIN Block to Clear PIN (Get Clear PIN)", "PIN",
+               "Decrypts an LMK-encrypted PIN block to recover the clear PIN. Response code: NH.",
+               None, None,
+               "COMPLIANCE HARD STOP: Exposing a clear PIN from an HSM violates PCI PIN Req 3-1. "
+               "This command exists for PIN printing workflows (e.g. mailers) and must only be "
+               "used with a PIN print module under dual control. Never log the clear PIN output. "
+               "In APC: no equivalent. APC does not expose clear PINs under any circumstance. "
+               "Wire params (thales-bogr): account number (12N last digits), PIN under LMK. "
+               "EFTlab + thales-bogr sources — reference quality.",
+               confidence="medium"),
     # PIN Verification
     HsmCommand("Thales/Futurex", "International", "DA",
                "Verify Terminal PIN Block — IBM3624", "PIN",
@@ -220,6 +355,26 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     HsmCommand("Thales/Futurex", "International", "CM",
                "Verify PIN using Visa PVV Method", "PIN",
                "Visa PVV PIN verification.", "verify_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY"),
+    HsmCommand("Thales/Futurex", "International", "DE",
+               "Generate IBM PIN Offset", "PIN",
+               "Generates an IBM 3624 PIN offset from a PVK and a PIN encrypted under LMK. "
+               "The offset encodes the distance from a natural PIN to the chosen PIN. Response code: DF.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Wire params (thales-bogr): PVK (under LMK), PIN under LMK, check length (1N), "
+               "account number (12N), decimalization table (16N), validation data (12N). "
+               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY. "
+               "EFTlab + thales-bogr sources — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "EE",
+               "Derive IBM 3624 PIN from Offset", "PIN",
+               "Derives the cardholder PIN from a PVK, offset, and account number. "
+               "Reverse of DE — produces the natural PIN for comparison. Response code: EF.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Wire params (thales-bogr): PVK (under LMK), PIN offset (4N), check length (1N), "
+               "account number (12N), decimalization table (16N), validation data (12N). "
+               "In APC: generate_pin_data. "
+               "EFTlab + thales-bogr sources — reference quality.",
+               confidence="medium"),
     # CVV
     HsmCommand("Thales/Futurex", "International", "CW",
                "Generate Visa Card Verification Value (CVV)", "CVV",
@@ -312,6 +467,64 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Decrypts a data block. Response code: M3.",
                "decrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
                "EFTlab source — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "M4",
+               "Translate (Re-encrypt) a Data Block", "ENCRYPT",
+               "Re-encrypts a data block from one key to another without exposing plaintext. "
+               "Response code: M5. Used at zone boundaries to change the protecting key.",
+               "re_encrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
+               "In APC: re_encrypt_data. Both inbound and outbound keys must be TR31_D0. "
+               "EFTlab source — reference quality.",
+               confidence="medium"),
+    # Key Management — ceremony and generation
+    HsmCommand("Thales/Futurex", "International", "GC",
+               "Generate ZMK Component", "KEY_MGMT",
+               "Generates a clear ZMK component for use in a split-knowledge key ceremony. "
+               "Returns the clear component and its encrypted form under LMK. Response code: GD. "
+               "Parameters: key length [1=single, 2=double, 3=triple], key type (3-digit), key scheme.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "In APC: the ceremony is performed out-of-band by custodians; the resulting "
+               "ZMK/KEK is imported via import_key using TR-34 (recommended) or TR-31. "
+               "APC has no component generation command. "
+               "snowch/hsm-guide source — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "FK",
+               "Form Key from Components", "KEY_MGMT",
+               "XORs 2–9 key components (entered by separate custodians) into a working key. "
+               "Component types: X=clear XOR, H=half/third, E=LMK-encrypted, S=smartcard. "
+               "Response code: FL.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "In APC: no equivalent — component XOR ceremony is out-of-band; result is "
+               "imported via TR-34/TR-31. "
+               "snowch/hsm-guide source — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "KG",
+               "Generate Zone PIN Key (ZPK)", "KEY_MGMT",
+               "Generates a new ZPK encrypted under both LMK and an optional ZMK. "
+               "Response code: KH. Parameters: key length, key type (001=ZPK), key scheme (LMK), "
+               "key scheme (ZMK), encrypted ZMK.",
+               "create_key", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "In APC: create_key with TR31_P0_PIN_ENCRYPTION_KEY usage. "
+               "APC replaces LMK storage — the key ARN is the reference. "
+               "snowch/hsm-guide source — reference quality.",
+               confidence="medium"),
+    # Diagnostic / utility (no APC equivalent)
+    HsmCommand("Thales/Futurex", "International", "NC",
+               "Perform HSM Diagnostics / Self-Test", "KEY_MGMT",
+               "Runs HSM self-test and returns firmware version and LMK check value. "
+               "Response code: ND. No input parameters required. "
+               "Wire hex example: command code 'NC' = 0x4E43.",
+               None, None,
+               "No APC equivalent — APC health is monitored via CloudWatch and the AWS console. "
+               "snowch/hsm-guide + thales-bogr sources — reference quality.",
+               confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "QH",
+               "Query Host / Connectivity Test", "KEY_MGMT",
+               "Tests HSM connectivity and returns firmware version and LMK check value. "
+               "Response code: QI.",
+               None, None,
+               "No APC equivalent — use AWS service health checks. "
+               "snowch/hsm-guide source — reference quality.",
                confidence="medium"),
 ]
 
@@ -867,8 +1080,9 @@ for _cmd in ALL_COMMANDS:
 
 # Futurex Excrypt: commands wrapped in [ ] with ; separators
 FUTUREX_EXCRYPT_PATTERNS = [
-    r'\[([A-Z]{4});',                   # [TPIN; or [EMVA;
-    r'send\s*\(\s*["\[](TPIN|XPIN|EMVA|GMAC|VMAC|TPDD|VPIN|DCDK|ECDK)',
+    r'\[AO([A-Z]{4});',                 # [AOTPIN; [AOGKBL; — actual Excrypt wire format
+    r'\[([A-Z]{4});',                   # [TPIN; [EMVA; — application-level / abbreviated
+    r'send\s*\(\s*["\[](TPIN|XPIN|EMVA|GMAC|VMAC|TPDD|VPIN|DCDK|ECDK|GKBL|GPGS)',
 ]
 
 # Numeric codes: Atalla Standard API and Futurex Standard (Atalla-compatible).
