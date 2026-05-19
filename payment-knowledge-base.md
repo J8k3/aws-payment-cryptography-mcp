@@ -3852,15 +3852,16 @@ attributes:
     - Translate PIN block (Format 0/1/3 ↔ Format 0/1/3, clear-key)
   validation_posture: >
     Operations backed by established primitives (AES-CMAC, HMAC, CMAC) are high-confidence.
-    Operations in the payment-specific layer (DUKPT derivation, CVV, PVV, ISO 9797-1) are
-    partially verified — cross-check against payShield or APC for production use.
+    AES DUKPT key derivation is verified against all five ANSI X9.24-3-2017 normative test-vector
+    suites (artifact.ansi-x9-24-3-test-vectors). Other payment-specific operations (CVV, PVV,
+    ISO 9797-1) are partially verified — cross-check against payShield or APC for production use.
   recipe_chaining: >
     Operations output as hex or short scalar values that flow into the next operation's input.
     Generate ops return the short artifact (ARQC, PVV, PIN offset) with outputJson=false for
     chaining into Verify ops.
   not_covered:
     - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
-    - AES DUKPT cross-verification against artifact.ansi-x9-24-3-test-vectors (issue #14 in the fork repo — official vectors now in KB)
+    - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
     - Issuer card personalization, IMK/CMK derivation (out of scope)
 relationships:
   - type: related_to
