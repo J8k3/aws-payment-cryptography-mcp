@@ -2759,6 +2759,175 @@ relationships:
 status: active
 ```
 
+### AES DUKPT Official Test Vectors (ANSI X9.24-3-2017)
+
+```yaml
+id: artifact.ansi-x9-24-3-test-vectors
+entity_type: artifact
+canonical_name: ANSI X9.24-3-2017 Official AES DUKPT Test Vectors
+aliases:
+  - X9.24-3 Test Vectors
+  - AES DUKPT Test Vectors
+summary: >
+  Official supplement to ANSI X9.24-3-2017 (ASC X9, Jan 2018) providing normative test vectors
+  for validating AES DUKPT implementations. Covers five key-size combinations, eleven transaction
+  counter values from 1 to 0xFFFFFFFF, and AES Format 4 PIN block construction examples.
+domain:
+  - key_management
+  - cryptography
+  - testing
+attributes:
+  source_url: http://x9.org/standards/x9-24-part-3-test-vectors/
+  pdf_url: https://x9.org/wp-content/uploads/2018/03/X9.24-3-2017-Test-Vectors-20180129-1.pdf
+  python_source_zip: https://x9.org/wp-content/uploads/2018/03/X9.24-3-2017-Python-Source-20180129.zip
+  suites_covered:
+    - AES-128 keys from AES-128 BDK
+    - AES-128 keys from AES-256 BDK
+    - AES-256 keys from AES-256 BDK
+    - 2-key TDEA keys from AES-128 BDK
+    - 3-key TDEA keys from AES-128 BDK
+  counter_values_tested:
+    - counters 1–8 (first eight transactions)
+    - 131070 (0x1fffe) and 131071 (0x1ffff), last counters before first bit-skip
+    - 131072 (0x20000) and 131073 (0x20001), first skipped-bit counters
+    - 8675309 (0x845fed), random midrange sample
+    - 4294844416 (0xfffe2000) through 4294901760 (0xffff0000), last five active counters
+    - 4294967295 (0xffffffff), DUKPT Update Key renewal counter
+  common_inputs:
+    BDK_128: FEDCBA9876543210F1F1F1F1F1F1F1F1
+    BDK_256: FEDCBA9876543210F1F1F1F1F1F1F1F1FEDCBA9876543210F1F1F1F1F1F1F1F1
+    InitialKeyID: "1234567890123456"
+  initial_keys:
+    IK_AES128_from_AES128_BDK: 1273671EA26AC29AFA4D1084127652A1
+    IK_AES256_from_AES256_BDK: CE9CE0C101D1138F97FB6CAD4DF045A7083D4EAE2D35A31789D01CCF0949550F
+    notes:
+      - 2TDEA and 3TDEA suites share IK_AES128_from_AES128_BDK as their initial key.
+      - AES-128-from-AES-256-BDK suite shares IK_AES256_from_AES256_BDK as its initial key.
+      - Derivation keys at a given counter are identical across all suites that share the same IK.
+  derivation_data_structure:
+    description: >
+      16 bytes. Bytes 0–7 encode the key-type descriptor; bytes 8–11 are the last 4 bytes of
+      InitialKeyID (the device identifier half); bytes 12–15 are the 32-bit transaction counter
+      (big-endian). Only bytes 12–15 vary per transaction.
+    byte_layout:
+      byte_0_version: "0x01 (always)"
+      byte_1_key_size_class:
+        "0x01": 128-bit output key (AES-128, 2TDEA)
+        "0x02": 192/256-bit output key (3TDEA, AES-256)
+      bytes_2_3_key_purpose:
+        "0x0002": Key Encryption Key (KEK)
+        "0x1000": Encrypt-only (PIN encryption / data encryption encrypt)
+        "0x1001": Decrypt-only (data encryption decrypt)
+        "0x1002": Bidirectional (data encryption both ways)
+        "0x2000": MAC generation
+        "0x2001": MAC verification
+        "0x2002": MAC both ways
+        "0x8000": Key Derivation Key
+      bytes_4_5_algorithm:
+        "0x0000": 2-key TDEA
+        "0x0001": 3-key TDEA
+        "0x0002": AES-128
+        "0x0004": AES-256
+      bytes_6_7_key_length_bits_big_endian:
+        "0x0080": 128 bits
+        "0x00C0": 192 bits (3TDEA)
+        "0x0100": 256 bits (AES-256)
+      bytes_8_11: Last 4 bytes of 8-byte InitialKeyID
+      bytes_12_15: Transaction counter, 32-bit big-endian
+    examples:
+      AES128_PIN_encrypt_counter_1:   "01011000 00020080 90123456 00000001"
+      AES128_MAC_generation_counter_1: "01012000 00020080 90123456 00000001"
+      AES128_data_encrypt_counter_1:  "01013000 00020080 90123456 00000001"
+      AES128_KEK_counter_1:           "01010002 00020080 90123456 00000001"
+      AES128_DUKPT_update_key:        "01010002 00020080 90123456 FFFFFFFF"
+      AES256_PIN_encrypt_counter_1:   "01021000 00040100 90123456 00000001"
+      AES256_DUKPT_update_key:        "01020002 00040100 90123456 FFFFFFFF"
+      TDEA2_PIN_encrypt_counter_1:    "01011000 00000080 90123456 00000001"
+      TDEA2_DUKPT_update_key:         "01010002 00000080 90123456 FFFFFFFF"
+      TDEA3_PIN_encrypt_counter_1:    "01021000 000100C0 90123456 00000001"
+      TDEA3_DUKPT_update_key:         "01010002 00000080 90123456 FFFFFFFF"
+  reference_vectors_AES128_from_AES128_BDK:
+    initial_key: 1273671EA26AC29AFA4D1084127652A1
+    counter_1:
+      derivation_key:              4F21B565BAD9835E112B6465635EAE44
+      PIN_encryption_key:          AF8CB133A78F8DC2D1359F18527593FB
+      MAC_generation_key:          A2DC23DE6FDE0824A2BC321E08E4B8B7
+      data_encryption_encrypt:     A35C412EFD41FDB98B69797C02DCD08F
+      key_encryption_key:          36A724B7BEFA5A25F5E7B5782A4554A2
+    counter_8:
+      derivation_key:              718EE6CF0B27E53D5F7AF99C4D8146A2
+      PIN_encryption_key:          4D9DF3FBEE3448FC3E676D04320A90F5
+      MAC_generation_key:          6FD572E5D59E618875F193484F9178FB
+      data_encryption_encrypt:     650F34204ABD4E57764D61AC3D266FB1
+    DUKPT_update_key_0xFFFFFFFF:
+      derivation_key:              36C6EBBCC0536FC91C1D50660D4F82AE
+      key_encryption_key:          9A9770AEE1ACD1B13473D0463A1883B9
+  reference_vectors_AES256_from_AES256_BDK:
+    initial_key: CE9CE0C101D1138F97FB6CAD4DF045A7083D4EAE2D35A31789D01CCF0949550F
+    counter_1:
+      derivation_key:              54AC2B32B145EA4A554CB8BC44B17467063A799856B1CCC2A138D36E8DBF78B3
+      PIN_encryption_key:          8C1AB7BEE973829E30242E0BBBDD4946D540C98FC1B5BDCF94790001A23FD502
+      MAC_generation_key:          61DABDF4B340CF461EE860B1D1AB55357142BD2D6977306859CF49AEFE8F1549
+      data_encryption_encrypt:     71EB36C9A6B7F801D1D1700C29741FC5A5C4E9B45D742DA7AF6992B8AA29AF58
+    DUKPT_update_key_0xFFFFFFFF:
+      derivation_key:              39064FDC8373D710AFAA823E757E59190C92DD8FBF86B87B673632F4E04C97D2
+      key_encryption_key:          AEFB210C136278A1279F7C8815F446DB8EBE2AA910B157AA4E6484D8DE9C4807
+  reference_vectors_2TDEA_from_AES128_BDK:
+    initial_key: 1273671EA26AC29AFA4D1084127652A1
+    counter_1:
+      derivation_key:              4F21B565BAD9835E112B6465635EAE44
+      PIN_encryption_key:          630C706D9546E47D4449313F61C4D4AB
+      MAC_generation_key:          5D8FD787E8A796D07035FFCA9B5800BB
+      data_encryption_encrypt:     BD44121C223F831446A01EE3A4CB58D2
+    DUKPT_update_key_0xFFFFFFFF:
+      derivation_key:              36C6EBBCC0536FC91C1D50660D4F82AE
+      key_encryption_key:          4744A5ECBC62B5C4BB76FBEAE1E244A3
+  reference_vectors_3TDEA_from_AES128_BDK:
+    initial_key: 1273671EA26AC29AFA4D1084127652A1
+    counter_1:
+      derivation_key:              4F21B565BAD9835E112B6465635EAE44
+      PIN_encryption_key:          EA8B3F37EB9B15831167EF2977FD8762D9B5913F35766F6A
+      MAC_generation_key:          2A1061A6EAC2C14FAC3758EA07B3648A624B24E942785BF1
+      data_encryption_encrypt:     F716DFBC6B2D2D5825B694EEEE181A013F2F1C09380BBE0C
+    DUKPT_update_key_0xFFFFFFFF:
+      derivation_key:              36C6EBBCC0536FC91C1D50660D4F82AE
+      key_encryption_key:          4744A5ECBC62B5C4BB76FBEAE1E244A3
+  format_4_pin_block_example:
+    PAN: "4111111111111111"
+    PIN: "1234"
+    random_bytes: 2F69ADDE2E9E7ACE
+    plaintext_PIN_field:  441234AAAAAAAAAA2F69ADDE2E9E7ACE
+    plaintext_PAN_field:  44111111111111111000000000000000
+    field_construction:
+      PIN_field: "0x44 | PIN_length_nibble | PIN_digits | 0xA_padding | 8_random_bytes"
+      PAN_field: "0x44 | 12_rightmost_PAN_digits_before_check_digit | 0x1 | zero_pad_to_16_bytes"
+    encryption_algorithm:
+      step_1: "Block_A = AES_ECB_encrypt(PIN_key, PIN_field XOR PAN_field)"
+      step_2: "Encrypted_PIN_Block = AES_ECB_encrypt(PIN_key, Block_A XOR PAN_field)"
+      note: Double-pass encryption; PAN field XOR'd in as a tweak in both rounds.
+    transaction_1_PIN_key_AF8CB133A78F8DC2D1359F18527593FB:
+      intermediate_block_A:  DE84127CF6DCA7DFE47BDE89057CB820
+      intermediate_block_B:  9A95036DE7CDB6CEF47BDE89057CB820
+      encrypted_PIN_block:   A912150391AB65A67E52883D81CE2D15
+    transaction_2_PIN_key_D30BDC73EC9714B000BEC66BDB7B6D09:
+      intermediate_block_A:  37489F3DB975A040CD1EEE9E68051A44
+      intermediate_block_B:  73598E2CA864B151DD1EEE9E68051A44
+      encrypted_PIN_block:   52A00503BD34BA1383F6A7EE9FE2547F
+constraints:
+  - All vectors are normative for ANSI X9.24-3-2017 compliance testing.
+  - The DUKPT Update Key (counter 0xFFFFFFFF) always uses a 128-bit key regardless of working-key
+    size; 2TDEA and 3TDEA suites share the same Update Key derivation data and result.
+  - For AES-128 from AES-256 BDK, derivation keys at each counter are identical to AES-256 from
+    AES-256 BDK (same IK); only the output transaction key size differs (AES-128 vs AES-256).
+  - The Python reference ZIP at the X9 URL generates extended traces for all counters and suites.
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
+  - type: related_to
+    target_id: tool.cyberchef-payment-fork
+status: active
+```
+
 ### Master/Session Key Management
 
 ```yaml
@@ -3691,7 +3860,7 @@ attributes:
     chaining into Verify ops.
   not_covered:
     - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
-    - AES DUKPT cross-verified test vectors (issue #14 in the fork repo)
+    - AES DUKPT cross-verification against artifact.ansi-x9-24-3-test-vectors (issue #14 in the fork repo — official vectors now in KB)
     - Issuer card personalization, IMK/CMK derivation (out of scope)
 relationships:
   - type: related_to
