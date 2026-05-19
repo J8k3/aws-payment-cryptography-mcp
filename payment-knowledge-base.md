@@ -3645,6 +3645,62 @@ attributes:
 status: active
 ```
 
+### CyberChef Payment Operations Fork
+
+```yaml
+id: tool.cyberchef-payment-fork
+entity_type: tool_capability
+canonical_name: CyberChef Payment Operations Fork
+aliases:
+  - cyberchef.jacobmarks.com
+summary: >
+  A fork of the GCHQ CyberChef web tool extended with a Payment module containing 31 payment-domain
+  operations. Useful for test vector generation, algorithm cross-verification, and recipe chaining
+  in the browser. Hosted at https://cyberchef.jacobmarks.com/.
+domain:
+  - testing
+  - cryptography
+  - pin_processing
+  - card_validation
+  - emv
+  - key_management
+attributes:
+  payment_operations_covered:
+    - DUKPT TDES and AES key derivation (ANSI X9.24-1, X9.24-3)
+    - ISO PIN block build and parse (Format 0, 1, 3)
+    - VISA PVV generate and verify
+    - IBM 3624 PIN offset generate and verify
+    - CVV/CVV2/iCVV generate and verify
+    - EMV ARQC/ARPC generate and verify (AES-CMAC, supplied-key)
+    - EMV MAC generate and verify (ISO 9797-1 Alg 3, padding Method 2)
+    - ISO 9797-1 MAC Alg 1 and Alg 3 generate and verify
+    - AS2805 MAC, HMAC, AES-CMAC
+    - Payment data encrypt/decrypt/re-encrypt (AES, TDES, DUKPT variants)
+    - TR-31 key block parse (header inspection only — no decryption)
+    - TR-34 B9 envelope inspection
+    - Payment KCV calculate
+    - Test PAN generate
+    - Translate PIN block (Format 0/1/3 ↔ Format 0/1/3, clear-key)
+  validation_posture: >
+    Operations backed by established primitives (AES-CMAC, HMAC, CMAC) are high-confidence.
+    Operations in the payment-specific layer (DUKPT derivation, CVV, PVV, ISO 9797-1) are
+    partially verified — cross-check against payShield or APC for production use.
+  recipe_chaining: >
+    Operations output as hex or short scalar values that flow into the next operation's input.
+    Generate ops return the short artifact (ARQC, PVV, PIN offset) with outputJson=false for
+    chaining into Verify ops.
+  not_covered:
+    - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
+    - AES DUKPT cross-verified test vectors (issue #14 in the fork repo)
+    - Issuer card personalization, IMK/CMK derivation (out of scope)
+relationships:
+  - type: related_to
+    target_id: rule.cvv-family-contexts
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
 ## Cross-Cutting Constraint Rules
 
 ### DUKPT Versus Encryption Rule
@@ -3842,6 +3898,110 @@ constraints:
   - Tags may be primitive or constructed.
   - TLV structures may be nested.
   - EMV data often appears inside ISO 8583 DE55 for host interchange.
+status: active
+```
+
+### VISA PVV Two-Pass Decimalization Rule
+
+```yaml
+id: rule.pvv-decimalization
+entity_type: constraint_rule
+canonical_name: VISA PVV Two-Pass Decimalization
+summary: >
+  The VISA PVV selection algorithm uses a two-pass decimalization. An incorrect single-pass
+  implementation will produce wrong PVV values whenever hex letters appear before decimal digits
+  in the TDES-encrypted output.
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - Pass 1: scan the 16-character TDES-encrypted PVV input left to right; collect only decimal digits
+    (0-9). Stop when 4 digits are found.
+  - Pass 2: only if pass 1 produced fewer than 4 digits — rescan the same 16 characters, mapping
+    each hex letter using A=0, B=1, C=2, D=3, E=4, F=5. Append mapped digits until 4 total.
+  - A single-pass that immediately maps hex letters will produce incorrect PVV whenever a hex letter
+    appears before the fourth decimal digit in the output.
+  - The CVV family decimalization (CVV/CVV2/iCVV) uses the same two-pass approach; implementations
+    should be consistent.
+  - APC VerifyPinData handles this correctly on the HSM side; a mismatch between client-computed PVV
+    and APC-verified PVV is often caused by single-pass vs two-pass confusion.
+relationships:
+  - type: related_to
+    target_id: artifact.pvv
+  - type: related_to
+    target_id: algorithm.visa-pin
+  - type: related_to
+    target_id: rule.cvv-family-contexts
+status: active
+```
+
+### ARQC Preimage Assembly Rule
+
+```yaml
+id: rule.arqc-preimage-assembly
+entity_type: constraint_rule
+canonical_name: ARQC Preimage Assembly
+summary: >
+  The ARQC is computed over an assembled preimage, not directly over individual EMV tags.
+  The preimage byte layout is scheme-specific; using the wrong layout produces a
+  cryptogram that cannot be verified even with the correct session key.
+domain:
+  - emv
+  - cryptography
+constraints:
+  - The ARQC preimage is constructed by concatenating EMV transaction data in a fixed order
+    defined by the card scheme (Visa, Mastercard, etc.) and the issuer's personalization profile.
+  - Typical elements included (in order): amount authorized (tag 9F02), amount other (9F03),
+    terminal country code (9F1A), terminal verification results (95), transaction currency code
+    (5F2A), transaction date (9A), transaction type (9C), unpredictable number (9F37),
+    application interchange profile (82), application transaction counter (9F36),
+    issuer application data / card verification results (9F10 sub-fields as applicable).
+  - For EMV MAC and ARPC, the preimage is the already-assembled bytes as hex; the
+    cryptogram operation itself is AES-CMAC(session_key, preimage_bytes)[0:8].
+  - APC VerifyAuthRequestCryptogram takes the transaction data (CDOL-R1 or full chip data TLV)
+    and key ARN; it assembles the preimage internally per EMV Book 2 Annex A1.
+  - When using a software tool (e.g., CyberChef EMV Verify ARQC), the preimage must be
+    assembled externally before passing it to the operation; the tool does not parse TLV.
+  - The session key is typically derived from the issuer master key (E0 type) using ATC-based
+    EMV key derivation (Option A or Common Session Key derivation) applied before computing the ARQC.
+  - ARPC input = ARQC || ARC (Authorization Response Code, 2 bytes). Both are then passed to
+    AES-CMAC with the issuer session key to produce the ARPC.
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: artifact.arpc
+  - type: related_to
+    target_id: algorithm.emv-key-derivation
+  - type: related_to
+    target_id: tool.cyberchef-payment-fork
+status: active
+```
+
+### ISO 9797-1 Payment Industry Interpretation Rule
+
+```yaml
+id: rule.iso9797-payment-interpretation
+entity_type: constraint_rule
+canonical_name: ISO 9797-1 MAC Payment Industry Interpretation
+summary: >
+  The payment industry uses the labels "Algorithm 1" and "Algorithm 3" differently from
+  the pure ISO 9797-1 definitions. Understanding the difference prevents key or padding
+  mismatches during implementation.
+domain:
+  - cryptography
+constraints:
+  - "Pure ISO 9797-1 Algorithm 1: straightforward CBC-MAC using a single algorithm (DES, TDES, or AES) for all blocks."
+  - "Payment industry Algorithm 1 (as used in EMV and acquirer MAC contexts): DES CBC-MAC using the left half of the TDES key for all blocks except the last, then a TDES output transform (E-K1, D-K2, E-K3) on the final block only."
+  - "Payment industry Algorithm 3 (Retail MAC, ANSI X9.19): DES CBC-MAC with K1 (left 8 bytes) for all blocks, then decrypt with K2 (right 8 bytes), then re-encrypt with K3 (= K1 for 2-key, or third 8-byte segment for 3-key)."
+  - "The difference between Algorithm 1 and Algorithm 3 in the payment context is the final output transform: TDES-wrap (Alg 1) vs. decrypt-then-encrypt (Alg 3)."
+  - "ISO 9797-1 Padding Method 2 (80-then-zeros) is standard for EMV MAC. Padding Method 1 (zero-padding) is used in some acquirer host MAC contexts."
+  - "APC MAC operation enums: ISO9797_ALGORITHM1 (M1 key), ISO9797_ALGORITHM3 (M3 key), CMAC (M6 key)."
+relationships:
+  - type: related_to
+    target_id: algorithm.mac-iso9797
+  - type: related_to
+    target_id: rule.cvv-family-contexts
 status: active
 ```
 
