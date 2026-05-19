@@ -3701,6 +3701,68 @@ relationships:
 status: active
 ```
 
+### AWS Payment Cryptography HSM Proxy
+
+```yaml
+id: tool.apc-hsm-proxy
+entity_type: tool_capability
+canonical_name: AWS Payment Cryptography HSM Proxy
+aliases:
+  - apc-proxy
+  - apc-hsm-proxy
+summary: >
+  A Rust TCP proxy (J8k3/aws-payment-cryptography-hsm-proxy) that sits between HSM-dependent
+  payment applications and AWS Payment Cryptography. It speaks the wire protocol the application
+  already sends — Thales payShield 10K host commands or Futurex Excrypt Enterprise SSP v.2 —
+  and translates them to APC API calls, without changing the application. Use when application
+  refactoring is not on the table; if the application can be changed, call the APC SDK directly.
+domain:
+  - hsm_migration
+  - pin_processing
+  - card_validation
+  - key_management
+attributes:
+  supported_protocols:
+    - thales_payshield: >
+        2-byte length prefix + 2-byte command code framing. Handlers: CA/CC/CI/G0 (PIN translate),
+        C2/C4/M6/M8 (MAC generate/verify), CW/CY (CVV generate/verify), B2 (echo/heartbeat).
+    - futurex_excrypt: >
+        [AOCCCC;param;param;] bracket-delimited framing. Handlers: ECHO (heartbeat), TPIN (PIN translate).
+  workflow:
+    phase_1_discovery: >
+      Run proxy in passthrough mode against the real HSM. Commands are forwarded and logged to
+      discovery.jsonl (one record per unique command code, sensitive fields redacted). Feed the log
+      to the apc-agent hsm_analyze_discovery_log tool, which maps each command to its APC operation,
+      key type, and handler file path. AI writes the Rust handler code.
+    phase_2_translation: >
+      Disable passthrough. key_mappings in proxy.yaml resolves the application's key identifiers
+      (LMK blobs, TR-31 values, labels) to APC ARNs or aliases before making API calls. Commands
+      without a registered handler return error 68 (unsupported).
+  status_note: >
+    Not tested against a real HSM client application. Parsers are built from specification and
+    reference documentation. Known gaps are documented in the README Known Risks section.
+  known_risks:
+    - APC latency 20-100ms vs sub-millisecond hardware HSM — tight socket timeouts will fail
+    - Thales length field variant — some payShield versions count payload only, not header+payload
+    - Futurex error codes map to payShield-style codes (non-standard BB field values)
+    - TLS cipher compat — rustls requires TLS 1.2 minimum; older HSM client SDKs may not support it
+    - Discovery passthrough is single-chunk per command; stateful/multi-read sequences won't work
+  extension_point: >
+    Add src/handlers/<vendor>/<command>.rs implementing the Handler trait; register in
+    src/handlers/mod.rs. The Futurex parse_params() helper splits Excrypt payloads into a
+    HashMap<[u8;2], Vec<u8>>. Wrap key blocks and PIN blocks in Zeroizing<Vec<u8>>.
+relationships:
+  - type: companion_to
+    target_id: tool.apc-agent
+    notes: >
+      hsm_analyze_discovery_log in apc-agent is the intended Phase 1 analysis tool — it maps
+      discovery.jsonl entries to APC operations and generates handler scaffolding.
+  - type: related_to
+    target_id: tool.cyberchef-payment-fork
+    notes: CyberChef fork can be used to verify handler output (CVV, MAC, PIN) at the operation level.
+status: active
+```
+
 ## Cross-Cutting Constraint Rules
 
 ### DUKPT Versus Encryption Rule
