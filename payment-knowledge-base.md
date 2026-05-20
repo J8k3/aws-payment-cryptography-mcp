@@ -5978,6 +5978,53 @@ status: active
 
 ---
 
+### PCI PIN: Fixed Key TDES Is Banned; ISO Format 4 Is Mandated
+
+```yaml
+id: concept.pci-pin-tdes-sunset-and-format4-mandate
+entity_type: compliance_rule
+canonical_name: PCI PIN v3 — Fixed Key TDES Banned 2023; ISO Format 4 Required by 2025
+summary: >
+  PCI PIN Security Requirements v3.0 (August 2018) introduced hard sunset dates for fixed
+  key TDES and mandated support for ISO PIN block Format 4. Both deadlines are now in the
+  past (as of 2026), meaning any compliant acquirer environment must already be using DUKPT
+  or AES for PIN, and all compliant hosts must support ISO Format 4 in both directions.
+  PCI PIN v3 also added ANSI X9.24-3 (AES DUKPT) as a normative reference alongside X9.24-1,
+  formally recognizing AES DUKPT as the preferred migration target.
+domain:
+  - compliance
+  - pin_processing
+  - cryptography
+attributes:
+  tdes_fixed_key_sunset:
+    poi_devices: "2023-01-01 — fixed key TDES PIN encryption in POI devices is disallowed"
+    host_to_host: "2023-01-01 — fixed key TDES PIN encryption in host-to-host connections is disallowed"
+  iso_format_4_mandate:
+    decryption: "2023-01-01 — all hosts must support ISO PIN block Format 4 decryption"
+    encryption: "2025-01-01 — all hosts must support ISO PIN block Format 4 encryption"
+  normative_references_added_in_v3: ["ANSI X9.24-3 (AES DUKPT)", "ANSI TR-34"]
+  kcv_requirement: "KCV optional for TDEA keys, mandatory for AES keys"
+constraints:
+  - Fixed key TDES for PIN is already banned — compliant deployments must use DUKPT (TDES or AES)
+  - All compliant hosts in 2026 must support ISO Format 4 encryption and decryption
+  - AES DUKPT (X9.24-3) is explicitly recognized by PCI PIN as a normative migration target
+  - APC supports ISO Format 4 (TR31_P0_PIN_ENCRYPTION_KEY with AES) — use this for new deployments
+  - Cleartext key injection ban (from Req 32): entities injecting on behalf of others cannot use cleartext injection (since 2021); processors cannot use it (since 2023)
+references:
+  - "PCI PIN Security Requirements Modifications Summary of Changes v2.0 to v3.0, August 2018"
+  - "PCI PTS PIN Technical FAQs v3 June 2021"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: algorithm.dukpt
+  - type: related_to
+    target_id: rule.apc-iso-format4-required
+status: active
+```
+
+---
+
 ## Reference Catalogs to Materialize Next
 
 - EMV tag catalog
