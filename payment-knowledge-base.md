@@ -5487,11 +5487,21 @@ attributes:
     RESPONSE: incoming data decryption direction
   ansi_x9_24_1_data_variant: bytes 5 and 13 of session key XOR 0xFF (does not match any APC variant)
   mac_variant_alignment: APC REQUEST for MAC = ANSI X9.24-1 MAC Request (bytes 6,14); no data equivalent known
+  thales_hypothesis: >
+    APC was designed to be a drop-in for existing Thales payShield acquirer deployments.
+    The most probable source of the data variant definition is the Thales payShield M0
+    (DUKPT encrypt) command's Key Type flag, which defines variant byte positions as a
+    Thales-specific extension beyond ANSI X9.24-1. Futurex likely copied Thales convention
+    for interoperability. Confirm by inspecting the M0 command parameter table in
+    payShield 10K Legacy Host Commands (Version V1, 2019) — the KB currently has command
+    codes only, not full parameter detail for M0.
 constraints:
   - APC DUKPT data encryption: use DukptKeyVariant=REQUEST for outgoing, RESPONSE for incoming
-  - None of the five ANSI X9.24-1 variants reproduce APC data ciphertext
+  - None of the eight single-byte-pair XOR positions (0xFF at bytes n and n+8, n=0..7) reproduce APC data ciphertext
+  - This rules out a simple ANSI X9.24-1 style single-pair XOR; APC likely uses multi-byte XOR or a different structure
   - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST matches ANSI X9.24-1 "MAC Request" (bytes 6,14)
   - Migrate to AES DUKPT (ANSI X9.24-3) for a fully published, unambiguous derivation algorithm
+  - See GitHub issue aws-payment-cryptography-mcp#1 for PCI PIN/P2PE compliance coverage that may clarify variant requirements
 examples:
   - "BDK=0123456789ABCDEFFEDCBA9876543210, KSN=FFFF9876543210E00001, plaintext=0102030405060708:
      ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0, APC ciphertext=124F7A32F3F84187
