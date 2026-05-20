@@ -484,10 +484,46 @@ entity_type: algorithm
 canonical_name: IBM 3624 PIN Method
 aliases:
   - IBM_3624
-summary: Family of issuer PIN generation and verification methods using decimalization, offsets, and related derivations.
+summary: >
+  Legacy issuer PIN generation and verification method using single-DES encryption, a
+  decimalization table, and a PIN offset. The offset is stored by the issuer and compared
+  during online PIN verification without storing or transmitting the clear PIN.
 domain:
   - pin_processing
   - cryptography
+attributes:
+  cipher: single_DES_ECB
+  inputs:
+    PVK: 16-byte or 24-byte DES key (PIN Verification Key)
+    decimalization_table: 16-digit string mapping hex nibbles 0-F to decimal digits
+    validation_data: issuer-supplied digits (typically 12 rightmost PAN digits excl check digit), padded to 16 nibbles with pad character
+    pad_character: single hex nibble used to right-pad validation data (commonly F)
+    pin_length: 4-12 digits
+  natural_pin_derivation:
+    step_1: Build 16-nibble validation block — validation_data padded to 16 nibbles
+    step_2: Single-DES ECB encrypt the validation block with PVK
+    step_3: Decimalize — map each nibble of the encrypted output through decimalization_table
+    step_4: Natural PIN = leftmost pin_length digits of decimalized result
+  offset_generation:
+    for_each_digit_i: offset[i] = (desired_pin[i] - natural_pin[i] + 10) mod 10
+  verification:
+    step_1: Re-derive natural PIN from stored keying material
+    step_2: Reconstruct expected PIN — expected[i] = (natural_pin[i] + stored_offset[i]) mod 10
+    step_3: Compare reconstructed PIN to presented PIN
+  apc_equivalent: GeneratePinData / VerifyPinData with IBM_3624 pinVerificationMethod
+  security_note: >
+    Single DES and clear-key design; not suitable for new implementations.
+    Use VISA PVV or EMV-based PIN methods for new issuer systems.
+relationships:
+  - type: related_to
+    target_id: artifact.pin-offset
+  - type: related_to
+    target_id: key-type.pvk
+constraints:
+  - Decimalization table must be exactly 16 decimal digits (one per nibble 0-F)
+  - Validation data is padded with the pad character to reach 16 nibbles before encryption
+  - Natural PIN and stored offset together disclose the clear PIN; both must be protected
+  - Natural PIN derivation is fully deterministic for fixed keying material
 status: active
 ```
 
@@ -496,13 +532,48 @@ status: active
 ```yaml
 id: algorithm.visa-pin
 entity_type: algorithm
-canonical_name: Visa PIN Verification Method
+canonical_name: Visa PIN Verification Value Method
 aliases:
   - Visa PIN
-summary: PIN verification family using PVV and issuer PIN verification keys.
+  - PVV method
+  - VISA PVV
+summary: >
+  Issuer PIN verification method that produces a 4-digit PIN Verification Value (PVV) from
+  the PIN, PAN, and a PVK. The PVV is stored by the issuer and compared during online
+  authorization without storing or transmitting the clear PIN.
 domain:
   - pin_processing
   - cryptography
+attributes:
+  cipher: single_DES_ECB
+  inputs:
+    PVK: 16-byte or 24-byte DES key, selected by PVKI
+    PVKI: PIN Verification Key Index, 1-6; embedded in PVV input and selects which key
+    PAN: cardholder account number
+    PIN: 4-12 digit PIN
+  pvv_derivation_steps:
+    step_1: >
+      Build 8-byte PVV input = PVKI digit (1 nibble) + 11 rightmost PAN digits excluding
+      Luhn check digit (11 nibbles) + first PIN digit (1 nibble) = 16 hex nibbles / 8 bytes
+    step_2: DES-ECB encrypt PVV input using the PVK indexed by PVKI
+    step_3: >
+      Two-pass decimalization (see rule.pvv-decimalization): scan encrypted result
+      left-to-right collecting decimal digits (0-9); if fewer than 4 found, rescan mapping
+      A=0 B=1 C=2 D=3 E=4 F=5
+    step_4: PVV = first 4 collected digits
+  apc_equivalent: GeneratePinData / VerifyPinData with VISA_PVV pinVerificationMethod
+  stored_value: 4 decimal digit PVV stored by issuer; compared during online PIN authorization
+relationships:
+  - type: related_to
+    target_id: artifact.pvv
+  - type: related_to
+    target_id: key-type.pvk
+  - type: related_to
+    target_id: rule.pvv-decimalization
+constraints:
+  - PVKI is 1 digit (1-6); it is the first nibble of the PVV input and determines which PVK is used
+  - The 11 PAN digits exclude the Luhn check digit (rightmost digit of the PAN)
+  - The two-pass decimalization is mandatory per Visa spec; single-pass produces incorrect PVV
 status: active
 ```
 
@@ -620,6 +691,156 @@ aliases:
 summary: Network-specific card security code family commonly overlapping conceptually with CVV2/CVC2 terminology.
 domain:
   - card_validation
+status: active
+```
+
+### American Express CSC1 (Classic)
+
+```yaml
+id: artifact.amex-csc1
+entity_type: artifact
+canonical_name: American Express Card Security Code Version 1
+aliases:
+  - CSC1
+  - Amex CID Classic
+summary: >
+  Amex classic card security code. Uses the CVV algorithm with the card's actual service
+  code (not forced to 000). Printed on the card face; 3-5 digits.
+domain:
+  - card_validation
+  - card_data
+attributes:
+  algorithm: CVV (DES-based, same as CVV1/CVV2)
+  service_code_behavior: card service code used as-is
+  digits: 3-5
+  apc_generation_attribute: AmexCardSecurityCodeVersion1
+  key_usage: TR31_C0_CARD_VERIFICATION_KEY (TDES_2KEY)
+relationships:
+  - type: related_to
+    target_id: artifact.cvv2
+  - type: related_to
+    target_id: concept.card-security-code-family
+status: active
+```
+
+### American Express CSC2 (Enhanced)
+
+```yaml
+id: artifact.amex-csc2
+entity_type: artifact
+canonical_name: American Express Card Security Code Version 2
+aliases:
+  - CSC2
+  - Amex CID Enhanced
+summary: >
+  Amex enhanced card security code. Uses the CVV algorithm with service code forced to 000
+  (same convention as CVV2 and iCVV). Base algorithm for iCSC and AEVV. Typically printed
+  as a 4-digit value on the card face.
+domain:
+  - card_validation
+  - card_data
+attributes:
+  algorithm: CVV with service_code forced to 000
+  digits: 4
+  apc_generation_attribute: AmexCardSecurityCodeVersion2
+  key_usage: TR31_C0_CARD_VERIFICATION_KEY (TDES_2KEY)
+relationships:
+  - type: related_to
+    target_id: artifact.cvv2
+  - type: related_to
+    target_id: artifact.amex-icsc
+  - type: related_to
+    target_id: artifact.amex-aevv
+  - type: related_to
+    target_id: concept.card-security-code-family
+status: active
+```
+
+### American Express iCSC
+
+```yaml
+id: artifact.amex-icsc
+entity_type: artifact
+canonical_name: American Express Integrated Card Security Code
+aliases:
+  - iCSC
+summary: >
+  Amex chip-card analog of iCVV. Uses the CSC2 algorithm (CVV with service code override)
+  to produce a card-present security value that differs from the printed CSC2, preventing
+  replay of magnetic-stripe data on chip-capable cards.
+domain:
+  - card_validation
+  - emv
+attributes:
+  algorithm: CSC2 (CVV with service code override)
+  service_code_contact: "999"
+  service_code_contactless: "702"
+  apc_generation_attribute: AmexCardSecurityCodeVersion2
+  key_usage: TR31_C0_CARD_VERIFICATION_KEY (TDES_2KEY)
+relationships:
+  - type: related_to
+    target_id: artifact.icvv
+  - type: related_to
+    target_id: artifact.amex-csc2
+status: active
+```
+
+### American Express AEVV
+
+```yaml
+id: artifact.amex-aevv
+entity_type: artifact
+canonical_name: American Express Electronic Commerce Verification Value
+aliases:
+  - AEVV
+summary: >
+  Amex 3-D Secure authentication value equivalent to CAVV. Uses the CSC2 algorithm
+  with field repurposing: random number in the expiry date field; authentication
+  results code + two-factor code in the service code field. Always 3 digits.
+domain:
+  - card_validation
+  - cryptography
+attributes:
+  algorithm: CSC2 (CVV-family with repurposed input fields)
+  expiry_field_value: random_number
+  service_code_field_value: authentication_results_code + two_factor_code
+  output_length: 3 digits
+  apc_generation_attribute: AmexCardSecurityCodeVersion2
+  key_usage: TR31_C0_CARD_VERIFICATION_KEY (TDES_2KEY)
+relationships:
+  - type: related_to
+    target_id: artifact.cavv
+  - type: related_to
+    target_id: artifact.amex-csc2
+  - type: related_to
+    target_id: operation.three-d-secure
+status: active
+```
+
+### Mastercard DCVC3
+
+```yaml
+id: artifact.mastercard-dcvc3
+entity_type: artifact
+canonical_name: Mastercard Dynamic Card Verification Code 3
+aliases:
+  - DCVC3
+summary: >
+  Mastercard dynamic card verification value for contactless and chip transactions.
+  Derived from PAN, PSN, Track 1/2 service fields, unpredictable number, and ATC
+  using an EMV master key for dynamic numbers (E4).
+domain:
+  - card_validation
+  - emv
+attributes:
+  inputs: [PAN, PSN, track_service_fields, unpredictable_number, ATC]
+  key_usage: TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS (DeriveKey=true)
+  apc_generation_attribute: DynamicCardVerificationCode3
+relationships:
+  - type: related_to
+    target_id: artifact.dcvv
+  - type: related_to
+    target_id: artifact.arqc
 status: active
 ```
 
@@ -3951,6 +4172,66 @@ constraints:
 status: active
 ```
 
+### AES DUKPT Derivation Data Structure (X9.24-3)
+
+```yaml
+id: rule.aes-dukpt-derivation-data-structure
+entity_type: constraint_rule
+canonical_name: AES DUKPT Derivation Data Structure (ANSI X9.24-3)
+summary: >
+  AES DUKPT uses a 16-byte derivation data block as the AES-CMAC input for every key
+  derivation step. IK derivation and working-key derivation use different layouts. Mixing
+  them produces silently wrong keys; the only reliable check is running against the
+  normative X9.24-3-2017 test vectors.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  cmac_algorithm: AES-CMAC (RFC 4493)
+  derivation_data_length: 16 bytes
+  common_header_bytes_0_7:
+    byte_0: version = 0x01
+    byte_1: key_class = 0x01
+    bytes_2_3: key_usage (purpose-specific, see below)
+    bytes_4_5: algorithm = 0x0002 (AES-128)
+    bytes_6_7: key_length = 0x0080 (128 bits)
+  ik_derivation_data_bytes_8_15:
+    layout: full 8-byte IKI (device identifier portion with counter all-zeros)
+    key_usage: 0x8001
+    note: no counter field; full IKI fills bytes 8-15
+  working_key_derivation_data_bytes_8_15:
+    bytes_8_11: last 4 bytes of IKI only (NOT the full 8-byte IKI)
+    bytes_12_15: full 32-bit transaction counter (NOT masked to 21 bits)
+  key_usage_codes:
+    IK_derivation: 0x8001
+    intermediate_node: 0x0000
+    PIN_encryption: 0x1000
+    MAC_generation: 0x2000
+    MAC_verification: 0x2001
+    MAC_both_ways: 0x2002
+    data_encryption: 0x3000
+    data_decryption: 0x3001
+    data_both_ways: 0x3002
+    KEK: 0x0002
+  common_implementation_mistakes:
+    - Using KEY_USAGE 0x8000 for IK derivation instead of 0x8001
+    - Using version byte 0x00 instead of 0x01
+    - Using full 8-byte IKI in working-key derivation data (correct only for IK derivation)
+    - Using only the last 4 bytes of IKI in IK derivation data (correct only for working keys)
+    - Masking the counter to 21 bits before embedding in derivation data (embed full 32-bit value)
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
+  - type: related_to
+    target_id: artifact.ansi-x9-24-3-test-vectors
+constraints:
+  - All AES DUKPT derivation steps use AES-CMAC, not AES-CBC or AES-ECB
+  - Version byte 0x01 is mandatory; 0x00 produces silently wrong keys
+  - IK derivation KEY_USAGE is 0x8001; working key usages start at 0x0000/0x1000
+  - Run against normative X9.24-3-2017 test vectors (see artifact.ansi-x9-24-3-test-vectors) before declaring an AES DUKPT implementation correct
+status: active
+```
+
 ### PCI Data Classification Rule
 
 ```yaml
@@ -4535,6 +4816,873 @@ constraints:
 status: active
 ```
 
+## AWS Payment Cryptography — APC-Specific Reference
+
+### APC Key Lifecycle
+
+```yaml
+id: concept.apc-key-lifecycle
+entity_type: concept
+canonical_name: AWS Payment Cryptography Key Lifecycle
+aliases:
+  - APC key states
+summary: >
+  APC keys pass through defined lifecycle states. Key attributes are immutable
+  post-creation. Keys are rotated via alias reassignment rather than in-place mutation.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  key_states:
+    CREATE_COMPLETE: active and usable
+    DELETE_PENDING: scheduled for deletion; still usable during retention window
+    DELETE_COMPLETE: permanently deleted; unrecoverable
+  key_origin:
+    AWS_PAYMENT_CRYPTOGRAPHY: generated inside APC HSM
+    EXTERNAL: imported via TR-31, TR-34, ECDH, or RSA
+  immutable_attributes: [algorithm, key_length, key_usage, key_class, key_origin]
+  mutable_attributes: [effective_date, expiry_date, tags, deletion_window]
+  rotation_pattern: >
+    Create new key → update alias ARN to new key → disable/delete old key.
+    Consuming code references the alias and requires no updates.
+  ipek_ik_note: >
+    IPEK/IK keys derived for export are computed on demand and not stored by APC.
+    Each export re-derives from the parent BDK.
+constraints:
+  - Key attributes (algorithm, usage) cannot be changed after creation or import
+  - Replica Region Keys (RRK) are read-only; all mutations target the Primary Region Key (PRK)
+status: active
+```
+
+### APC Multi-Region Keys
+
+```yaml
+id: concept.apc-multi-region-keys
+entity_type: concept
+canonical_name: AWS Payment Cryptography Multi-Region Keys
+aliases:
+  - PRK
+  - RRK
+summary: >
+  APC keys can be replicated across AWS regions. The original is the Primary Region Key
+  (PRK); replicated copies are Replica Region Keys (RRK). Shared key material, separate
+  region-specific ARNs.
+domain:
+  - key_management
+attributes:
+  PRK: original key; all lifecycle operations performed here
+  RRK: read-only regional copy; supports cryptographic operations but not metadata changes
+  use_cases: [disaster_recovery, multi-region active-active payment processing]
+constraints:
+  - Replication, attribute changes, and deletion must be performed on the PRK
+status: active
+```
+
+### APC Dynamic Keys (MPoC / Inline Key Transport)
+
+```yaml
+id: concept.apc-dynamic-keys
+entity_type: concept
+canonical_name: AWS Payment Cryptography Dynamic Keys
+aliases:
+  - APC inline key
+  - MPoC keys
+  - APC wrapped key transport
+summary: >
+  APC data-plane operations accept short-lived TR-31 wrapped key blocks passed inline
+  instead of requiring keys to be pre-imported. Designed for MPoC (Mobile Point of
+  Capture) and softPOS deployments where per-transaction key provisioning is common.
+domain:
+  - key_management
+  - pin_processing
+  - cryptography
+attributes:
+  supported_operations: [EncryptData, DecryptData, ReEncryptData, TranslatePinData]
+  wrapping_kek: must be pre-imported to APC; usage TR31_K0 or TR31_K1
+  pin_key_requirements:
+    key_usage: P0 (PIN encryption)
+    mode_of_use: B (both) or D (decrypt-only)
+  data_key_requirements:
+    key_usage: D0 (data encryption)
+    mode_of_use: B or D
+  lifecycle: dynamic key is not persisted in APC key store; exists only for the operation
+relationships:
+  - type: uses
+    target_id: key-block.tr31
+  - type: related_to
+    target_id: key-type.kek
+constraints:
+  - Wrapping KEK must be pre-imported; only the TR-31 payload is inline
+  - Key usage and mode in the TR-31 header are enforced by APC
+status: active
+```
+
+### KBPK — Key Block Protection Key
+
+```yaml
+id: key_type.kbpk
+entity_type: key_type
+canonical_name: Key Block Protection Key (KBPK)
+aliases:
+  - KBPK
+  - TR31_K1_KEY_BLOCK_PROTECTION_KEY
+  - TR31_K0_KEY_ENCRYPTION_KEY
+summary: >
+  Key used to protect (wrap) other keys in a TR-31 key block. Two TR-31 usage codes
+  apply: K1 (preferred per X9.143) and K0 (legacy, retained for compatibility).
+  APC accepts both interchangeably.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  preferred_usage: TR31_K1_KEY_BLOCK_PROTECTION_KEY
+  legacy_usage: TR31_K0_KEY_ENCRYPTION_KEY
+  algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+  apc_note: K0 and K1 are functionally interchangeable in APC; K1 preferred per X9.143
+  tr31_version:
+    TDES_KBPK: version B
+    AES_KBPK: version D
+relationships:
+  - type: related_to
+    target_id: key-block.tr31
+  - type: related_to
+    target_id: key-type.kek
+constraints:
+  - Wrapping key must be at least as strong as the wrapped key (APC enforces this)
+status: active
+```
+
+### APC ECDH Key Agreement — Operational Specifics
+
+```yaml
+id: concept.apc-ecdh-key-agreement
+entity_type: concept
+canonical_name: APC ECDH Key Agreement Operational Details
+summary: >
+  APC implements NIST SP800-56A ECDH for importing and exporting symmetric keys.
+  An ECC key pair with usage K3 is required; DeriveKeyUsage is fixed at key creation.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  required_key_usage: TR31_K3_ASYMMETRIC_KEY_FOR_KEY_AGREEMENT
+  mode_of_use: DeriveKey (only valid mode for K3)
+  derive_key_usage_fixed_at_creation: true
+  supported_curves: [NIST_P256, NIST_P384, NIST_P521]
+  supported_kdf: NIST_SP800_56A with SHA_256 / SHA_384 / SHA_512
+  party_roles:
+    import: APC is Party V (Responder); caller provides ephemeral public key
+    export: APC is Party U (Initiator); APC provides ephemeral public key
+  certificate_chain_rule: >
+    P-384 CA can only issue P-384 or P-521 leaf certs.
+    Weaker-to-stronger issuance is not permitted.
+  aes256_note: ECDH is the ONLY path for AES-256 key transport; RSA wrap does not support AES-256
+relationships:
+  - type: related_to
+    target_id: algorithm.ecdh
+  - type: related_to
+    target_id: rule.apc-key-wrapping-strength
+constraints:
+  - A given K3 key pair can only derive one type of output key (DeriveKeyUsage fixed at creation)
+  - Cannot reuse an ECC key pair for a different DeriveKeyUsage purpose
+status: active
+```
+
+### APC Supported TR-31 Key Usage Codes
+
+```yaml
+id: reference_list.apc-tr31-key-usages
+entity_type: reference_list
+canonical_name: APC Supported TR-31 Key Usage Codes
+summary: >
+  Complete TR-31 key usage codes supported by AWS Payment Cryptography, their permitted
+  algorithms, and operational notes. Source: APC valid-attributes documentation (accessed 2026-05-19).
+domain:
+  - key_management
+  - cryptography
+attributes:
+  P0_PIN_ENCRYPTION_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    note: AES P0 keys require ISO Format 4 PIN blocks
+  C0_CARD_VERIFICATION_KEY:
+    algorithms: [TDES_2KEY]
+    note: CVV1, CVV2, iCVV, dCVV, Amex CSC1/CSC2/iCSC/AEVV; TDES_2KEY only
+  D0_DATA_ENCRYPTION_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+  D1_ASYMMETRIC_DATA_ENCRYPTION_KEY:
+    algorithms: [RSA_2048, RSA_3072, RSA_4096]
+  E0_EMV_MKEY_APP_CRYPTOGRAMS:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    mode: DeriveKey only
+    note: ARQC/TC/AAC master key
+  E1_EMV_MKEY_CONFIDENTIALITY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    mode: DeriveKey only
+    note: EMV secure messaging encryption master key
+  E2_EMV_MKEY_INTEGRITY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    mode: DeriveKey only
+    note: EMV secure messaging MAC master key; used by GenerateMacEmvPinChange
+  E4_EMV_MKEY_DYNAMIC_NUMBERS:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128]
+    mode: DeriveKey only
+    note: dCVV, Mastercard DCVC3, Visa CVN17 dynamic card values
+  E5_EMV_MKEY_CARD_PERSONALIZATION:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128]
+    mode: DeriveKey only
+  E6_EMV_MKEY_OTHER:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128]
+    mode: DeriveKey only
+  M1_ISO9797_1_MAC_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY]
+  M3_ISO9797_3_MAC_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY]
+  M6_ISO9797_5_CMAC_KEY:
+    algorithms: [AES_128, AES_192, AES_256]
+    note: AES-CMAC MAC key
+  M7_HMAC_KEY:
+    algorithms: [HMAC_SHA256, HMAC_SHA384, HMAC_SHA512]
+    note: Used for Mastercard SPA2 AAV via GenerateMac
+  K0_KEY_ENCRYPTION_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    note: Legacy; functionally equivalent to K1 in APC
+  K1_KEY_BLOCK_PROTECTION_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
+    note: Preferred KBPK usage per X9.143
+  K2_TR34_ASYMMETRIC_KEY:
+    algorithms: [RSA_2048, RSA_3072, RSA_4096]
+    note: Public key for TR-34 key transport
+  K3_ASYMMETRIC_KEY_FOR_KEY_AGREEMENT:
+    algorithms: [ECC_NIST_P256, ECC_NIST_P384, ECC_NIST_P521]
+    note: ECDH; DeriveKeyUsage fixed at creation
+  V1_IBM3624_PIN_VERIFICATION_KEY:
+    algorithms: [TDES_2KEY]
+    note: APC operationally enforces TDES_2KEY
+  V2_VISA_PIN_VERIFICATION_KEY:
+    algorithms: [TDES_2KEY]
+    note: APC operationally enforces TDES_2KEY for PVV
+  B0_BASE_DERIVATION_KEY:
+    algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_256]
+    note: DUKPT BDK for TDES or AES DUKPT
+  S0_ASYMMETRIC_KEY_FOR_DIGITAL_SIGNATURE:
+    algorithms: [RSA_2048, RSA_3072, RSA_4096, ECC_NIST_P256, ECC_NIST_P384, ECC_NIST_P521]
+status: active
+```
+
+### TR-31 Optional Header Fields (APC)
+
+```yaml
+id: artifact.tr31-optional-header-fields
+entity_type: artifact
+canonical_name: TR-31 Key Block Optional Header Fields
+aliases:
+  - TR-31 optional blocks
+  - key block optional headers
+summary: >
+  TR-31 key blocks may carry two-character optional header field IDs after the core header.
+  APC reads and writes specific fields on import/export to convey supplementary key context.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  BI:
+    name: BDK Identifier
+    description: Identifies the BDK that generated this IPEK/IK
+    tdes_format: 2-hex type + 10-hex KSI
+    aes_format: 2-hex type + 8-hex BDK ID
+    apc: auto-populated on IPEK/IK export
+  HM:
+    name: HMAC hash algorithm
+    description: Hash algorithm for HMAC (M7) keys
+    apc: auto-populated on export; parsed on import
+  IK:
+    name: AES DUKPT initial KSN
+    description: 16 hex chars; IKI (derivation data, no counter)
+    apc: populated on AES DUKPT IK export
+  KS:
+    name: TDES DUKPT initial KSN
+    description: 20 hex chars; full KSN with counter zeroed
+    apc: populated on TDES DUKPT IPEK export
+  KP:
+    name: KCV of wrapping KBPK
+    description: method byte (00=ANSI_X9_24, 01=CMAC) + 6-hex KCV of wrapping key
+    apc: auto-populated on export; lets receiver confirm they used the correct KEK
+  PB:
+    name: Padding block
+    description: Auto-calculated to align total block length to a multiple of 8 bytes
+    apc: never set manually; auto-calculated
+relationships:
+  - type: related_to
+    target_id: key-block.tr31
+  - type: related_to
+    target_id: artifact.ksn
+  - type: related_to
+    target_id: key-type.bdk
+constraints:
+  - PB is always auto-calculated; manually setting it will corrupt the block
+  - BI and IK/KS link an exported IPEK/IK back to its parent BDK for future re-derivation
+status: active
+```
+
+### EMV CVN Variant to APC Session Key Derivation Attribute
+
+```yaml
+id: reference_list.emv-cvn-to-apc-session-key-attribute
+entity_type: reference_list
+canonical_name: EMV CVN Variant to APC SessionKeyDerivation Attribute
+summary: >
+  Maps EMV Cryptogram Version Number (CVN) to the APC SessionKeyDerivation attribute used
+  in GenerateCardValidationData, VerifyCardValidationData, and GenerateAuthRequestCryptogram.
+domain:
+  - emv
+  - card_validation
+  - key_management
+attributes:
+  visa:
+    CVN10: {apc_attribute: Visa, note: per-card master key derivation (SDA)}
+    CVN18: {apc_attribute: EmvCommon, note: Common Session Key per EMVCo spec}
+    CVN22: {apc_attribute: EmvCommon, note: CSK variant}
+    CVN01: {apc_attribute: Visa, note: shared attribute code with CVN10}
+    CVN17:
+      apc_attribute: EmvCommon (dynamic)
+      key_usage: TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS
+      generation_attribute: DynamicCardVerificationValue
+      note: Visa dCVV; uses E4 master key with DeriveKey
+  mastercard:
+    CVN14: {apc_attribute: EmvCommon, note: CSK}
+    CVN15: {apc_attribute: EmvCommon, note: CSK variant}
+    CVN12: {apc_attribute: MastercardSessionKey, note: uses unpredictable number in derivation}
+    CVN13: {apc_attribute: MastercardSessionKey, note: like CVN12 with different diversification}
+  jcb:
+    CVN04: {apc_attribute: EmvCommon, note: JCB CSK}
+    CVN01: {apc_attribute: Visa, note: per-card derivation, shared attribute with Visa CVN10}
+  arpc_methods:
+    Method_1: ARQC XOR 4-byte response code; simple XOR response
+    Method_2: MAC over 8-byte Card Status Update (CSU) + proprietary auth data; primary method in APC examples
+  apc_key_usages:
+    arqc_generation: TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS
+    integrity_mac: TR31_E2_EMV_MKEY_INTEGRITY
+    confidentiality: TR31_E1_EMV_MKEY_CONFIDENTIALITY
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: artifact.arpc
+  - type: related_to
+    target_id: algorithm.emv-key-derivation
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+status: active
+```
+
+## APC Constraint Rules
+
+### APC: Wrapping Key Strength Enforcement
+
+```yaml
+id: rule.apc-key-wrapping-strength
+entity_type: constraint_rule
+canonical_name: APC Wrapping Key Strength Enforcement
+summary: >
+  APC automatically rejects key import/export operations where the wrapping key is weaker
+  than the key being wrapped. This is enforced server-side; no client-side workaround exists.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - RSA_2048 can wrap TDES keys only (2KEY or 3KEY)
+  - RSA_3072 or RSA_4096 can wrap TDES or AES-128
+  - RSA cannot wrap AES-192 or AES-256; use ECDH instead
+  - AES-128 KBPK can wrap TDES or AES-128 (not AES-192 or AES-256)
+  - AES-256 KBPK can wrap any supported symmetric key
+  - ECDH is the only path for AES-256 key transport
+relationships:
+  - type: related_to
+    target_id: key_type.kbpk
+  - type: related_to
+    target_id: concept.apc-ecdh-key-agreement
+  - type: related_to
+    target_id: rule.apc-rsa-wrap-padding
+status: active
+```
+
+### APC: TR-31 Version Selection Is Automatic
+
+```yaml
+id: rule.apc-tr31-version-selection
+entity_type: constraint_rule
+canonical_name: APC TR-31 Key Block Version Selection
+summary: >
+  APC selects the TR-31 version automatically based on the wrapping KBPK's algorithm.
+  Callers cannot override the version on export. Versions A and C are accepted for
+  import only (legacy compatibility).
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - TDES KBPK → TR-31 version B (2-key TDES MAC)
+  - AES KBPK → TR-31 version D (AES-CMAC)
+  - Versions A and C: import-only; legacy key loading support
+  - Version selection on export is automatic and non-configurable
+relationships:
+  - type: related_to
+    target_id: key-block.tr31
+  - type: related_to
+    target_id: key_type.kbpk
+status: active
+```
+
+### APC: ISO Format 4 Required for AES PIN Keys
+
+```yaml
+id: rule.apc-format4-aes-pin-requirement
+entity_type: constraint_rule
+canonical_name: APC ISO Format 4 Required for AES PIN Encryption Keys
+summary: >
+  When the PIN encryption key in an APC operation is AES (any AES length), the PIN
+  block format must be ISO 9564 Format 4. APC rejects Formats 0, 1, and 3 when an
+  AES P0 key is specified.
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - AES P0 key + Format 0/1/3 → APC validation error
+  - AES P0 key + Format 4 → correct
+  - TDES P0 key + Format 0/1/3 → correct
+  - Format 4 uses double-pass AES ECB encryption with PAN as tweak
+relationships:
+  - type: related_to
+    target_id: format.pin-block-format-4
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+status: active
+```
+
+### APC: IPEK/IK Not Persisted After Export
+
+```yaml
+id: rule.apc-ipek-not-persisted
+entity_type: constraint_rule
+canonical_name: APC IPEK/IK Is Derived On Demand and Not Stored
+summary: >
+  When APC exports a DUKPT IPEK (TDES) or IK (AES), it derives the key on demand from
+  the BDK and does not persist it. Each export re-derives independently. The KSN counter
+  is ignored during IPEK/IK derivation.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - IPEK/IK cannot be referenced by ARN for subsequent APC data-plane operations
+  - KSN counter bits are ignored; same IPEK results for any counter value on the same device
+  - The BDK must remain in APC to re-derive the same IPEK/IK
+relationships:
+  - type: related_to
+    target_id: key-type.ipek
+  - type: related_to
+    target_id: key-type.bdk
+  - type: related_to
+    target_id: algorithm.dukpt
+status: active
+```
+
+### APC: Key Attributes Are Immutable After Creation
+
+```yaml
+id: rule.apc-key-attributes-immutable
+entity_type: constraint_rule
+canonical_name: APC Key Attributes Are Immutable Post-Creation
+summary: >
+  A key's algorithm, key length, usage, class, and origin cannot be changed after
+  creation or import. Key rotation is achieved by creating a new key and reassigning
+  the alias.
+domain:
+  - key_management
+constraints:
+  - To change algorithm or usage, create a new key and redirect the consuming alias
+  - Effective date, expiry date, and tags are the only mutable attributes
+  - KeyOrigin (AWS_PAYMENT_CRYPTOGRAPHY vs EXTERNAL) is immutable
+relationships:
+  - type: related_to
+    target_id: concept.apc-key-lifecycle
+status: active
+```
+
+### APC: PVK Must Be TDES_2KEY for PVV/IBM 3624
+
+```yaml
+id: rule.apc-pvk-tdes2key-only
+entity_type: constraint_rule
+canonical_name: APC PVK Must Be TDES_2KEY for PIN Verification Operations
+summary: >
+  Although the APC valid-attributes table may list additional algorithms alongside PIN
+  verification key usages, PVV and IBM 3624 PIN operations require TDES_2KEY. Other
+  algorithm variants are schema-defined but not operationally active.
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - GeneratePinData / VerifyPinData with VISA_PVV require TDES_2KEY PVK (TR31_V2)
+  - GeneratePinData / VerifyPinData with IBM_3624 require TDES_2KEY PVK (TR31_V1)
+  - Using a non-TDES_2KEY PVK produces an APC validation error
+relationships:
+  - type: related_to
+    target_id: algorithm.visa-pin
+  - type: related_to
+    target_id: algorithm.ibm-3624
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+status: active
+```
+
+### APC: KCV Algorithm by Key Type
+
+```yaml
+id: rule.apc-kcv-algorithm-by-key-type
+entity_type: constraint_rule
+canonical_name: APC KCV Algorithm Depends on Key Type
+summary: >
+  APC computes KCVs automatically and returns the method used alongside the value.
+  The algorithm differs by key type.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - TDES keys → ANSI_X9_24 (encrypt 8 zero bytes; top 3 bytes = KCV)
+  - AES keys → CMAC (AES-CMAC over 16 zero bytes; top 3 bytes = KCV)
+  - Asymmetric keys (RSA, ECC) → SHA_1 of public key; top 3 bytes = KCV
+  - APC returns the KCV method identifier alongside every KCV value in key management responses
+relationships:
+  - type: related_to
+    target_id: artifact.kcv
+  - type: related_to
+    target_id: rule.kcv-validation-after-transfer
+status: active
+```
+
+### APC: RSA Wrap Padding Requirements
+
+```yaml
+id: rule.apc-rsa-wrap-padding
+entity_type: constraint_rule
+canonical_name: APC RSA Key Wrap Must Use OAEP Padding
+summary: >
+  APC uses RSA-OAEP padding for all RSA key wrap operations. PKCS#1 v1.5 is not
+  supported. RSA wrap is also limited to TDES and AES-128; AES-192/256 requires ECDH.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - RSA_OAEP_SHA_256 and RSA_OAEP_SHA_512 are the only supported padding modes
+  - PKCS#1 v1.5 padding is explicitly not supported
+  - RSA key wrap supports TDES and AES-128 wrapped keys only; AES-192/256 requires ECDH
+relationships:
+  - type: related_to
+    target_id: rule.apc-key-wrapping-strength
+status: active
+```
+
+### APC: EMV Master Key Usages Are DeriveKey-Only
+
+```yaml
+id: rule.apc-emv-master-key-derive-only
+entity_type: constraint_rule
+canonical_name: APC EMV Master Keys Must Be Created with DeriveKey
+summary: >
+  Keys with TR-31 usages E0 through E6 (EMV master keys) can only be created in APC
+  with DeriveKey=true or NoRestrictions=true. They cannot be configured for direct
+  encrypt or decrypt operations.
+domain:
+  - key_management
+  - emv
+  - cryptography
+constraints:
+  - E0 (app cryptograms), E1 (confidentiality), E2 (integrity), E4 (dynamic numbers),
+    E5 (personalization), E6 (other) — all require DeriveKey mode
+  - Attempting to create an E-usage key without DeriveKey produces an APC validation error
+  - Session keys derived from E-usage master keys can then perform the actual crypto operations
+relationships:
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+  - type: related_to
+    target_id: algorithm.emv-key-derivation
+status: active
+```
+
+### APC: GenerateMac mac_length Is in Nibbles (Hex Digits), Not Bytes
+
+```yaml
+id: rule.apc-generate-mac-length-nibbles
+entity_type: constraint_rule
+canonical_name: APC GenerateMac mac_length Parameter Is in Nibbles
+summary: >
+  The mac_length parameter of APC GenerateMac specifies the output length in nibbles
+  (hexadecimal digits), not bytes. Passing 8 returns a 4-byte (8 hex char) MAC. Pass 16
+  for a full 8-byte MAC. This differs from the natural expectation of byte-length.
+domain:
+  - cryptography
+  - key_management
+constraints:
+  - mac_length=8 → 4-byte output (8 hex chars)
+  - mac_length=16 → 8-byte output (16 hex chars); this is the standard payment MAC size
+  - Passing a byte count (e.g. 8 when 8 bytes are needed) silently produces a truncated result
+examples:
+  - "GenerateMac with mac_length=16 returns a full 8-byte ISO 9797 MAC"
+relationships:
+  - type: related_to
+    target_id: operation.apc-generate-mac
+status: active
+```
+
+### APC: ISO 9797-1 Algorithm 3 Uses Method 1 (Zero Padding)
+
+```yaml
+id: rule.apc-iso9797-algorithm3-method1
+entity_type: constraint_rule
+canonical_name: APC ISO 9797-1 Algorithm 3 Always Uses Padding Method 1
+summary: >
+  APC GenerateMac and VerifyMac with MacAlgorithm=ISO9797_ALGORITHM3 apply ISO 9797-1
+  Padding Method 1 (zero-pad to block boundary). They do not support Method 2 (ISO 7816-4
+  append 0x80 then zeros). Any MAC computed with Method 2 will not verify against APC.
+domain:
+  - cryptography
+constraints:
+  - APC ISO9797_ALGORITHM3 → Method 1 (right-pad with 0x00)
+  - Method 2 (ISO 7816-4: append 0x80 then zeros) is not supported by APC for this algorithm
+  - EMV issuer-script MAC operations often use Method 2 — these will NOT match APC GenerateMac output
+  - To produce an APC-compatible MAC, use explicit Method 1 in the client MAC library
+examples:
+  - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' (Method 2) does not"
+relationships:
+  - type: related_to
+    target_id: algorithm.iso9797-algorithm3
+  - type: related_to
+    target_id: rule.apc-generate-mac-length-nibbles
+status: active
+```
+
+### APC: DUKPT TDES Data Encryption Variant Is Undocumented
+
+```yaml
+id: rule.apc-dukpt-tdes-data-variant
+entity_type: constraint_rule
+canonical_name: APC DUKPT TDES Data Encryption Uses an Undocumented Internal Variant
+summary: >
+  APC EncryptData / DecryptData with DUKPT TDES uses an internal key variant that does not
+  correspond to any of the five named ANSI X9.24-1 variants (None, PIN, MAC Request,
+  MAC Response, Data). Ciphertexts produced by APC cannot be reproduced by standard
+  ANSI X9.24-1 "Data" variant derivation. APC is internally self-consistent
+  (encrypt-then-decrypt roundtrip works) but is not interoperable with ANSI-compliant
+  implementations for data encryption.
+domain:
+  - cryptography
+  - key_management
+constraints:
+  - ANSI X9.24-1 "Data" variant: bytes 5 and 13 of session key XOR 0xFF
+  - APC data encryption variant: undocumented; does not match any standard named variant
+  - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST matches ANSI X9.24-1 "MAC Request" variant
+  - Migrate to AES DUKPT (ANSI X9.24-3) for a fully published derivation algorithm
+examples:
+  - "BDK=0123456789ABCDEFFEDCBA9876543210, KSN=FFFF9876543210E00001, plaintext=0102030405060708:
+     ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0, APC ciphertext=124F7A32F3F84187"
+relationships:
+  - type: related_to
+    target_id: algorithm.dukpt
+  - type: related_to
+    target_id: key-type.bdk
+status: active
+```
+
+### APC: ARQC Verification Requires AES-256 E0 Master Key
+
+```yaml
+id: rule.apc-arqc-aes256-required
+entity_type: constraint_rule
+canonical_name: APC VerifyAuthRequestCryptogram Requires AES-256 E0 Key
+summary: >
+  APC VerifyAuthRequestCryptogram rejects AES-128 E0 (TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS)
+  keys with an invalid key algorithm error. An AES-256 E0 master key is required for APC
+  ARQC verification. TDES E0 keys work for TDES ARQC. This constraint is not documented
+  in the APC public API reference.
+domain:
+  - emv
+  - cryptography
+constraints:
+  - AES-128 E0 → VerifyAuthRequestCryptogram returns "KeyAlgorithm of the input key is invalid"
+  - AES-256 E0 → accepted for AES ARQC verification
+  - TDES E0 (TDES_2KEY or TDES_3KEY) → accepted for TDES ARQC verification
+  - AES ARQC computation itself (AES-CMAC with Option A session key derivation) is correct for AES-128;
+    only APC verification rejects AES-128
+examples:
+  - "emv_e0=101112131415161718191A1B1C1D1E1F (AES-128), ATC=0001:
+     sessionKey=EC1EBB481BE674B22456BD15F98843DB, ARQC=8C8E19CED4DBBF59 (correct per spec).
+     APC rejected the key — AES-256 E0 required for APC cross-validation."
+relationships:
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: algorithm.emv-key-derivation
+  - type: related_to
+    target_id: rule.apc-emv-master-key-derive-only
+status: active
+```
+
+### APC: D0 / E0 / P0 Keys Require NoRestrictions Mode
+
+```yaml
+id: rule.apc-d0-e0-p0-norestrictions
+entity_type: constraint_rule
+canonical_name: APC D0, E0, and P0 Keys Require NoRestrictions Mode on Import
+summary: >
+  APC rejects symmetric key imports for D0 (data encryption), E0 (EMV app cryptograms),
+  and P0 (PIN encryption) usages when specific KeyModesOfUse combinations are supplied.
+  Only NoRestrictions=true is accepted for these usage types on import via KEY_CRYPTOGRAM.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - D0 with Encrypt+Decrypt → rejected; use NoRestrictions=true
+  - E0 with Generate or Verify → rejected; use NoRestrictions=true
+  - P0 with Encrypt → rejected; use NoRestrictions=true
+  - NoRestrictions=true bypasses mode enforcement and is the only import-compatible option
+    for these three usage types
+  - Side effect: D0 keys imported with NoRestrictions are then rejected by re_encrypt_data
+    ("KeyUsages not allowed for this operation") — APC does not permit re-encrypt on
+    unrestricted D0 keys
+relationships:
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+  - type: related_to
+    target_id: rule.apc-reencrypt-norestrictions-blocked
+status: active
+```
+
+### APC: ReEncryptData Blocked for D0 Keys with NoRestrictions
+
+```yaml
+id: rule.apc-reencrypt-norestrictions-blocked
+entity_type: constraint_rule
+canonical_name: APC ReEncryptData Rejects D0 Keys Imported with NoRestrictions
+summary: >
+  APC ReEncryptData requires that D0 keys carry explicit Encrypt and Decrypt modes.
+  D0 keys imported with NoRestrictions=true (the only import-compatible mode) are
+  rejected by ReEncryptData with a "KeyUsages not allowed" error. There is no workaround
+  within the KEY_CRYPTOGRAM import path; keys intended for ReEncryptData must be imported
+  with explicit Encrypt+Decrypt mode via TR-31 or TR-34 if those paths are available.
+domain:
+  - key_management
+  - cryptography
+constraints:
+  - ReEncryptData + D0 key with NoRestrictions=true → "KeyUsages not allowed for this operation"
+  - D0 with Encrypt+Decrypt mode cannot be imported via KEY_CRYPTOGRAM (APC rejects the modes)
+  - This is an APC API constraint; it is not a deficiency in the plaintext key material
+relationships:
+  - type: related_to
+    target_id: rule.apc-d0-e0-p0-norestrictions
+  - type: related_to
+    target_id: reference_list.apc-tr31-key-usages
+status: active
+```
+
+### APC: KEY_CRYPTOGRAM Import Requirements
+
+```yaml
+id: concept.apc-key-cryptogram-import
+entity_type: concept
+canonical_name: APC KEY_CRYPTOGRAM Import Operational Requirements
+summary: >
+  Key import via the KEY_CRYPTOGRAM method (RSA-OAEP wrapped symmetric key) has several
+  non-obvious requirements discovered through direct API testing. All must be satisfied
+  for a successful import.
+domain:
+  - key_management
+  - cryptography
+attributes:
+  required_parameters:
+    KeyClass: SYMMETRIC_KEY  # must be explicit; omitting causes "Missing required parameter" error
+    Exportable: false  # required inside the KeyCryptogram sub-object
+    KeyCheckValueAlgorithm: >
+      top-level parameter to import_key, NOT inside KeyCryptogram; placing it inside
+      KeyCryptogram causes a validation error
+  wrapped_key_encoding:
+    format: HEX uppercase  # WrappedKeyCryptogram must be hex, not base64
+    common_mistake: base64-encoding the RSA OAEP output
+  wrapping_padding: RSA_OAEP_SHA_256 (RSA_OAEP_SHA_512 also accepted)
+  rsa_certificate_quirk: >
+    The APC-returned RSA wrapping certificate contains an ASN.1 extension that causes
+    Node.js X509Certificate and .NET X509Certificate2 to fail during SPKI extraction.
+    Workaround: manually extract SPKI from the DER bytes at offset 265 (length 422),
+    save as a .der file, and load with createPublicKey({format:'der', type:'spki'}).
+    Verified with APC RSA-3072 wrapping certificate (2026-05-19).
+constraints:
+  - KeyClass: SYMMETRIC_KEY must be present in KeyAttributes
+  - WrappedKeyCryptogram must be hex string, not base64
+  - KeyCheckValueAlgorithm is a top-level import_key parameter
+  - Exportable: false must be set inside the KeyCryptogram sub-object
+  - For D0/E0/P0 keys, use NoRestrictions:true in KeyModesOfUse (see rule.apc-d0-e0-p0-norestrictions)
+relationships:
+  - type: related_to
+    target_id: rule.apc-rsa-wrap-padding
+  - type: related_to
+    target_id: rule.apc-d0-e0-p0-norestrictions
+status: active
+```
+
+### APC: IBM 3624 VerifyPinData Requires PinValidationDataPadCharacter
+
+```yaml
+id: rule.apc-ibm3624-pad-char-required
+entity_type: constraint_rule
+canonical_name: APC VerifyPinData IBM 3624 Requires PinValidationDataPadCharacter
+summary: >
+  APC VerifyPinData with IBM 3624 verification attributes requires the
+  PinValidationDataPadCharacter field. Omitting it causes a validation error.
+  The pad character is the fill nibble used in the decimalization output ('F' is common).
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - VerifyPinData + VerificationMethod=IBM_3624 + missing PinValidationDataPadCharacter → validation error
+  - Typical value is 'F' (hex 0xF fill nibble used by most IBM 3624 implementations)
+  - The GeneratePinData path for IBM 3624 has the same requirement
+examples:
+  - "verification_attributes: {Algorithm: IBM_3624, PinValidationData: '43210', PinValidationDataPadCharacter: 'F', ...}"
+relationships:
+  - type: related_to
+    target_id: algorithm.ibm-3624
+  - type: related_to
+    target_id: rule.apc-pvk-tdes2key-only
+status: active
+```
+
+### APC: GeneratePinData VISA PVV Emits ISO Format 0 Compliance Warning
+
+```yaml
+id: rule.apc-generate-pin-data-iso0-compliance-warning
+entity_type: constraint_rule
+canonical_name: APC GeneratePinData Issues Compliance Warning for ISO Format 0
+summary: >
+  APC GeneratePinData for VISA PVV with an ISO Format 0 encrypted PIN block input emits
+  a PCI compliance warning in the response because ISO Format 0 is a legacy format. The
+  operation still proceeds. VerifyPinData does not emit this warning. For production use,
+  APC recommends ISO Format 4 with AES keys.
+domain:
+  - pin_processing
+  - cryptography
+constraints:
+  - GeneratePinData + VisaPinVerificationValue + ISO Format 0 PIN block → response includes compliance warning
+  - Warning does not block the operation; the PVV is computed and returned
+  - VerifyPinData with the same inputs does not emit the warning
+  - Prefer ISO Format 4 with AES P0 key in production to avoid the warning
+relationships:
+  - type: related_to
+    target_id: format.pin-block-format-0
+  - type: related_to
+    target_id: rule.apc-format4-aes-pin-requirement
+  - type: related_to
+    target_id: algorithm.visa-pin
+status: active
+```
+
 ## Reference Catalogs to Materialize Next
 
 - EMV tag catalog
@@ -4566,3 +5714,5 @@ that publish annual revisions).
 | 2026-05-14 | payShield 10K Installation and User Guide | Thales | updated 15 January 2021 | hsm, key_management, cryptography |
 | 2026-05-15 | Security Rules and Procedures, Merchant Edition | Mastercard | 11 February 2025 | card_data, card_validation, emv |
 | 2026-05-15 | Visa Core Rules and Visa Product and Service Rules | Visa | 18 April 2026 public edition | emv, card_data, card_validation, cryptography |
+| 2026-05-19 | AWS Payment Cryptography User Guide (full site tree: what-is, concepts, terminology, cryptographic-details, keys-import/export, valid-attributes, use-cases issuers/acquirers, security, physical key exchange, BYOCA, dynamic keys, post-quantum TLS) | AWS | accessed 2026-05-19 | key_management, pin_processing, card_validation, emv, cryptography, hsm |
+| 2026-05-19 | Direct APC API testing: 11 symmetric keys imported via KEY_CRYPTOGRAM (RSA-3072 OAEP), 20 operations cross-validated between CyberChef Payments and APC data plane. Findings: mac_length nibbles, ISO9797 Method 1, DUKPT data variant, ARQC AES-256 requirement, D0/E0/P0 NoRestrictions, re-encrypt block, KEY_CRYPTOGRAM import quirks, IBM 3624 pad char | Direct API testing (CyberChef Payments vs AWS Payment Cryptography) | live 2026-05-19 | cryptography, pin_processing, key_management, emv |
