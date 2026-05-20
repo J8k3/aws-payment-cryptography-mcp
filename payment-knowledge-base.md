@@ -5711,6 +5711,273 @@ relationships:
 status: active
 ```
 
+## PCI PIN Security Requirements — Acquirer-Relevant Rules
+
+Source: PCI PTS PIN Security Requirements Technical FAQs v3, June 2021 (listings.pcisecuritystandards.org).
+These rules are the compliance layer that governs how acquirers operate HSMs and manage keys.
+APC as a cloud HSM satisfies the physical and certification requirements; the procedural rules below
+still bind the acquirer operating APC.
+
+---
+
+### PCI PIN: TR-31 Key Blocks Required for BDKs and Initial DUKPT Keys
+
+```yaml
+id: concept.pci-pin-key-block-requirements
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 18 — TR-31 Key Blocks for BDKs and Initial DUKPT Keys
+summary: >
+  PCI PIN Security Requirement 18 mandates that encrypted symmetric keys be managed in
+  structures called key blocks (TR-31 or ISO 20038). This applies to BDKs and initial
+  DUKPT keys. Per-transaction DUKPT working keys are EXEMPT provided they remain inside
+  an SCD at all times. Key blocks apply to both conveyance and storage.
+  TR-31 is the standard method; any equivalent method must include cryptographic binding
+  of key-usage information and must undergo independent expert review that is publicly available.
+  Deadline for external connections to Associations/Networks: 1 January 2023.
+domain:
+  - key_management
+  - compliance
+attributes:
+  applies_to:
+    - BDKs (Base Derivation Keys)
+    - initial DUKPT keys
+    - TMKs (Terminal Master Keys)
+    - any symmetric key outside an SCD
+  exempt:
+    - per-transaction DUKPT working keys stored inside an SCD
+  standards: ["ANSI TR-31", "ISO 20038"]
+  deadline_external_connections: "2023-01-01"
+constraints:
+  - BDKs and initial DUKPT keys must be conveyed and stored in TR-31 key blocks
+  - Per-transaction working keys inside an SCD do not need key blocks
+  - APC imports/exports keys via TR-31; this requirement is met by the APC import flow
+  - Any proprietary key block equivalent requires an independent expert review (doctoral-level cryptography credentials, 10+ years experience) that is publicly available
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q28 (Req 18), Q29, Q30, Q31, Q33, Q34"
+relationships:
+  - type: related_to
+    target_id: algorithm.tr31
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+status: active
+```
+
+---
+
+### PCI PIN: BDK Segmentation Required
+
+```yaml
+id: concept.pci-pin-bdk-segmentation
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 20 — BDK Segmentation by FI, Vendor, and Geography
+summary: >
+  Entities processing or injecting DUKPT must implement a BDK segmentation strategy.
+  Segmentation dimensions include: different BDKs per financial institution (sponsor),
+  per injection vendor / ESO / terminal manufacturer or model, and per geographic region,
+  market segment, or processing platform. A single BDK may cover an entire POI population
+  only if the entity has exactly one financial institution sponsor, one injection vendor,
+  and operates within a single geographic region.
+domain:
+  - key_management
+  - compliance
+attributes:
+  segmentation_dimensions:
+    - financial_institution_sponsor
+    - injection_vendor_or_ESO
+    - terminal_manufacturer_or_model
+    - geographic_region
+    - market_segment_or_processing_platform
+  single_bdk_allowed_when:
+    - exactly one FI sponsor
+    - exactly one injection vendor
+    - within one geographic region (e.g., within the US)
+constraints:
+  - Multi-sponsor or multi-vendor acquirers must use separate BDKs per FI and per injection vendor
+  - APC models BDKs as TR31_B0_BASE_DERIVATION_KEY; create one APC BDK alias per required segment
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q36 (Req 20)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: key-type.bdk
+status: active
+```
+
+---
+
+### PCI PIN: Cloud HSM (HSM-as-a-Service) Compliance Path
+
+```yaml
+id: concept.pci-pin-cloud-hsm-compliance
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 1 — Cloud HSM Is Permitted; Acquirer Remains Responsible
+summary: >
+  An acquirer may use a third-party hosted HSM service (HSM in the cloud). The acquirer
+  is responsible for ensuring all PCI PIN requirements are met by the cloud HSM provider.
+  When a cloud provider houses HSMs in a third-party data center, specific controls apply:
+  the cloud provider must control all logical access (data center ops staff must have no
+  logical admin access); CCTV must be positioned per Annex B requirements and stream to
+  a cloud-provider-controlled server; cabinet access must be dual-control (cloud provider
+  staff badge/biometric, or pre-authorized data center staff under dual control with
+  monitoring, authorization, identity verification, and activity monitoring).
+  APC satisfies these requirements as a PCI PTS HSM V3 and FIPS 140-2 Level 3 certified service.
+domain:
+  - compliance
+  - hsm
+attributes:
+  apc_certification: "PCI PTS HSM V3, FIPS 140-2 Level 3"
+  acquirer_responsibility: true
+  cloud_provider_requirements:
+    - no logical access for data center ops staff
+    - CCTV per Annex B, streaming to cloud provider server
+    - dual-control cabinet access with monitoring and identity verification
+constraints:
+  - APC satisfies HSM certification; acquirer must still implement procedural controls on their side
+  - Acquirer must verify APC's compliance attestation covers all applicable requirements
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q5, Q6"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-hsm-certification
+status: active
+```
+
+---
+
+### PCI PIN: HSM Certification Requirements
+
+```yaml
+id: concept.pci-pin-hsm-certification
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 1 — HSM Must Be FIPS 140-2 Level 3 or PCI Approved
+summary: >
+  HSMs used for PIN acquiring must be either PCI approved or FIPS 140-2 Level 3 or higher
+  certified. The FIPS certificate scope must include: (1) the hardware where all cryptographic
+  processes execute and secret data is stored; (2) the firmware required to load vendor-provided
+  software components securely; and (3) for new deployments after 1 July 2020, the tamper-
+  responsive boundaries within which PIN translation occurs. APC holds FIPS 140-2 Level 3
+  and PCI PTS HSM V3 certifications.
+domain:
+  - compliance
+  - hsm
+attributes:
+  required_certification: "FIPS 140-2 Level 3 or PCI Approved"
+  fips_scope_must_cover:
+    - hardware executing cryptographic processes and storing secret data
+    - firmware for loading vendor software securely
+    - tamper-responsive boundaries for PIN translation (new deployments post 2020-07-01)
+  apc_status: "meets requirement — FIPS 140-2 Level 3 + PCI PTS HSM V3"
+constraints:
+  - HSMs on NIST CMVP Historical Validation List cannot be used for new deployments after December 2019
+  - If applying a vendor firmware patch, entity must obtain documentation confirming the update was submitted for NIST/PCI evaluation
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q9, Q10, Q13, Q14"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-cloud-hsm-compliance
+status: active
+```
+
+---
+
+### PCI PIN: TDES Wrapping AES Keys Is Treated as Cleartext Injection
+
+```yaml
+id: concept.pci-pin-tdes-aes-wrap-cleartext
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 10 / Requirement 1 — TDES Wrap of AES Key = Cleartext Injection
+summary: >
+  TDES keys are significantly weaker than AES keys. Using a TDES key to encrypt an AES key
+  for conveyance is treated by PCI PIN as equivalent to cleartext key injection. It is
+  permitted only via direct cable connection (not over a network) and requires a secure room
+  as defined in Requirement 32-9. Key-encipherment keys must be of equal or greater strength
+  than the keys they protect for any network transport. AES keys encrypted with 2048-bit RSA
+  for transport is the permitted exception (RSA 2048 provides ~112-bit strength, sufficient for
+  AES-128 but not for AES-256 — for AES-256, Diffie-Hellman or Elliptic Curve must be used).
+domain:
+  - key_management
+  - compliance
+  - cryptography
+attributes:
+  tdes_wrapping_aes_treatment: "cleartext injection"
+  tdes_wrapping_aes_allowed_via: "direct cable only, not network, requires secure room"
+  rsa_2048_wrapping_aes_128: "permitted"
+  rsa_2048_wrapping_aes_256: "NOT permitted — use DH or ECDH"
+  key_strength_rule: "encipherment key must be >= strength of protected key for network transport"
+constraints:
+  - Never transport AES keys under TDES over a network — treat as cleartext breach
+  - APC TR-31 import uses RSA-2048 or RSA-3072 to wrap the key block — compliant for AES-128 and AES-256
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q1, Q3, Q4, Q20"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+status: active
+```
+
+---
+
+### PCI PIN: Acquiring HSMs Must Not Output Cleartext PINs
+
+```yaml
+id: concept.pci-pin-acquiring-hsm-no-cleartext-pin
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 29 — Acquiring HSMs Must Disable Cleartext PIN Output
+summary: >
+  All commands and configuration options associated with outputting cleartext PINs must be
+  disabled or removed from HSMs used for acquiring functions. HSMs temporarily used for PIN
+  issuance may be reconfigured, but must use a separate key hierarchy (a different MFK).
+  APC enforces this by design — it is a managed service scoped to acquirer use cases and
+  does not expose cleartext PIN output commands.
+domain:
+  - compliance
+  - hsm
+  - pin_processing
+constraints:
+  - APC does not provide cleartext PIN output — compliant by design
+  - If using a shared HSM for both issuing and acquiring, a separate MFK hierarchy is required for each role
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q40 (Req 29), Q39 (Req 23)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-hsm-certification
+status: active
+```
+
+---
+
+### PCI PIN: Deriving Initial DUKPT Keys from BDK Counts as Key Generation
+
+```yaml
+id: concept.pci-pin-dukpt-initial-key-is-key-generation
+entity_type: compliance_rule
+canonical_name: PCI PIN Normative Annex B — BDK-to-Initial-DUKPT Derivation Is Key Generation
+summary: >
+  When a Key Injection Facility (KIF) uses a BDK to derive initial DUKPT keys for injection
+  into POI devices, that derivation counts as key generation under PCI PIN (per ISO 11568,
+  repeatable key generation by key derivation). This means the KIF must meet all PCI PIN
+  requirements for key-generation facilities. Initial DUKPT keys must be conveyed to POI
+  devices encrypted under a key of equal or greater strength (TR-31 key block).
+domain:
+  - key_management
+  - compliance
+constraints:
+  - KIF performing BDK-to-IPEK derivation must comply with PCI PIN key-generation facility requirements
+  - IPEK/initial key transport to POI must use equal-or-greater-strength wrapping key
+  - APC does not export IPEKs in cleartext; export is under a TR-31 KEK or asymmetric wrap
+references:
+  - "PCI PTS PIN Technical FAQs v3 June 2021, Q57 (Annex B), Q58 (Annex B)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+status: active
+```
+
+---
+
 ## Reference Catalogs to Materialize Next
 
 - EMV tag catalog
@@ -5744,3 +6011,4 @@ that publish annual revisions).
 | 2026-05-15 | Visa Core Rules and Visa Product and Service Rules | Visa | 18 April 2026 public edition | emv, card_data, card_validation, cryptography |
 | 2026-05-19 | AWS Payment Cryptography User Guide (full site tree: what-is, concepts, terminology, cryptographic-details, keys-import/export, valid-attributes, use-cases issuers/acquirers, security, physical key exchange, BYOCA, dynamic keys, post-quantum TLS) | AWS | accessed 2026-05-19 | key_management, pin_processing, card_validation, emv, cryptography, hsm |
 | 2026-05-19 | Direct APC API testing: 11 symmetric keys imported via KEY_CRYPTOGRAM (RSA-3072 OAEP), 20 operations cross-validated between CyberChef Payments and APC data plane. Findings: mac_length nibbles, ISO9797 Method 1, DUKPT data variant, ARQC AES-256 requirement, D0/E0/P0 NoRestrictions, re-encrypt block, KEY_CRYPTOGRAM import quirks, IBM 3624 pad char | Direct API testing (CyberChef Payments vs AWS Payment Cryptography) | live 2026-05-19 | cryptography, pin_processing, key_management, emv |
+| 2026-05-19 | PCI PTS PIN Security Requirements Technical FAQs v3 | PCI Security Standards Council | June 2021 | compliance, key_management, pin_processing, hsm |
