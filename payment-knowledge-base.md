@@ -5983,36 +5983,58 @@ status: active
 ```yaml
 id: concept.pci-pin-tdes-sunset-and-format4-mandate
 entity_type: compliance_rule
-canonical_name: PCI PIN v3 — Fixed Key TDES Banned 2023; ISO Format 4 Required by 2025
+canonical_name: PCI PIN v3 — Fixed Key TDES Banned 2023; ISO Format 4 Encouraged, Mandate Dates Suspended
 summary: >
-  PCI PIN Security Requirements v3.0 (August 2018) introduced hard sunset dates for fixed
-  key TDES and mandated support for ISO PIN block Format 4. Both deadlines are now in the
-  past (as of 2026), meaning any compliant acquirer environment must already be using DUKPT
-  or AES for PIN, and all compliant hosts must support ISO Format 4 in both directions.
-  PCI PIN v3 also added ANSI X9.24-3 (AES DUKPT) as a normative reference alongside X9.24-1,
-  formally recognizing AES DUKPT as the preferred migration target.
+  PCI PIN v3.0 (August 2018) banned fixed key TDES for PIN encryption effective 1 January 2023
+  (both POI devices and host-to-host). This ban is confirmed and in force (PCI PIN §8.2 FAQ).
+  NIST SP 800-57 Rev. 5 independently disallowed 3-key TDEA after 2023. Fixed key AES PIN
+  encryption is unaffected.
+  ISO Format 4 mandate dates (decryption by 2023-01-01, encryption by 2025-01-01) were set in
+  v3.0 but SUSPENDED by PCI PIN v3.1 (March 2021) while PCI SSC re-evaluates. As of this KB
+  entry, no mandatory Format 4 effective dates are in force. Migration to Format 4 is strongly
+  encouraged as the only format supporting AES, but not yet required by a fixed deadline.
+  PCI PIN v3 also added ANSI X9.24-3 (AES DUKPT) and ANSI TR-34 as normative references.
 domain:
   - compliance
   - pin_processing
   - cryptography
 attributes:
   tdes_fixed_key_sunset:
-    poi_devices: "2023-01-01 — fixed key TDES PIN encryption in POI devices is disallowed"
-    host_to_host: "2023-01-01 — fixed key TDES PIN encryption in host-to-host connections is disallowed"
+    poi_devices: "2023-01-01 — fixed key TDES PIN encryption in POI devices is disallowed (confirmed)"
+    host_to_host: "2023-01-01 — fixed key TDES PIN encryption in host-to-host connections is disallowed (confirmed)"
+    nist_status: "NIST SP 800-57 Rev.5 disallows 3-key TDEA after 2023 independently of PCI"
   iso_format_4_mandate:
-    decryption: "2023-01-01 — all hosts must support ISO PIN block Format 4 decryption"
-    encryption: "2025-01-01 — all hosts must support ISO PIN block Format 4 encryption"
+    status: "SUSPENDED — PCI PIN v3.1 (March 2021) suspended the v3.0 sunrise dates pending re-evaluation"
+    original_v30_dates: "decryption 2023-01-01, encryption 2025-01-01 (never took effect)"
+    poi_v5_plus: "POI devices approved to PCI PTS POI v5+ are required to support Format 4"
   normative_references_added_in_v3: ["ANSI X9.24-3 (AES DUKPT)", "ANSI TR-34"]
   kcv_requirement: "KCV optional for TDEA keys, mandatory for AES keys"
+  iso8583_transport: >
+    Original ISO 8583 Field 52 is 64-bit only — too small for Format 4 (128-bit).
+    ISO 13492 adds Fields 110, 111, and 50 for AES support in ISO 8583.
+    ISO 20022 (ATICA) supports AES natively via variable-length fields.
+  format4_structure_summary: >
+    Two 128-bit fields: PIN field (C=0100, N=PIN length, P=PIN digits, F=fill 0xA, R=64 random bits)
+    and PAN field (M=control for PAN 12-19 digits, A=PAN digits, zero-padded).
+    Encryption: AES(PIN field) XOR PAN field, then AES again. Requires AES (128-bit block cipher).
+    Both encrypt and decrypt must occur within an SCD/HSM.
+  format4_prevents_replay: "Random bits in lower 64 bits of PIN field make each block unique except by chance"
+  format_translation_restrictions: >
+    Format 0→4: Permitted. Format 1→4: Permitted. Format 2→4: NOT Permitted.
+    Format 3→4: Permitted. Standard formats (0-4) must not be translated to non-standard formats.
+    PAN must not change during translation between formats that both include the PAN.
 constraints:
-  - Fixed key TDES for PIN is already banned — compliant deployments must use DUKPT (TDES or AES)
-  - All compliant hosts in 2026 must support ISO Format 4 encryption and decryption
-  - AES DUKPT (X9.24-3) is explicitly recognized by PCI PIN as a normative migration target
+  - Fixed key TDES for PIN is banned — compliant deployments must use DUKPT (TDES or AES)
+  - ISO Format 4 has no mandatory effective date as of 2026 — but is the only format supporting AES
+  - AES DUKPT (X9.24-3) is a PCI PIN normative reference — use for all new deployments
   - APC supports ISO Format 4 (TR31_P0_PIN_ENCRYPTION_KEY with AES) — use this for new deployments
-  - Cleartext key injection ban (from Req 32): entities injecting on behalf of others cannot use cleartext injection (since 2021); processors cannot use it (since 2023)
+  - Format 4 → Format 0/3 translation at HSM is a valid interim strategy while upstream catches up
+  - Tokens used as PAN in Format 4 blocks must preserve PAN format (Luhn, length)
+  - Cleartext key injection ban: entities injecting on behalf of others (since 2021); processors (since 2023)
 references:
   - "PCI PIN Security Requirements Modifications Summary of Changes v2.0 to v3.0, August 2018"
-  - "PCI PTS PIN Technical FAQs v3 June 2021"
+  - "PCI PTS PIN Technical FAQs v3 June 2021, §8.2"
+  - "PCI Information Supplement: Implementing ISO Format 4 PIN Blocks, September 2021, §4 (suspension notice)"
 relationships:
   - type: related_to
     target_id: concept.pci-pin-key-block-requirements
@@ -6059,3 +6081,5 @@ that publish annual revisions).
 | 2026-05-19 | AWS Payment Cryptography User Guide (full site tree: what-is, concepts, terminology, cryptographic-details, keys-import/export, valid-attributes, use-cases issuers/acquirers, security, physical key exchange, BYOCA, dynamic keys, post-quantum TLS) | AWS | accessed 2026-05-19 | key_management, pin_processing, card_validation, emv, cryptography, hsm |
 | 2026-05-19 | Direct APC API testing: 11 symmetric keys imported via KEY_CRYPTOGRAM (RSA-3072 OAEP), 20 operations cross-validated between CyberChef Payments and APC data plane. Findings: mac_length nibbles, ISO9797 Method 1, DUKPT data variant, ARQC AES-256 requirement, D0/E0/P0 NoRestrictions, re-encrypt block, KEY_CRYPTOGRAM import quirks, IBM 3624 pad char | Direct API testing (CyberChef Payments vs AWS Payment Cryptography) | live 2026-05-19 | cryptography, pin_processing, key_management, emv |
 | 2026-05-19 | PCI PTS PIN Security Requirements Technical FAQs v3 | PCI Security Standards Council | June 2021 | compliance, key_management, pin_processing, hsm |
+| 2026-05-19 | PCI PIN Security Requirements Modifications Summary of Changes v2.0 to v3.0 | PCI Security Standards Council | August 2018 | compliance, pin_processing, cryptography |
+| 2026-05-19 | PCI Information Supplement: Implementing ISO Format 4 PIN Blocks | PCI Security Standards Council | September 2021 (v1.01) | compliance, pin_processing, cryptography |
