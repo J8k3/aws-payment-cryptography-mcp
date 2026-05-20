@@ -5451,7 +5451,7 @@ constraints:
   - EMV issuer-script MAC operations often use Method 2 — these will NOT match APC GenerateMac output
   - To produce an APC-compatible MAC, use explicit Method 1 in the client MAC library
 examples:
-  - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' (Method 2) does not"
+  - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' now exposes a padding method selector (default Method 2)"
 relationships:
   - type: related_to
     target_id: algorithm.iso9797-algorithm3
@@ -5460,30 +5460,42 @@ relationships:
 status: active
 ```
 
-### APC: DUKPT TDES Data Encryption Variant Is Undocumented
+### APC: DUKPT TDES Data Encryption Uses Directional Variants, Not ANSI X9.24-1 "Data" Variant
 
 ```yaml
 id: rule.apc-dukpt-tdes-data-variant
 entity_type: constraint_rule
-canonical_name: APC DUKPT TDES Data Encryption Uses an Undocumented Internal Variant
+canonical_name: APC DUKPT TDES Data Encryption Uses REQUEST/RESPONSE/BIDIRECTIONAL, Not ANSI X9.24-1 Data Variant
 summary: >
-  APC EncryptData / DecryptData with DUKPT TDES uses an internal key variant that does not
-  correspond to any of the five named ANSI X9.24-1 variants (None, PIN, MAC Request,
-  MAC Response, Data). Ciphertexts produced by APC cannot be reproduced by standard
-  ANSI X9.24-1 "Data" variant derivation. APC is internally self-consistent
-  (encrypt-then-decrypt roundtrip works) but is not interoperable with ANSI-compliant
-  implementations for data encryption.
+  APC EncryptData / DecryptData with DUKPT TDES accepts DukptKeyVariant values of
+  BIDIRECTIONAL, REQUEST (outgoing/encrypt direction), and RESPONSE (incoming/decrypt
+  direction). These are a directional model, not the ANSI X9.24-1 named variants (None,
+  PIN, MAC Request, MAC Response, Data). The XOR byte positions APC uses for data
+  REQUEST/RESPONSE/BIDIRECTIONAL are not published. Empirical testing against all five
+  ANSI X9.24-1 named variants confirmed none produces the same ciphertext as APC.
+  APC is internally self-consistent (encrypt-then-decrypt roundtrip works) but output
+  is not interoperable with ANSI X9.24-1 "Data" variant implementations.
+  For MAC, APC REQUEST maps to ANSI X9.24-1 "MAC Request" (bytes 6 and 14 XOR 0xFF);
+  no equivalent mapping is known for data encryption.
 domain:
   - cryptography
   - key_management
+attributes:
+  apc_dukpt_key_variants_for_data:
+    BIDIRECTIONAL: supports both incoming decryption and outgoing encryption
+    REQUEST: outgoing data encryption direction
+    RESPONSE: incoming data decryption direction
+  ansi_x9_24_1_data_variant: bytes 5 and 13 of session key XOR 0xFF (does not match any APC variant)
+  mac_variant_alignment: APC REQUEST for MAC = ANSI X9.24-1 MAC Request (bytes 6,14); no data equivalent known
 constraints:
-  - ANSI X9.24-1 "Data" variant: bytes 5 and 13 of session key XOR 0xFF
-  - APC data encryption variant: undocumented; does not match any standard named variant
-  - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST matches ANSI X9.24-1 "MAC Request" variant
-  - Migrate to AES DUKPT (ANSI X9.24-3) for a fully published derivation algorithm
+  - APC DUKPT data encryption: use DukptKeyVariant=REQUEST for outgoing, RESPONSE for incoming
+  - None of the five ANSI X9.24-1 variants reproduce APC data ciphertext
+  - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST matches ANSI X9.24-1 "MAC Request" (bytes 6,14)
+  - Migrate to AES DUKPT (ANSI X9.24-3) for a fully published, unambiguous derivation algorithm
 examples:
   - "BDK=0123456789ABCDEFFEDCBA9876543210, KSN=FFFF9876543210E00001, plaintext=0102030405060708:
-     ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0, APC ciphertext=124F7A32F3F84187"
+     ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0, APC ciphertext=124F7A32F3F84187
+     (all five ANSI variants tested; none matched APC output)"
 relationships:
   - type: related_to
     target_id: algorithm.dukpt
