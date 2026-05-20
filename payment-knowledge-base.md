@@ -5489,12 +5489,18 @@ attributes:
   mac_variant_alignment: APC REQUEST for MAC = ANSI X9.24-1 MAC Request (bytes 6,14); no data equivalent known
   thales_hypothesis: >
     APC was designed to be a drop-in for existing Thales payShield acquirer deployments.
-    The most probable source of the data variant definition is the Thales payShield M0
-    (DUKPT encrypt) command's Key Type flag, which defines variant byte positions as a
-    Thales-specific extension beyond ANSI X9.24-1. Futurex likely copied Thales convention
-    for interoperability. Confirm by inspecting the M0 command parameter table in
-    payShield 10K Legacy Host Commands (Version V1, 2019) — the KB currently has command
-    codes only, not full parameter detail for M0.
+    DISPROVEN FOR LEGACY COMMAND SET (2026-05-19): The Thales payShield 10K Legacy Host
+    Commands (Version V1, 2019, PUGD0538-002) was read in full. There is no M0 command.
+    The DUKPT section (Section 6) contains only five commands (CI/CK/CM/CO/CQ) and all
+    are PIN-only — there is no DUKPT data encryption command in the legacy set. Data
+    encryption (XW/XU commands) accepts a pre-supplied session data key under LMK pair
+    30-31, not a BDK+KSN derivation; those commands cannot be the source of APC's variant.
+    The legacy doc references modern replacement commands G0/GQ/GS/GU for DUKPT PIN
+    translate; these and any modern DUKPT data command would be in the non-legacy payShield
+    Host Commands reference (separate document, not yet reviewed). If the variant origin
+    still matters, the next investigation target is the modern Thales payShield Host Commands
+    reference. Futurex interop hypothesis remains plausible but cannot be confirmed from
+    legacy docs alone.
 constraints:
   - APC DUKPT data encryption: use DukptKeyVariant=REQUEST for outgoing, RESPONSE for incoming
   - None of the eight single-byte-pair XOR positions (0xFF at bytes n and n+8, n=0..7) reproduce APC data ciphertext
