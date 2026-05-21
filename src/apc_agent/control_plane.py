@@ -27,15 +27,18 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         tags: list[dict] | None = None,
     ) -> dict:
         """
-        Create a new APC key.
+        Create a new APC key. Call explain_key_usage first to confirm the right
+        key usage code — APC keys are typed at creation and the type cannot change.
+
+        AES keys must use CMAC for KCV (not ANSI_X9_24). Enforced here.
 
         Args:
-            key_algorithm: e.g. AES_128, AES_256, TDES_3KEY, RSA_2048
+            key_algorithm: AES_128, AES_256, TDES_3KEY, RSA_2048, RSA_3072, RSA_4096, ECC_NIST_P256, etc.
             key_usage: TR-31 key usage code, e.g. TR31_P0_PIN_ENCRYPTION_KEY
             key_class: SYMMETRIC_KEY, ASYMMETRIC_KEY_PAIR, or PRIVATE_KEY
-            exportable: Whether the key can be exported
-            enabled: Whether the key is immediately active
-            key_check_value_algorithm: CMAC or ANSI_X9_24 (TDES only; AES must use CMAC)
+            exportable: Whether the key can be exported via TR-31 or TR-34
+            enabled: Whether the key is immediately active (default true)
+            key_check_value_algorithm: CMAC (required for AES) or ANSI_X9_24 (TDES only)
             tags: Optional list of {Key, Value} tag dicts
         """
         usage_info = get_key_usage_info(key_usage)
@@ -224,14 +227,15 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         wrapping_key_algorithm: str,
     ) -> dict:
         """
-        Get APC's public key and import token needed to import a key.
-        Use this as the first step in TR-34 or KeyCryptogram key import flows.
+        First step in any TR-34 or KeyCryptogram key import flow. Call this to obtain
+        APC's public wrapping key and import token before constructing the import payload.
+
+        AES-128 keys require RSA_3072 or higher wrapping key (key-strength rule enforced by APC).
 
         Args:
             key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
                                RootCertificatePublicKey, or TrustedCertificatePublicKey
-            wrapping_key_algorithm: RSA_2048, RSA_3072, RSA_4096 (for asymmetric flows).
-                                    AES-128 requires RSA_3072 or higher (key-strength rule).
+            wrapping_key_algorithm: RSA_2048, RSA_3072, or RSA_4096
         """
         return client().get_parameters_for_import(
             KeyMaterialType=key_material_type,
@@ -406,8 +410,12 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def explain_key_usage(key_usage: str) -> dict:
         """
-        Explain a TR-31 key usage code — what it is, what operations it supports,
-        and any compliance considerations.
+        Call this whenever a TR-31 key usage code appears or someone asks "which key type
+        should I use for X?" — P0, B0, E0, E1, E2, M6, C0, V1, V2, K0, K1, D0, etc.
+        Works without AWS credentials.
+
+        Returns what the key type is, what operations it permits, which APC data-plane
+        calls accept it, and any PCI compliance considerations.
 
         Args:
             key_usage: TR-31 key usage code, e.g. TR31_P0_PIN_ENCRYPTION_KEY
@@ -422,7 +430,13 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def list_all_key_usages() -> list[dict]:
-        """Return all supported TR-31 key usage codes with descriptions."""
+        """
+        Call this when designing key infrastructure, selecting key types for a new
+        payment operation, or when asked what key types APC supports.
+        Works without AWS credentials.
+
+        Returns all TR-31 key usage codes with names, descriptions, and APC support status.
+        """
         return list_key_usages()
 
 

@@ -5482,9 +5482,26 @@ domain:
   - key_management
 attributes:
   apc_dukpt_key_variants_for_data:
-    BIDIRECTIONAL: supports both incoming decryption and outgoing encryption
-    REQUEST: outgoing data encryption direction
-    RESPONSE: incoming data decryption direction
+    REQUEST: outgoing data encryption direction — VALID for TDES_2KEY BDK
+    RESPONSE: incoming data decryption direction — VALID for TDES_2KEY BDK
+    BIDIRECTIONAL: INVALID for TDES_2KEY BDK (returns "Invalid DukptKeyVariant provided
+      for key algorithm"); BIDIRECTIONAL is an AES DUKPT-only variant
+    NO_VARIANT: omitting DukptKeyVariant entirely defaults to REQUEST behavior
+      (produces identical ciphertext to explicit REQUEST)
+  apc_tdes_2key_bdk_derivation_type:
+    valid: TDES_2KEY only — specifying TDES_3KEY for a TDES_2KEY BDK returns
+      "DUKPT derivation type TDES_3KEY is invalid for the corresponding key algorithm"
+  apc_tdes_dukpt_ciphertexts_confirmed_2026_05_20:
+    BDK: 0123456789ABCDEFFEDCBA9876543210 (KCV=08D7B4)
+    KSN: FFFF9876543210E00001
+    plaintext: 0102030405060708 (ECB, single block)
+    REQUEST: 124F7A32F3F84187
+    RESPONSE: 3C4DC2BD394544E2
+    ciphertext_xor_REQUEST_RESPONSE: 2E02B88FCABD0565
+    note: >
+      What was previously labeled "APC BIDIRECTIONAL ciphertext" in this KB was actually
+      the REQUEST ciphertext. The BIDIRECTIONAL call was never valid for TDES_2KEY and
+      the prior test had silently defaulted to REQUEST behavior.
   ansi_x9_24_1_data_variant: bytes 5 and 13 of session key XOR 0xFF (does not match any APC variant)
   mac_variant_alignment: APC REQUEST for MAC = ANSI X9.24-1 MAC Request (bytes 6,14); no data equivalent known
   thales_hypothesis: >
@@ -5501,17 +5518,46 @@ attributes:
     still matters, the next investigation target is the modern Thales payShield Host Commands
     reference. Futurex interop hypothesis remains plausible but cannot be confirmed from
     legacy docs alone.
+  exhaustive_ruling_out_2026_05_20: >
+    Empirical testing with test vector (BDK=0123456789ABCDEFFEDCBA9876543210,
+    KSN=FFFF9876543210E00001, plaintext=0102030405060708) has ruled out ALL of:
+    (1) All 8 single-byte-pair XOR positions (bytes n and n+8 XOR 0xFF, n=0..7) — ANSI X9.24-1 variants.
+    (2) KL/KR swap (KR || KL) with each of the 5 standard variant masks.
+    (3) Speculative "Table 4" multi-byte masks (no cited source; empirically false).
+    (4) Alternative TDES key expansion arrangements (LRR, RLR, RRL, RLL, LLR) with all variants.
+    (5) CBC with IV=all-zeros.
+    (6) Single-byte-pair XOR, ANY value 0x01-0xFF, all 8 positions — 2040 candidates, no match
+        against either REQUEST (124F7A32F3F84187) or RESPONSE (3C4DC2BD394544E2).
+    (7) 2-byte-pair XOR (symmetric mirrors: same value for byte[n] and byte[n+8]), ALL C(8,2)=28
+        pairs × all value combos — ~1.8M candidates, no match.
+    (8) Asymmetric single-byte XOR (left half only or right half only, any position, any value)
+        — no match.
+    (9) AES-CMAC-based derivation (X9.24-3 style, 2026-05-20): tested CMAC(BDK, derivation_data)
+        where derivation_data used the X9.24-3 standard format (version || key_usage || algo ||
+        length || counter) across all plausible key usage codes for REQUEST/RESPONSE (data
+        encryption, data decryption, MAC generation, MAC verification, PIN, and values 0x0006–0x0009),
+        with TDES-2KEY and AES-128 algo fields, and both 64-bit and 128-bit length fields.
+        Also tested: CMAC(BDK, KSN) raw; CMAC(BDK, KSN zero-padded to 12/16 bytes);
+        two-step chain CMAC(BDK, ksn_base) → CMAC(ik, counter); CMAC(BDK, KSN || usage_byte)
+        for all plausible request/response byte suffix pairs. ZERO matches against either
+        REQUEST (124F7A32F3F84187) or RESPONSE (3C4DC2BD394544E2).
+    CONCLUSION: APC TDES DUKPT data key derivation is neither a post-derivation XOR mask
+    (ANSI X9.24-1 style) nor an AES-CMAC-based derivation (X9.24-3 style). The algorithm
+    is non-standard and requires AWS documentation or an AWS support case to resolve.
 constraints:
-  - APC DUKPT data encryption: use DukptKeyVariant=REQUEST for outgoing, RESPONSE for incoming
-  - None of the eight single-byte-pair XOR positions (0xFF at bytes n and n+8, n=0..7) reproduce APC data ciphertext
-  - This rules out a simple ANSI X9.24-1 style single-pair XOR; APC likely uses multi-byte XOR or a different structure
-  - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST matches ANSI X9.24-1 "MAC Request" (bytes 6,14)
+  - APC DUKPT TDES data encryption: use DukptKeyVariant=REQUEST for outgoing, RESPONSE for incoming
+  - BIDIRECTIONAL is invalid for TDES_2KEY — it is an AES DUKPT-only variant in APC
+  - Omitting DukptKeyVariant defaults to REQUEST behavior (identical ciphertext)
+  - TDES_3KEY derivation type rejected for TDES_2KEY BDK — only TDES_2KEY is valid
+  - APC's REQUEST/RESPONSE data ciphertexts do not match ANY post-derivation XOR mask structure
+  - DUKPT MAC aligns: APC DukptKeyVariant=REQUEST for MAC = ANSI X9.24-1 MAC Request (bytes 6,14)
   - Migrate to AES DUKPT (ANSI X9.24-3) for a fully published, unambiguous derivation algorithm
-  - See GitHub issue aws-payment-cryptography-mcp#1 for PCI PIN/P2PE compliance coverage that may clarify variant requirements
 examples:
   - "BDK=0123456789ABCDEFFEDCBA9876543210, KSN=FFFF9876543210E00001, plaintext=0102030405060708:
-     ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0, APC ciphertext=124F7A32F3F84187
-     (all five ANSI variants tested; none matched APC output)"
+     ANSI X9.24-1 Data variant ciphertext=92A5157E4607D1B0,
+     APC REQUEST ciphertext=124F7A32F3F84187,
+     APC RESPONSE ciphertext=3C4DC2BD394544E2
+     (all XOR-mask-based approaches exhaustively tested; none matched)"
 relationships:
   - type: related_to
     target_id: algorithm.dukpt
@@ -5733,7 +5779,7 @@ summary: >
   an SCD at all times. Key blocks apply to both conveyance and storage.
   TR-31 is the standard method; any equivalent method must include cryptographic binding
   of key-usage information and must undergo independent expert review that is publicly available.
-  Deadline for external connections to Associations/Networks: 1 January 2023.
+  All three rollout phases are now past their deadlines.
 domain:
   - key_management
   - compliance
@@ -5742,18 +5788,36 @@ attributes:
     - BDKs (Base Derivation Keys)
     - initial DUKPT keys
     - TMKs (Terminal Master Keys)
+    - ZMKs (Zone Master Keys) and KEKs
+    - PEKs (PIN Encryption Keys) in host-to-host transport
     - any symmetric key outside an SCD
   exempt:
     - per-transaction DUKPT working keys stored inside an SCD
+    - issuer keys: PVV, CVV, EMV personalization keys (not in scope for PCI PIN key block
+      requirement; key blocks recommended as best practice but not mandated — Q13)
   standards: ["ANSI TR-31", "ISO 20038"]
-  deadline_external_connections: "2023-01-01"
+  rollout_phases:
+    phase_1: "2019-06-01 — internal connections (HSM-to-HSM within same entity)"
+    phase_2: "2021-06-01 — external connections to networks/associations/other acquiring entities"
+    phase_3: "2023-06-01 — merchant/ATM connections"
+  tr31_key_hierarchy:
+    kbpk: "Key-Block Protection Key — wraps the payload; used for no other purpose"
+    kbek: "Key-Block Encryption Key — derived from KBPK; encrypts the key payload"
+    kbak: "Key-Block Authentication Key — derived from KBPK; MACs the block header+payload"
+  previously_established_keys: >
+    Entities are not required to reissue existing KEKs solely to comply with Req 18.
+    Previously established keys can remain in use until they are next exchanged (Q4).
 constraints:
   - BDKs and initial DUKPT keys must be conveyed and stored in TR-31 key blocks
   - Per-transaction working keys inside an SCD do not need key blocks
   - APC imports/exports keys via TR-31; this requirement is met by the APC import flow
-  - Any proprietary key block equivalent requires an independent expert review (doctoral-level cryptography credentials, 10+ years experience) that is publicly available
+  - Any proprietary key block equivalent requires an independent expert review (doctoral-level
+    cryptography credentials, 10+ years experience) that is publicly available
+  - Key block requirement and fixed-key TDES ban (Req 18-2) are INDEPENDENT requirements
+    with no relationship between them — complying with one does not satisfy the other (Q7)
 references:
   - "PCI PTS PIN Technical FAQs v3 June 2021, Q28 (Req 18), Q29, Q30, Q31, Q33, Q34"
+  - "PCI Information Supplement: PIN Security Req 18-3 Key Blocks, June 2019 (three-phase rollout, Q4, Q7, Q13)"
 relationships:
   - type: related_to
     target_id: algorithm.tr31
@@ -6003,6 +6067,13 @@ attributes:
     poi_devices: "2023-01-01 — fixed key TDES PIN encryption in POI devices is disallowed (confirmed)"
     host_to_host: "2023-01-01 — fixed key TDES PIN encryption in host-to-host connections is disallowed (confirmed)"
     nist_status: "NIST SP 800-57 Rev.5 disallows 3-key TDEA after 2023 independently of PCI"
+  double_length_tdes_dukpt_exemption: >
+    Double-length (2-key) TDES is disallowed by NIST since 2015, but PCI has NOT adopted that
+    ban for DUKPT use cases: double-length TDES DUKPT (unique key per transaction) remains
+    PCI-acceptable per PCI PIN and PTS because the unique-key property preserves effective
+    security. PCI diverges from NIST here for payment-specific reasons. EXCEPTION: CPoC and
+    SPoC programs require AES-128 minimum and do not accept the double-length TDES DUKPT
+    exemption. (Source: SRC expert opinion letter to ep2, October 2020.)
   iso_format_4_mandate:
     status: "SUSPENDED — PCI PIN v3.1 (March 2021) suspended the v3.0 sunrise dates pending re-evaluation"
     original_v30_dates: "decryption 2023-01-01, encryption 2025-01-01 (never took effect)"
@@ -6025,16 +6096,22 @@ attributes:
     PAN must not change during translation between formats that both include the PAN.
 constraints:
   - Fixed key TDES for PIN is banned — compliant deployments must use DUKPT (TDES or AES)
+  - Double-length TDES DUKPT remains acceptable under PCI PIN/PTS for unique-key-per-transaction deployments
+  - CPoC and SPoC programs require AES-128 minimum — double-length TDES DUKPT is NOT acceptable there
   - ISO Format 4 has no mandatory effective date as of 2026 — but is the only format supporting AES
   - AES DUKPT (X9.24-3) is a PCI PIN normative reference — use for all new deployments
   - APC supports ISO Format 4 (TR31_P0_PIN_ENCRYPTION_KEY with AES) — use this for new deployments
   - Format 4 → Format 0/3 translation at HSM is a valid interim strategy while upstream catches up
   - Tokens used as PAN in Format 4 blocks must preserve PAN format (Luhn, length)
   - Cleartext key injection ban: entities injecting on behalf of others (since 2021); processors (since 2023)
+  - "Strong Cryptography" is defined only in the PCI DSS Glossary; PCI DSS itself has no
+    cryptographic algorithm requirements — algorithm mandates come from PCI PIN, PCI PTS,
+    PCI P2PE, PCI CPoC, and PCI SPoC
 references:
   - "PCI PIN Security Requirements Modifications Summary of Changes v2.0 to v3.0, August 2018"
   - "PCI PTS PIN Technical FAQs v3 June 2021, §8.2"
   - "PCI Information Supplement: Implementing ISO Format 4 PIN Blocks, September 2021, §4 (suspension notice)"
+  - "SRC Security Research & Consulting GmbH expert opinion letter to Technical Cooperation ep2, October 2020 (double-length TDES DUKPT exemption; CPoC/SPoC AES requirement; Strong Cryptography scope)"
 relationships:
   - type: related_to
     target_id: concept.pci-pin-key-block-requirements
@@ -6083,3 +6160,5 @@ that publish annual revisions).
 | 2026-05-19 | PCI PTS PIN Security Requirements Technical FAQs v3 | PCI Security Standards Council | June 2021 | compliance, key_management, pin_processing, hsm |
 | 2026-05-19 | PCI PIN Security Requirements Modifications Summary of Changes v2.0 to v3.0 | PCI Security Standards Council | August 2018 | compliance, pin_processing, cryptography |
 | 2026-05-19 | PCI Information Supplement: Implementing ISO Format 4 PIN Blocks | PCI Security Standards Council | September 2021 (v1.01) | compliance, pin_processing, cryptography |
+| 2026-05-19 | PCI Information Supplement: PIN Security Requirement 18-3 – Key Blocks | PCI Security Standards Council | June 2019 | compliance, key_management |
+| 2026-05-19 | Use of triple length TDES in ep2 v7.x with regard to PCI SSC requirements (expert opinion letter) | SRC Security Research & Consulting GmbH / Technical Cooperation ep2 | October 30, 2020 | compliance, cryptography, pin_processing |

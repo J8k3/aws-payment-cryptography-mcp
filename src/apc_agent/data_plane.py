@@ -28,7 +28,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         wrapped_key: dict | None = None,
     ) -> dict:
         """
-        Encrypt payment data using an APC key.
+        Call this when encrypting cardholder data, PIN blocks, or sensitive payment
+        fields for storage or transmission. Also use when implementing DUKPT session
+        encryption or EMV session-key-based data confidentiality.
 
         Supported key types: D0 (symmetric), D1 (asymmetric RSA), B0 (DUKPT), E1/E6 (EMV).
         All inputs and outputs are hexBinary encoded.
@@ -68,7 +70,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         wrapped_key: dict | None = None,
     ) -> dict:
         """
-        Decrypt payment data using an APC key.
+        Call this when decrypting cardholder data or payment fields received from a
+        terminal, acquiring host, or issuer — including DUKPT session-key decryption
+        and EMV confidentiality decryption.
 
         Supported key types: D0, D1, B0 (DUKPT), E1/E6 (EMV).
         All inputs and outputs are hexBinary encoded.
@@ -99,7 +103,11 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         outgoing_wrapped_key: dict | None = None,
     ) -> dict:
         """
-        Re-encrypt data from one key to another without exposing plaintext.
+        Call this when rewrapping payment data under a new key — for example when
+        rotating zone encryption keys, moving data between security domains, or
+        transitioning from TDES to AES. The plaintext never leaves the HSM boundary.
+
+        Re-encrypts data from one key to another without exposing plaintext.
         The decryption and re-encryption occur entirely within the APC HSM boundary.
 
         Args:
@@ -140,13 +148,15 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         outgoing_wrapped_key: dict | None = None,
     ) -> dict:
         """
-        Translate a PIN block between encryption zones without exposing the PIN in clear text.
-        This is the primary acquirer PIN routing operation (PCI PIN Req 1, 2-2).
+        Call this when implementing acquirer PIN routing, verifying a PIN translation
+        flow, or checking whether a given format-to-format translation is legal under PCI PIN.
+        This is the core HSM operation in every acquiring PIN path.
 
-        COMPLIANCE ENFORCED:
-        - The PAN must not change between incoming and outgoing formats (PCI PIN Req 3-3)
-        - Only legal format translations are permitted (Req 3-3)
-        - Fixed TDES keys are prohibited since 1 January 2023 (Req 2-2)
+        Translates a PIN block between encryption zones inside the APC HSM boundary —
+        the PIN is never exposed in clear text. Compliance rules are enforced:
+        - PAN must not change between incoming and outgoing formats (PCI PIN Req 3-3)
+        - Only legal ISO 9564 format translations are permitted (Req 3-3)
+        - Fixed TDES PIN keys are prohibited since 1 January 2023 (Req 2-2)
 
         Preferred flow: AES DUKPT (Format 4) inbound → ZPK AES (Format 4 or 0) outbound
 
@@ -225,8 +235,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         encryption_wrapped_key: dict | None = None,
     ) -> dict:
         """
-        Generate a PIN and/or PIN verification value (PVV / offset).
-        Issuer function — use with care in acquirer contexts.
+        Call this when implementing IBM 3624 or Visa PVV PIN generation, generating a
+        PIN offset for card personalization, or producing a test PIN block for a given
+        PAN. Issuer function — use with care in acquirer contexts.
 
         Supported schemes via generation_attributes:
           Visa PVV:          {"VisaPin": {"PinVerificationKeyIndex": 1}}
@@ -287,6 +298,10 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         encryption_wrapped_key: dict | None = None,
     ) -> dict:
         """
+        Call this when implementing PIN verification at an issuer host — checking a
+        cardholder-entered PIN against a stored IBM 3624 offset or Visa PVV. Also use
+        to validate PIN verification logic end-to-end before deploying to production.
+
         Verify a cardholder PIN against a stored PIN verification value.
 
         Supported key types:
@@ -336,8 +351,11 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         validation_data_length: int | None = None,
     ) -> dict:
         """
-        Generate card validation data: CVV, CVV2, iCVV, ARQC, or dynamic values.
+        Call this when implementing card personalization, CVV/CVV2/iCVV generation,
+        or validating card data for testing. Also use to generate test vectors for
+        CVK-based validation before writing production code.
 
+        Generates CVV, CVV2, iCVV, or dynamic card verification values.
         Supported key types: C0 (CVK), E4/E6 (EMV).
 
         generation_attributes examples:
@@ -371,6 +389,10 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         validation_data: str,
     ) -> dict:
         """
+        Call this when validating a card presented at POS or in CNP — verifying a CVV,
+        CVV2, or iCVV value against the issuer's CVK. Also use to test CVK-based
+        validation before writing production card-present or card-not-present logic.
+
         Verify card validation data (CVV, CVV2, iCVV, dynamic values).
 
         Supported key types: C0 (CVK), E4/E6 (EMV).
@@ -398,7 +420,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         mac_length: int | None = None,
     ) -> dict:
         """
-        Generate a Message Authentication Code to protect transaction data integrity.
+        Call this when implementing or validating MAC generation for ISO 8583 transactions,
+        EMV issuer scripts, or any payment message authentication. Also call to verify
+        which MAC algorithm a given M-key type supports before writing code.
 
         Preferred key type: M6 (CMAC). Legacy: M1 (CBC-MAC), M3 (Retail MAC), M0 (AS2805).
         ISO 8583 field 64 (primary MAC) or field 128 (secondary MAC).
@@ -454,7 +478,8 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         mac_length: int | None = None,
     ) -> dict:
         """
-        Verify a Message Authentication Code.
+        Call this to verify a MAC on a received payment message or issuer script.
+        Mirrors generate_mac — use the same algorithm and key.
 
         Args:
             key_identifier: ARN or alias of MAC key
@@ -484,8 +509,16 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         derivation_method_attributes: dict,
     ) -> dict:
         """
-        Generate a MAC for EMV offline PIN change operations.
-        Combines MAC generation (E2 key) and PIN encryption (E1 key) in a single HSM operation.
+        Call this before implementing any EMV PIN change flow — issuer script, CHANGE
+        REFERENCE DATA (INS=24), or offline PIN change MAC assembly.
+
+        IMPORTANT: This operation requires THREE separate keys, not one:
+          P0  — PIN Encryption Key: encrypts the new PIN block
+          E2  — EMV Integrity Key: generates the script MAC
+          E1  — EMV Confidentiality Key: encrypts the script data
+
+        Single-key EMV MAC helpers (E2 only) cannot replicate this. A full EMV PIN change
+        requires all three key types to be provisioned in APC separately.
 
         Required key types:
           new_pin_pek_identifier: P0 (PIN Encryption Key for new PIN)
@@ -523,10 +556,15 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         auth_response_attributes: dict | None = None,
     ) -> dict:
         """
-        Verify an EMV Authorization Request Cryptogram (ARQC) and optionally generate
-        an Authorization Response Cryptogram (ARPC).
+        Call this when implementing EMV transaction authorization (ARQC verification),
+        generating an issuer ARPC response, or validating EMV session key derivation.
+        ISO 8583 field 55 carries the ARQC and ATC from the chip card.
+
+        Verifies an EMV Authorization Request Cryptogram (ARQC) and optionally generates
+        an Authorization Response Cryptogram (ARPC) in the same call.
 
         Required key type: E0 (EMV Application Cryptogram Master Key).
+        APC requires AES-256 E0 keys — AES-128 E0 keys are rejected at the API level.
 
         major_key_derivation_mode options:
           EMV_OPTION_A — Visa/Amex ARQC derivation
@@ -572,6 +610,11 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         key_check_value_algorithm: str | None = None,
     ) -> dict:
         """
+        Call this when implementing ECDH-based key agreement — for example, deriving a
+        shared session key from an ECC key pair and a counterparty certificate, then
+        wrapping the result as a TR-31 key block for local use. Also use when a key
+        exchange protocol delivers a key via Diffie-Hellman and you need it in APC format.
+
         Translate an ECDH-wrapped TR-31 key block into a KEK-wrapped TR-31 key block
         without ever importing the working key into APC storage.
 
@@ -618,6 +661,10 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         random_key_send_variant_mask: str,
     ) -> dict:
         """
+        Call this when implementing Australian AS2805 payment network key exchange —
+        generating the KEK validation request or response value for node-to-node
+        symmetric key establishment between an acquirer switch and a card scheme.
+
         Generate an AS2805 Key Encryption Key validation value.
         Used in Australian payment network node-to-node key exchange.
 
@@ -645,8 +692,12 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def pin_block_retention_advisory() -> dict:
         """
-        Return the PCI PIN requirement for PIN block handling in logs.
-        Call this when designing any transaction logging or audit trail system.
+        Call this before designing any transaction logging, audit trail, or database
+        schema that processes ISO 8583 transactions containing field 52 (PIN block).
+        Works without AWS credentials.
+
+        Returns the PCI PIN Req 4 rule: encrypted PIN blocks must not be retained in
+        logs after the authorization response is received — even encrypted form is prohibited.
         """
         return {
             "requirement": PIN_BLOCK_RETENTION_VIOLATION.pci_requirement,
@@ -662,7 +713,11 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def pan_change_advisory() -> dict:
         """
-        Return the PCI PIN requirement prohibiting PAN changes during PIN translation.
+        Call this before implementing any PIN translation flow where the PAN might
+        differ between the inbound and outbound formats, or when asked about PCI PIN
+        Req 3-3 / ISO 9564 PAN handling. Works without AWS credentials.
+
+        Returns the PCI PIN rule: the PAN must not change during any PIN block translation.
         """
         return {
             "requirement": PAN_CHANGE_VIOLATION.pci_requirement,

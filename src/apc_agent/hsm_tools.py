@@ -24,14 +24,20 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def hsm_lookup_command(command_code: str, api: str | None = None) -> dict:
         """
-        Look up an HSM vendor command and return its APC equivalent.
+        Call this whenever you see an HSM command code in legacy payment code,
+        documentation, or logs — e.g. "TPIN", "CA", "G0", "M6", "CC", "CI",
+        "CW", "CY", "B2", "KQ", "GW", or numeric Atalla codes like "31", "5D".
+        Works without AWS credentials.
+
+        Returns the command name, category (PIN/MAC/CVV/KEY_MGMT/ENCRYPT/ARQC),
+        description, and the APC operation + key type that replaces it.
+
+        Coverage: Futurex Excrypt (authoritative), Thales payShield legacy + international
+        (authoritative/reference quality), Atalla numeric codes (directory quality).
 
         Args:
             command_code: The HSM command code, e.g. "TPIN", "CA", "31"
             api: Optional API filter — "Excrypt", "Standard", or "International"
-
-        Returns dict with command metadata and APC mapping, or a not-found message.
-        Coverage: Futurex (authoritative), Thales International (reference quality), Atalla (not available).
         """
         results = lookup_command(command_code)
         if api:
@@ -69,8 +75,11 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def hsm_get_apc_mapping(command_code: str) -> dict:
         """
-        Return just the APC operation and key type for an HSM command. Useful for
-        quick refactoring lookups without full metadata.
+        Call this for a quick command-code → APC operation lookup when you already
+        know the command and just need the migration target — faster than hsm_lookup_command
+        when you don't need the full description and notes. Works without AWS credentials.
+
+        Returns just the APC operation and key type for an HSM command.
 
         Args:
             command_code: The HSM command code, e.g. "TPIN", "CA", "31"
@@ -96,13 +105,14 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         vendor: str | None = None,
     ) -> dict:
         """
-        List known HSM commands, optionally filtered by category or vendor.
+        Call this to discover which HSM commands are known and what APC operations they
+        map to — useful when scoping a migration, reviewing an HSM integration, or
+        deciding which APC operations a proxy handler needs to implement.
+        Works without AWS credentials.
 
         Args:
-            category: One of PIN, MAC, CVV, KEY_MGMT, ENCRYPT, ARQC, P2PE — or omit for all
-            vendor: "Futurex" or "Thales" — or omit for all vendors
-
-        Returns a list of commands with their APC mappings.
+            category: PIN, MAC, CVV, KEY_MGMT, ENCRYPT, ARQC, or P2PE — omit for all
+            vendor: "Futurex" or "Thales" — omit for all vendors
         """
         if category and vendor:
             cmds = [c for c in ALL_COMMANDS
@@ -134,11 +144,13 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def hsm_analyze_code(source_code: str) -> dict:
         """
-        Analyze a snippet of legacy payment code (Python, Java, C, etc.) and detect
-        HSM socket calls. Returns identified commands and their APC migration paths.
+        Call this whenever reviewing legacy payment code that may contain HSM socket calls —
+        Python, Java, C, Go, or any language. Even a single file or function is worth scanning.
+        Works without AWS credentials.
 
-        Recognizes Futurex Excrypt ([ ] delimiters), Futurex Standard (numeric codes),
-        and International/Thales (2-char codes with fixed-length fields).
+        Detects Futurex Excrypt commands ([AOCCCC;...] frames), Thales/International 2-char
+        command codes, and Atalla/Futurex Standard numeric codes. Returns identified commands,
+        their APC migration path, and migration notes for LMK, DUKPT, and fixed-key patterns.
 
         Args:
             source_code: Raw source code containing HSM socket calls or command strings.
@@ -208,14 +220,15 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def hsm_analyze_discovery_log(log_content: str) -> dict:
         """
-        Analyze the contents of a discovery.jsonl file produced by apc-hsm-proxy
-        running in discovery mode. Returns per-command APC mappings and handler
-        generation guidance for the proxy.
+        Call this when analyzing the output of apc-hsm-proxy running in discovery mode
+        (a discovery.jsonl file). Returns per-command APC mappings, which proxy handlers
+        already exist, which still need to be written, and migration notes.
+        Works without AWS credentials.
 
-        Each line in the log is a JSON object with fields:
-          vendor  — "futurex_excrypt" or "thales_payshield"
-          cmd     — HSM command code, e.g. "TPIN" or "CA"
-          params  — Futurex: map of parameter codes to values (sensitive = "[REDACTED]")
+        Each log line is a JSON object:
+          vendor      — "futurex_excrypt" or "thales_payshield"
+          cmd         — HSM command code, e.g. "TPIN" or "CA"
+          params      — Futurex: parameter codes → values (sensitive fields = "[REDACTED]")
           payload_len — Thales: observed payload length in bytes
 
         Args:
@@ -320,7 +333,10 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def hsm_migration_notes(topic: str) -> dict:
         """
-        Return migration guidance for a specific HSM concept that has no direct APC equivalent.
+        Call this when discussing HSM migration for concepts that have no direct APC
+        equivalent — LMK (Local Master Key), DUKPT initial key loading, or fixed ZPK
+        key schemes. Returns detailed migration guidance for the selected topic.
+        Works without AWS credentials.
 
         Args:
             topic: One of "lmk", "dukpt", "fixed_key"

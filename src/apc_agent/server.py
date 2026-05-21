@@ -25,9 +25,14 @@ _KB_PATH = Path(__file__).parent.parent.parent / "payment-knowledge-base.md"
     "payment://knowledge-base",
     name="Payment Knowledge Base",
     description=(
-        "Vendor-neutral reference for payment domain concepts: card data, PIN blocks, "
-        "card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, "
-        "cryptographic algorithms, and cross-cutting constraint rules."
+        "Reference for payment domain concepts and APC-specific operational detail. "
+        "Covers: card data, PIN blocks, card verification values (CVV/CVC/CSC/PVV/iCVV), "
+        "EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, "
+        "TR-31/TR-34/DUKPT (TDES and AES) specifics, APC key lifecycle and multi-region "
+        "keys, APC dynamic keys (MPoC), ECDH key agreement, supported TR-31 key usage "
+        "codes, EMV CVN session key derivation, and APC constraint rules (wrapping key "
+        "strength, KCV algorithm by key type, RSA padding, key attribute immutability, "
+        "ISO Format 4 requirements for AES PIN keys, and more)."
     ),
     mime_type="text/markdown",
 )
