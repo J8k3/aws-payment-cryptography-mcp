@@ -56,6 +56,47 @@ Tools are registered by calling `register_*_tools(mcp: FastMCP)` functions. Each
 
 **HSM analysis (R8)** is source-code-only. `hsm_analysis.py` holds the command registry and regex patterns. `hsm_tools.py` exposes them as MCP tools. Current coverage: Futurex (authoritative), Thales International (reference quality), Atalla (not available). Do not extend R8 to live traffic interception.
 
+## Session Start
+
+- At the start of a session, sync with `origin/master` before doing substantive work.
+- Preferred command: `git pull --rebase origin master`
+- Only do this automatically when the worktree is clean. If local changes are already present, inspect before rebasing.
+
+## Commit Scope
+
+- Keep commits small and reviewable by default.
+- Prefer one commit per logical change — a new tool, a new compliance rule, a knowledge-base addition.
+- Group related changes (e.g., a new tool + its test + the knowledge-base entry it required) into one commit when they can't be evaluated independently.
+- Prefer squash or amend for iterative follow-ups — if a second commit only fixes or extends the immediately preceding one, squash rather than leaving noise in the log.
+- Do not split a change just to make it look smaller; split when a reviewer would genuinely benefit from evaluating the pieces independently.
+
+## Knowledge Contribution (Standing Instruction)
+
+When working in this repo or in the CyberChef payments repo, any new domain knowledge discovered — a PCI rule, an HSM command mapping, an APC API constraint, an algorithm edge case — must be written back into the relevant source file **in the same commit** as the code that revealed it:
+
+| Discovered in | Write it to |
+|---|---|
+| Payment algorithm research | `payment-knowledge-base.md` |
+| HSM command analysis | `hsm_analysis.py` (command registry) |
+| PCI compliance rule | `compliance.py` (enforcement logic) |
+| APC API constraint or gap | `CLAUDE.md` → Key Constraints section, and open a GitHub issue if actionable |
+
+Do not defer knowledge updates. If the session ends without the relevant file being updated, the knowledge is lost.
+
+**Cross-repo:** If a gap or finding also affects the CyberChef payments fork, file a GitHub issue at `J8k3/CyberChef` capturing what was learned and what needs to change there.
+
+## Pre-commit Checklist (Tool Changes)
+
+Before committing any new or changed MCP tool, verify all of the following are in the same commit:
+
+- If the tool exposes new domain knowledge: `payment-knowledge-base.md` updated
+- If the tool detects a new HSM command: `hsm_analysis.py` updated
+- If the tool enforces a new compliance rule: `compliance.py` updated and tested
+- Tests passing (`pytest`)
+- Tool docstring has a "Call this when..." trigger sentence
+
+Do not commit the tool and defer the knowledge or test update to a follow-up.
+
 ## Critical Behavioral Rules
 
 **PCI compliance is a hard constraint, not a preference.** Before calling any boto3 API, tools check `compliance.py`. Hard stops return an error dict — they never call boto3. Legacy construct warnings return a `confirmation_required` field and do not proceed until the user explicitly confirms.
