@@ -7963,7 +7963,7 @@ Result tags: `9F26` (cryptogram value) · `9F27` (CID — type: ARQC/TC/AAC)
 
 ## EMV Issuer Cryptography
 
-Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management, v4.3, November 2011 (EMVCo).
+Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management, v4.3 (November 2011) and v4.4 (November 2023) (EMVCo). Entries use v4.3 structure; v4.4 corrections applied to algorithm constraints (Bulletin 208, ECC additions).
 
 ### EMV RSA Key Hierarchy
 
@@ -8010,9 +8010,9 @@ attributes:
     SDA: Issuer signs static application data (SSAD); card carries Issuer PK cert + SSAD
     DDA: ICC generates dynamic signature over terminal-provided unpredictable number
     CDA: DDA combined with GENERATE AC — ICC signs cryptogram + dynamic data together
-  algorithms_v4_3:
-    asymmetric: RSA only
-    hash: SHA-1 only (hash algorithm indicator 0x01)
+  algorithms:
+    v4_3: RSA only; SHA-1 only (indicator 0x01)
+    v4_4_additions: "ECC alternative added — P-256 (primary) and P-521 (contingency) via XDA (Extended Dynamic Authentication, Book 2 Section 12); ECC certificates use SHA-256 (indicator 0x02)"
 relationships:
   - type: related_to
     target_id: operation.emv-sda
@@ -8020,6 +8020,8 @@ relationships:
     target_id: operation.emv-dda
   - type: related_to
     target_id: operation.emv-cda
+  - type: related_to
+    target_id: concept.emv-book2-algorithms
 status: active
 ```
 
@@ -8294,13 +8296,13 @@ relationships:
 status: active
 ```
 
-### EMV Approved Algorithms (Book 2, v4.3)
+### EMV Approved Algorithms (Book 2, v4.4)
 
 ```yaml
 id: concept.emv-book2-algorithms
 entity_type: concept
-canonical_name: EMV Book 2 Approved Algorithms (v4.3)
-summary: Algorithm constraints defined in EMV Book 2 Annex B that apply to all ICC/issuer symmetric and asymmetric operations; note that v4.3 (2011) restricts hashing to SHA-1 only.
+canonical_name: EMV Book 2 Approved Algorithms (v4.4)
+summary: Algorithm constraints defined in EMV Book 2 Annex B; v4.4 adds ECC (P-256/P-521 via XDA/ODE), SHA-256/SHA-512, and corrects RSA modulus size limits — Issuer and ICC max is 247 bytes (not 248) per Bulletin 208.
 domain:
   - emv
   - cryptography
@@ -8315,18 +8317,57 @@ attributes:
       approved_for: Session key derivation, ARQC/ARPC, secure messaging
   asymmetric:
     RSA:
-      note: Only asymmetric algorithm approved in v4.3
       public_exponent: Must be 3 or 65537 (2^16+1)
-      max_modulus_bytes: 248 bytes (1984 bits) for CA, Issuer, ICC, and PIN encipherment keys
+      max_modulus_bytes_Table43:
+        CA:                  248 bytes (1984 bits)
+        Issuer_SDA_mode:     248 bytes
+        Issuer:              247 bytes (1976 bits)
+        ICC:                 247 bytes
+        ICC_PIN_encipherment: 247 bytes
+        note: "Bulletin 208 corrected the v4.3 table; Issuer/ICC caps are 247 bytes, not 248"
       key_size_constraints:
         - "N_IC <= N_I <= N_CA  (ICC modulus <= Issuer modulus <= CA modulus)"
         - "N_PE <= N_I          (PIN Encipherment key modulus <= Issuer modulus)"
-  hashing:
-    SHA_1:
+    ECC:
+      added_in: v4.4
+      curves:
+        primary:
+          name: P-256
+          N_FIELD: 32 bytes
+          spec: FIPS 186-4
+          equation: "y² = x³ − 3x + b over F_p (prime field)"
+          used_for: XDA offline authentication (Book 2 Section 12), ODE PIN encipherment (Section 13)
+        contingency:
+          name: P-521
+          N_FIELD: 66 bytes
+          spec: FIPS 186-4
+      public_key_encoding: x-coordinate only (N_FIELD bytes); receiving party recovers y from curve equation
+  hashing_Table47:
+    "0x01":
+      algorithm: SHA-1
       output: 20 bytes
-      hash_algorithm_indicator: "0x01"
-      note: Only hash algorithm approved in EMV Book 2 v4.3; later versions added SHA-256
-  note: These constraints apply to v4.3 (2011). Later EMVCo publications relaxed SHA-1 and added RSA-2048+ guidance.
+      approved_for: RSA operations only (legacy; NOT permitted for ECC)
+    "0x02":
+      algorithm: SHA-256
+      output: 32 bytes
+      approved_for: ECC primary; also permitted for RSA
+    "0x03":
+      algorithm: SHA-512
+      output: 64 bytes
+      approved_for: ECC contingency (P-521)
+    "0x80":
+      algorithm: SM3
+      output: 32 bytes
+      approved_for: Scheme-specific / proprietary
+  ECC_algorithm_suites:
+    signature_Table48:
+      "0x10":
+        description: EC-SDSA + SHA-256 + P-256  (primary XDA suite)
+      "0x13":
+        description: EC-SDSA + SHA-512 + P-521  (contingency)
+    encryption_Table49:
+      "0x00":
+        description: P-256 + ECDH + Encrypt-then-MAC (EtM) + AES  (primary ODE suite)
 relationships:
   - type: related_to
     target_id: concept.emv-rsa-key-hierarchy
@@ -8380,5 +8421,6 @@ that publish annual revisions).
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
 | 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
+| 2026-05-22 | EMV Book 2 — Security and Key Management v4.4 delta read (targeted: cover/revision log/ToC pp.1-10; Annex B Approved Algorithms pp.151-169 — Table 43 RSA modulus corrections per Bulletin 208, B2 ECC P-256/P-521 curve parameters, Table 47 hash algorithm indicators, Table 48 ECC signature suites, Table 49 ODE encryption suites; Bulletin 162 AES key derivation erratum noted) | EMVCo | v4.4, November 2023 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |
