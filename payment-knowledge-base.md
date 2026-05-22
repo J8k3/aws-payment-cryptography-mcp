@@ -7765,144 +7765,190 @@ with a strong salt are acceptable where retrieval is not required.
 
 ## EMV Tag Catalog
 
-Source: https://www.kabc.ca/emv/tags (public reference; EMVCo Book 3 and Book 4 are authoritative).
-Authority column omitted — tags in 9F/5F ranges are predominantly EMVCo-defined; scheme-specific
-tags (Mastercard 9F51+, Visa 9F10 interpretation) noted in descriptions where known.
+Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification,
+v4.4, October 2022 (EMVCo), Annex A (Data Elements Dictionary). This supersedes the prior kabc.ca-sourced
+catalog; corrections include: tag 91 length (8–16 not 8), exponent tags (1 or 3 not 3), 9F3B length (2–8),
+9F41 length (2–4), added missing Book 3 tags (42, 4F, 73, 81, 83, 86–89, 9F0A, 9F0C, 9F19, 9F25), added
+biometric tags (7F60, A1, 9F30, 9F31, BF4A–BF4E, DF50–DF54, new in v4.4). Scheme-proprietary tags
+(Mastercard 9F51+, Visa, contactless kernel) are in a separate subsection below.
 
-| Tag | Name | Format | Max Len | Notes |
-|-----|------|--------|---------|-------|
-| 50 | Application Label | AN | 16 | Mnemonic identifier for application |
-| 56 | Track 1 Data | B | 76 | Track 1 equivalent data |
-| 57 | Track 2 Equivalent Data | B | 19 | Track 2 elements; used in EMV transactions |
-| 5A | Application PAN | CN | 10 | Primary Account Number |
-| 61 | Application Template | B | var | Directory entry template |
-| 6F | FCI Template | B | var | File Control Information template |
-| 70 | Record Template / AEF Data | B | var | Application Elementary File data |
-| 71 | Issuer Script Template 1 | B | var | Script commands delivered pre-GENERATE AC |
-| 72 | Issuer Script Template 2 | B | var | Script commands delivered post-GENERATE AC |
-| 77 | Response Message Template 2 | B | var | TLV-encoded GPO/GENERATE AC response |
-| 80 | Response Message Template 1 | B | var | Non-TLV GPO response |
-| 82 | Application Interchange Profile | B | 2 | Bitmap of card features (SDA/DDA/CDA, etc.) |
-| 84 | DF Name / AID | B | 16 | Application Identifier |
-| 8A | Authorisation Response Code | AN | 2 | Online authorisation response (e.g. 00, 05) |
-| 8C | CDOL1 | B | var | Card Risk Management DOL for first GENERATE AC |
-| 8D | CDOL2 | B | var | Card Risk Management DOL for second GENERATE AC |
-| 8E | CVM List | B | var | Cardholder verification method rules |
-| 8F | CA Public Key Index | B | 1 | Index of Certification Authority public key |
-| 90 | Issuer Public Key Certificate | B | var | RSA certificate for issuer public key |
-| 91 | Issuer Authentication Data | B | 8 | Contains ARPC; sent in online response |
-| 92 | Issuer Public Key Remainder | B | var | Remainder of issuer key modulus |
-| 93 | SSAD | B | var | Signed Static Application Data (SDA) |
-| 94 | Application File Locator | B | var | List of SFI/record ranges to read |
-| 95 | Terminal Verification Results | B | 5 | Bitmap of terminal offline checks |
-| 97 | TDOL | B | var | Transaction Certificate Data Object List |
-| 98 | TC Hash Value | B | 20 | SHA-1 hash of TC input data |
-| 99 | Transaction PIN Data | B | 8 | Online PIN block (ISO format) |
-| 9A | Transaction Date | N | 3 | YYMMDD; ARQC input |
-| 9B | Transaction Status Information | B | 2 | Card processing status bitmap |
-| 9C | Transaction Type | N | 1 | 00=purchase, 01=cash, 20=refund |
-| 9D | DDF Name | B | 16 | PSE Directory Definition File name |
-| A5 | FCI Proprietary Template | B | var | Issuer-proprietary FCI data |
-| 5F20 | Cardholder Name | AN | 26 | Name as on card |
-| 5F24 | Application Expiry Date | N | 3 | YYMMDD expiration date |
-| 5F25 | Application Effective Date | N | 3 | YYMMDD start date |
-| 5F28 | Issuer Country Code | N | 2 | ISO 3166-1 numeric |
-| 5F2A | Transaction Currency Code | N | 2 | ISO 4217 numeric |
-| 5F2D | Language Preference | AN | 8 | ISO 639 language codes |
-| 5F30 | Service Code | N | 2 | 3-digit magnetic stripe service code |
-| 5F34 | Application PAN Sequence Number | N | 1 | Differentiates cards with same PAN |
-| 5F36 | Transaction Currency Exponent | N | 1 | Decimal places in currency amount |
-| 5F50 | Issuer URL | AN | var | URL for card issuer |
-| 5F53 | IBAN | AN | 34 | International Bank Account Number |
-| 5F54 | BIC | B | 11 | Bank Identifier Code |
-| 5F55 | Issuer Country Code (alpha2) | AN | 2 | ISO 3166-1 alpha-2 |
-| 5F56 | Issuer Country Code (alpha3) | AN | 3 | ISO 3166-1 alpha-3 |
-| 9F01 | Acquirer Identifier | N | 6 | Acquirer institution ID |
-| 9F02 | Amount, Authorised | N | 6 | BCD; primary ARQC input |
-| 9F03 | Amount, Other | N | 6 | BCD; cashback amount |
-| 9F04 | Amount, Other (Binary) | B | 4 | Binary format of cashback amount |
-| 9F05 | Application Discretionary Data | B | 32 | Issuer-discretionary data |
-| 9F06 | Application Identifier (Terminal) | B | 16 | AID as selected by terminal |
-| 9F07 | Application Usage Control | B | 2 | Usage restrictions bitmap |
-| 9F08 | Application Version Number (Card) | B | 2 | Card application version |
-| 9F09 | Application Version Number (Terminal) | B | 2 | Terminal application version |
-| 9F0B | Cardholder Name Extended | ANS | 45 | Extended cardholder name |
-| 9F0D | IAC-Default | B | 5 | Issuer Action Code — Default |
-| 9F0E | IAC-Denial | B | 5 | Issuer Action Code — Denial |
-| 9F0F | IAC-Online | B | 5 | Issuer Action Code — Online |
-| 9F10 | Issuer Application Data | B | 32 | Proprietary issuer data; interpretation varies by scheme |
-| 9F11 | Issuer Code Table Index | N | 1 | Character set index for preferred name display |
-| 9F12 | Application Preferred Name | ANS | 16 | Name in national character set |
-| 9F13 | Last Online Application Transaction Counter Register | B | 2 | ATC value at last online transaction |
-| 9F14 | Lower Consecutive Offline Limit | B | 1 | Floor for offline transaction count |
-| 9F15 | Merchant Category Code | N | 2 | ISO 18245 MCC |
-| 9F16 | Merchant Identifier | AN | 15 | Merchant ID as registered |
-| 9F17 | Personal Identification Number (PIN) Try Counter | B | 1 | Remaining PIN attempts |
-| 9F18 | Issuer Script Identifier | B | 4 | Identifies issuer script |
-| 9F1A | Terminal Country Code | N | 2 | ISO 3166-1 numeric |
-| 9F1B | Terminal Floor Limit | B | 4 | Amount below which offline allowed |
-| 9F1C | Terminal Identification | AN | 8 | Terminal ID (TID) |
-| 9F1D | Terminal Risk Management Data | B | 8 | Risk management bitmap |
-| 9F1E | Interface Device Serial Number | AN | 8 | Card reader serial number |
-| 9F1F | Track 1 Discretionary Data | ANS | 26 | Discretionary part of Track 1 |
-| 9F20 | Track 2 Discretionary Data | CN | 11 | Discretionary part of Track 2 |
-| 9F21 | Transaction Time | N | 3 | HHMMSS |
-| 9F22 | Certification Authority Public Key Index (Terminal) | B | 1 | CA key index at terminal |
-| 9F23 | Upper Consecutive Offline Limit | B | 1 | Ceiling for offline transaction count |
-| 9F24 | Payment Account Reference | AN | 29 | Non-PAN token reference (EMVCo tokenisation) |
-| 9F26 | Application Cryptogram | B | 8 | ARQC, TC, or AAC value; primary APC target |
-| 9F27 | Cryptogram Information Data | B | 1 | Cryptogram type: 80=ARQC, 40=TC, 00=AAC |
-| 9F2D | ICC PIN Encipherment Public Key Certificate | B | var | Certificate for PIN encipherment |
-| 9F2E | ICC PIN Encipherment Public Key Exponent | B | 3 | Exponent for PIN key |
-| 9F2F | ICC PIN Encipherment Public Key Remainder | B | var | Modulus remainder for PIN key |
-| 9F32 | Issuer Public Key Exponent | B | 3 | RSA exponent |
-| 9F33 | Terminal Capabilities | B | 3 | Bitmap of terminal capability |
-| 9F34 | Cardholder Verification Method (CVM) Results | B | 3 | Result of CVM processing; ARQC input |
-| 9F35 | Terminal Type | N | 1 | Environment and capability code |
-| 9F36 | Application Transaction Counter | B | 2 | Monotonically incrementing card counter; ARQC input |
-| 9F37 | Unpredictable Number | B | 4 | Terminal-generated random; ARQC input |
-| 9F38 | Processing Options Data Object List (PDOL) | B | var | Tags requested by card in GPO |
-| 9F39 | Point-of-Service (POS) Entry Mode | N | 1 | Card read method code |
-| 9F3A | Amount, Reference Currency | B | 4 | Amount in reference currency |
-| 9F3B | Application Reference Currency | N | 2 | Reference currency code |
-| 9F3C | Transaction Reference Currency Code | N | 2 | Currency for reference conversion |
-| 9F3D | Transaction Reference Currency Exponent | N | 1 | Decimal places for reference currency |
-| 9F40 | Additional Terminal Capabilities | B | 5 | Extended terminal features bitmap |
-| 9F41 | Transaction Sequence Counter | N | 4 | Terminal transaction sequence number |
-| 9F42 | Application Currency Code | N | 2 | Card application currency |
-| 9F43 | Application Reference Currency Exponent | N | 1 | Decimal places |
-| 9F44 | Application Currency Exponent | N | 1 | Decimal places for application currency |
-| 9F45 | Data Authentication Code | B | 2 | Code for static data authentication |
-| 9F46 | ICC Public Key Certificate | B | var | Card RSA public key certificate |
-| 9F47 | ICC Public Key Exponent | B | 3 | Card RSA public key exponent |
-| 9F48 | ICC Public Key Remainder | B | var | Card RSA public key modulus remainder |
-| 9F49 | Dynamic Data Authentication Data Object List (DDOL) | B | var | Tags for INTERNAL AUTHENTICATE |
-| 9F4A | Static Data Authentication Tag List | B | var | Tags included in static authentication |
-| 9F4B | Signed Dynamic Application Data (SDAD) | B | var | DDA/CDA signature |
-| 9F4C | ICC Dynamic Number | B | 8 | Card-generated random value for DDA/CDA |
-| 9F4D | Log Entry | B | 2 | SFI and max records for transaction log |
-| 9F4E | Merchant Name and Location | ANS | 50 | Display name and location |
-| 9F4F | Log Format | B | var | DOL for transaction log record format |
-| 9F51 | Application Currency Code (Mastercard) | N | 2 | Mastercard-specific currency code |
-| 9F52 | Card Verification Results (Mastercard) | B | 6 | Mastercard issuer proprietary data |
-| 9F53 | Consecutive Transaction Counter International Limit (Mastercard) | B | 1 | Mastercard CTLI |
-| 9F54 | Cumulative Total Transaction Amount (Mastercard) | B | 6 | Mastercard total limit |
-| 9F55 | Geographic Indicator (Mastercard) | B | 1 | Domestic vs international indicator |
-| 9F56 | Issuer Authentication Indicator (Mastercard) | B | var | Mastercard proprietary |
-| 9F57 | Issuer Country Code (Mastercard) | B | 2 | Binary country code |
-| 9F58 | Lower Consecutive Offline Limit (International) | B | 1 | Mastercard international floor |
-| 9F59 | Upper Consecutive Offline Limit (International) | B | 1 | Mastercard international ceiling |
-| 9F5A | Application Program Identifier | B | 9 | Program ID for contactless kernel selection |
-| 9F5C | Cumulative Total Transaction Amount Upper Limit (Mastercard) | B | 6 | Mastercard CTTAUL |
-| 9F6C | Card Transaction Qualifiers (CTQ) | B | 2 | Contactless card qualifiers bitmap |
-| 9F6D | Mag-Stripe Application Version Number | B | 2 | Contactless mag-stripe version |
-| 9F6E | Form Factor Indicator / Third Party Data | B | 8 | Device type indicator (contactless) |
-| 9F74 | VLP Authorisation Code | B | 6 | Visa Low-Value Payment auth code |
-| 9F7C | Customer Exclusive Data | B | 32 | Issuer proprietary; card-specific |
-| BF0C | FCI Issuer Discretionary Data | B | var | Constructed; issuer-specific FCI data |
-| DF01 | Reference Control Parameter | B | 1 | Contactless kernel reference parameter |
+### EMVCo Book 3 v4.4 — Authoritative Tags
 
-Format codes: B=Binary, N=Numeric (BCD), AN=Alphanumeric, ANS=Alphanumeric+Special, CN=Compressed Numeric
+| Tag | Name | Source | Fmt | Length | Notes |
+|-----|------|--------|-----|--------|-------|
+| 42 | Issuer Identification Number (IIN) | ICC | n 6 | 3 | First 6 digits of PAN; identifies major industry and issuer |
+| 4F | Application Dedicated File (ADF) Name | ICC | b | 5–16 | AID stored on card (ISO/IEC 7816-5) |
+| 50 | Application Label | ICC | ans | 1–16 | Mnemonic for AID; special chars limited to space |
+| 57 | Track 2 Equivalent Data | ICC | b | ≤19 | Track 2 data minus start/end sentinel and LRC |
+| 5A | Application Primary Account Number (PAN) | ICC | cn | ≤10 | Up to 19 decimal digits; cn encoding |
+| 5F20 | Cardholder Name | ICC | ans | 2–26 | Per ISO/IEC 7813 |
+| 5F24 | Application Expiration Date | ICC | n 6 (YYMMDD) | 3 | |
+| 5F25 | Application Effective Date | ICC | n 6 (YYMMDD) | 3 | |
+| 5F28 | Issuer Country Code | ICC | n 3 | 2 | ISO 3166-1 numeric |
+| 5F2A | Transaction Currency Code | Terminal | n 3 | 2 | ISO 4217 numeric; ARQC input |
+| 5F2D | Language Preference | ICC | an 2 | 2–8 | ISO 639; 1–4 codes; recommend lowercase |
+| 5F30 | Service Code | ICC | n 3 | 2 | Magnetic stripe service code |
+| 5F34 | Application PAN Sequence Number | ICC | n 2 | 1 | Differentiates cards with same PAN |
+| 5F36 | Transaction Currency Exponent | Terminal | n 1 | 1 | Decimal places in transaction amount |
+| 5F50 | Issuer URL | ICC | ans | var. | Issuer library server URL |
+| 5F53 | International Bank Account Number (IBAN) | ICC | var. | ≤34 | ISO 13616 |
+| 5F54 | Bank Identifier Code (BIC) | ICC | var. | 8 or 11 | ISO 9362 |
+| 5F55 | Issuer Country Code (alpha2) | ICC | a 2 | 2 | ISO 3166-1 alpha-2 |
+| 5F56 | Issuer Country Code (alpha3) | ICC | a 3 | 3 | ISO 3166-1 alpha-3 |
+| 5F57 | Account Type | Terminal | n 2 | 1 | Values per Annex G |
+| 61 | Application Template | ICC | b | ≤252 | Directory entry template |
+| 6F | File Control Information (FCI) Template | ICC | var. | ≤252 | Per ISO/IEC 7816-4 |
+| 70 | READ RECORD Response Message Template | ICC | — | — | AEF data template |
+| 71 | Issuer Script Template 1 | Issuer | b | var. | Script commands before second GENERATE AC |
+| 72 | Issuer Script Template 2 | Issuer | b | var. | Script commands after second GENERATE AC |
+| 73 | Directory Discretionary Template | ICC | var. | ≤252 | Issuer discretionary directory data |
+| 77 | Response Message Template Format 2 | — | — | — | TLV-encoded GPO/GENERATE AC response |
+| 80 | Response Message Template Format 1 | — | — | — | Non-TLV response |
+| 81 | Amount, Authorised (Binary) | Terminal | b | 4 | Binary authorised amount (excluding adjustments) |
+| 82 | Application Interchange Profile (AIP) | ICC | b | 2 | Bitmap of card capabilities (SDA/DDA/CDA, contactless, etc.) |
+| 83 | Command Template | Terminal | b | var. | GENERATE AC command data field identifier |
+| 84 | Dedicated File (DF) Name | ICC | b | 5–16 | ISO/IEC 7816-4 DF name |
+| 86 | Issuer Script Command | Issuer | b | ≤261 | Command for transmission to ICC |
+| 87 | Application Priority Indicator | ICC | b | 1 | Priority in application selection |
+| 88 | Short File Identifier (SFI) | ICC | b | 1 | File pointer for READ RECORD |
+| 89 | Authorisation Code | Issuer | per PS | 6 | Auth code generated by authorisation authority |
+| 8A | Authorisation Response Code | Issuer/Terminal | an 2 | 2 | e.g. 00=approved, 05=declined |
+| 8C | CDOL1 | ICC | b | ≤252 | DOL for first GENERATE AC |
+| 8D | CDOL2 | ICC | b | ≤252 | DOL for second GENERATE AC |
+| 8E | CVM List | ICC | b | 10–252 | Cardholder verification method rules |
+| 8F | Certification Authority Public Key Index | ICC | b | 1 | CA PK index; used with RID |
+| 90 | Issuer Public Key Certificate | ICC | b | var. | RSA or ECC issuer cert signed by CA |
+| 91 | Issuer Authentication Data | Issuer | b | 8–16 | ARPC (Method 1: 8 bytes); ARPC+CSU+proprietary (Method 2: up to 16 bytes) |
+| 92 | Issuer Public Key Remainder | ICC | b | var. | Overflow bytes of issuer key modulus |
+| 93 | Signed Static Application Data (SSAD) | ICC | b | N_I | SDA signature |
+| 94 | Application File Locator (AFL) | ICC | var. | ≤252 | SFI/record ranges to read |
+| 95 | Terminal Verification Results (TVR) | Terminal | b | 5 | Offline check bitmap; ARQC input |
+| 97 | Transaction Certificate Data Object List (TDOL) | ICC | b | ≤252 | DOL for TC hash computation |
+| 98 | TC Hash Value | Terminal | b | 20 | SHA-1 hash of TC data |
+| 99 | Transaction PIN Data | Terminal | b | var. | Online PIN block |
+| 9A | Transaction Date | Terminal | n 6 (YYMMDD) | 3 | ARQC input |
+| 9B | Transaction Status Information (TSI) | Terminal | b | 2 | Card processing status bitmap |
+| 9C | Transaction Type | Terminal | n 2 | 1 | First 2 digits of ISO 8583:1987 Processing Code |
+| 9D | Directory Definition File (DDF) Name | ICC | b | 5–16 | PSE DDF |
+| 9F01 | Acquirer Identifier | Terminal | n 6–11 | 6 | Acquirer institution ID |
+| 9F02 | Amount, Authorised (Numeric) | Terminal | n 12 | 6 | BCD; primary ARQC input |
+| 9F03 | Amount, Other (Numeric) | Terminal | n 12 | 6 | BCD; cashback |
+| 9F04 | Amount, Other (Binary) | Terminal | b | 4 | Binary cashback amount |
+| 9F05 | Application Discretionary Data | ICC | b | 1–32 | Issuer/PS application data |
+| 9F06 | Application Identifier (AID) — terminal | Terminal | b | 5–16 | AID selected by terminal |
+| 9F07 | Application Usage Control | ICC | b | 2 | Geographic/service restrictions |
+| 9F08 | Application Version Number (card) | ICC | b | 2 | PS-assigned version |
+| 9F09 | Application Version Number (terminal) | Terminal | b | 2 | PS-assigned version |
+| 9F0A | Application Selection Registered Proprietary Data (ASRPD) | Card | b | var. | Proprietary data for application selection |
+| 9F0B | Cardholder Name Extended | ICC | ans | 27–45 | Extended name >26 chars |
+| 9F0C | Issuer Identification Number Extended (IINE) | ICC | n 6 or 8 | 3 or 4 | 6- or 8-digit IIN; may coexist with tag 42 |
+| 9F0D | Issuer Action Code — Default (IAC-Default) | ICC | b | 5 | Conditions for offline decline |
+| 9F0E | Issuer Action Code — Denial (IAC-Denial) | ICC | b | 5 | Conditions for hard decline |
+| 9F0F | Issuer Action Code — Online (IAC-Online) | ICC | b | 5 | Conditions for online attempt |
+| 9F10 | Issuer Application Data (IAD) | ICC | b | ≤32 | Proprietary; scheme-specific encoding; ARQC input |
+| 9F11 | Issuer Code Table Index | ICC | n 2 | 1 | ISO 8859 charset index for preferred name |
+| 9F12 | Application Preferred Name | ICC | ans | 1–16 | Name in national character set |
+| 9F13 | Last Online ATC Register | ICC | b | 2 | ATC at last online transaction |
+| 9F14 | Lower Consecutive Offline Limit (LCOL) | ICC | b | 1 | Offline floor transaction count |
+| 9F15 | Merchant Category Code (MCC) | Terminal | n 4 | 2 | ISO 8583:1993 Card Acceptor Business Code |
+| 9F16 | Merchant Identifier | Terminal | ans 15 | 15 | Combined with Acquirer ID = unique merchant |
+| 9F17 | PIN Try Counter | ICC | b | 1 | Remaining PIN attempts |
+| 9F18 | Issuer Script Identifier | Issuer | b | 4 | Identifies issuer script |
+| 9F19 | Token Requestor ID | ICC | n 11 | 6 | Token requestor per EMV Payment Tokenisation Framework |
+| 9F1A | Terminal Country Code | Terminal | n 3 | 2 | ISO 3166-1 numeric; ARQC input |
+| 9F1B | Terminal Floor Limit | Terminal | b | 4 | Amount threshold for offline authorisation |
+| 9F1C | Terminal Identification (TID) | Terminal | an 8 | 8 | Unique terminal ID at merchant |
+| 9F1D | Terminal Risk Management Data | Terminal | b | 1–8 | Application-specific risk management |
+| 9F1E | Interface Device (IFD) Serial Number | Terminal | an 8 | 8 | Manufacturer-assigned serial |
+| 9F1F | Track 1 Discretionary Data | ICC | ans | var. | Discretionary part of Track 1 (ISO/IEC 7813) |
+| 9F20 | Track 2 Discretionary Data | ICC | cn | var. | Discretionary part of Track 2 |
+| 9F21 | Transaction Time | Terminal | n 6 (HHMMSS) | 3 | Local time of authorisation |
+| 9F22 | Certification Authority Public Key Index (terminal) | Terminal | b | 1 | CA key index at terminal |
+| 9F23 | Upper Consecutive Offline Limit (UCOL) | ICC | b | 1 | Offline ceiling transaction count |
+| 9F24 | Payment Account Reference (PAR) | ICC | an 29 | 29 | Non-financial PAN token linkage (Tokenisation Framework) |
+| 9F25 | Last 4 Digits of PAN | ICC | n 4 | 2 | Per EMV Payment Tokenisation Framework |
+| 9F26 | Application Cryptogram | ICC | b | 8 | ARQC, TC, or AAC value; primary APC target |
+| 9F27 | Cryptogram Information Data (CID) | ICC | b | 1 | Upper nibble: 80=ARQC, 40=TC, 00=AAC |
+| 9F2D | ICC PIN Encipherment PK Certificate (RSA) / ICC PK Certificate for ODE (ECC) | ICC | b | var. | For PIN encipherment or biometric encipherment |
+| 9F2E | ICC PIN Encipherment Public Key Exponent | ICC | b | 1 or 3 | |
+| 9F2F | ICC PIN Encipherment Public Key Remainder | ICC | b | var. | |
+| 9F32 | Issuer Public Key Exponent | ICC | b | 1 or 3 | Used for SSAD/ICC cert verification |
+| 9F33 | Terminal Capabilities | Terminal | b | 3 | Card data input / CVM / security features bitmap |
+| 9F34 | CVM Results | Terminal | b | 3 | Result of CVM processing; ARQC input |
+| 9F35 | Terminal Type | Terminal | n 2 | 1 | Environment and communications capability code |
+| 9F36 | Application Transaction Counter (ATC) | ICC | b | 2 | Monotonic counter; ARQC input; Book 2 session key input |
+| 9F37 | Unpredictable Number | Terminal | b | 4 | Terminal random nonce; ARQC input |
+| 9F38 | Processing Options Data Object List (PDOL) | ICC | b | var. | Tags requested by card in GET PROCESSING OPTIONS |
+| 9F39 | POS Entry Mode | Terminal | n 2 | 1 | ISO 8583:1987 POS entry method code |
+| 9F3A | Amount, Reference Currency | Terminal | b | 4 | Amount in reference currency |
+| 9F3B | Application Reference Currency | ICC | n 3 | 2–8 | 1–4 ISO 4217 codes (3 digits each) |
+| 9F3C | Transaction Reference Currency Code | Terminal | n 3 | 2 | Reference currency for conversion |
+| 9F3D | Transaction Reference Currency Exponent | Terminal | n 1 | 1 | Decimal places for reference currency |
+| 9F40 | Additional Terminal Capabilities | Terminal | b | 5 | Extended terminal features bitmap |
+| 9F41 | Transaction Sequence Counter | Terminal | n 4–8 | 2–4 | Increments per transaction |
+| 9F42 | Application Currency Code | ICC | n 3 | 2 | ISO 4217; card application currency |
+| 9F43 | Application Reference Currency Exponent | ICC | n 1 | 1–4 | One exponent per reference currency |
+| 9F44 | Application Currency Exponent | ICC | n 1 | 1 | Decimal places for application currency |
+| 9F45 | Data Authentication Code | ICC | b | 2 | Issuer-assigned SDA check value |
+| 9F46 | ICC Public Key Certificate | ICC | b | var. | Card RSA or ECC public key cert |
+| 9F47 | ICC Public Key Exponent | ICC | b | 1 or 3 | |
+| 9F48 | ICC Public Key Remainder | ICC | b | var. | |
+| 9F49 | Dynamic Data Authentication Data Object List (DDOL) | ICC | b | ≤252 | DOL for INTERNAL AUTHENTICATE |
+| 9F4A | Static Data Authentication Tag List | ICC | — | var. | Tags included in SSAD |
+| 9F4B | Signed Dynamic Application Data (SDAD) | ICC | b | N_IC | DDA/CDA signature |
+| 9F4C | ICC Dynamic Number | ICC | b | 2–8 | Card-generated nonce for DDA/CDA |
+| 9F4D | Log Entry | ICC | b | 2 | SFI + max records for transaction log |
+| 9F4E | Merchant Name and Location | Terminal | ans | var. | |
+| 9F4F | Log Format | ICC | b | var. | DOL for transaction log record |
+| A5 | FCI Proprietary Template | ICC | var. | var. | Proprietary FCI per ISO/IEC 7816-4 |
+| BF0C | FCI Issuer Discretionary Data | ICC | var. | ≤222 | Issuer discretionary FCI; constructed |
+
+#### Biometric Tags (added in Book 3 v4.4)
+
+| Tag | Name | Source | Fmt | Length | Notes |
+|-----|------|--------|-----|--------|-------|
+| 7F60 | Biometric Information Template (BIT) | Card/Terminal | b | var. | Nested under BF4A, BF4B, or standalone; defined in ISO/IEC 19785-3 |
+| 9F30 | Biometric Terminal Capabilities | Terminal | b | 3 | Indicates biometric CVM capabilities |
+| 9F31 | Card BIT Group Template | Card | b | var. | Container for BITs on card |
+| A1 | Biometric Header Template (BHT) | Card/Terminal | b | var. | Nested inside 7F60; from ISO/IEC 19785-3 |
+| BF4A | Offline BIT Group Template | Card | b | var. | Offline biometric BITs; nested under 9F31 |
+| BF4B | Online BIT Group Template | Card | b | var. | Online biometric BITs; nested under 9F31 |
+| BF4C | Biometric Try Counters Template | Card | b | var. | Contains per-modality try counters |
+| BF4D | Preferred Attempts Template | Card | b | var. | Contains per-modality preferred attempt counts |
+| BF4E | Biometric Verification Data Template | Terminal | b | var. | TLV values for VERIFY command |
+| DF50 | Facial Try Counter / Preferred Facial Attempts / Enciphered Biometric Key Seed | Card | b | 1 / 1 / var. | Interpretation depends on parent (BF4C / BF4D / BF4E) |
+| DF51 | Finger Try Counter / Preferred Finger Attempts / Enciphered Biometric Data | Card | b | 1 / 1 / var. | |
+| DF52 | Iris Try Counter / Preferred Iris Attempts / MAC of Enciphered Biometric Data | Card | b | 1 / 1 / 8 | |
+| DF53 | Palm Try Counter / Preferred Palm Attempts | Card | b | 1 / 1 | |
+| DF54 | Voice Try Counter / Preferred Voice Attempts | Card | b | 1 / 1 | |
+
+Format codes: b=binary, n=numeric (BCD), an=alphanumeric, ans=alphanumeric+special, cn=compressed numeric, var.=variable length
+
+### Scheme and Kernel Proprietary Tags (not in Book 3)
+
+These are defined by payment schemes or contactless kernel specifications, not by EMVCo Book 3.
+Sources: Mastercard M/Chip, Visa, EMV Contactless Book C kernels.
+
+| Tag | Name | Owner | Fmt | Length | Notes |
+|-----|------|-------|-----|--------|-------|
+| 56 | Track 1 Data | Legacy mag-stripe | B | ≤76 | Not an ICC data object; ISO/IEC 7813 Track 1 |
+| 9F51 | Application Currency Code | Mastercard | N | 2 | M/Chip-specific |
+| 9F52 | Card Verification Results | Mastercard | B | 6 | M/Chip issuer proprietary |
+| 9F53 | Consecutive Transaction Counter International Limit | Mastercard | B | 1 | M/Chip CTLI |
+| 9F54 | Cumulative Total Transaction Amount | Mastercard | B | 6 | M/Chip accumulator |
+| 9F55 | Geographic Indicator | Mastercard | B | 1 | Domestic vs international indicator |
+| 9F56 | Issuer Authentication Indicator | Mastercard | B | var. | Mastercard proprietary |
+| 9F57 | Issuer Country Code | Mastercard | B | 2 | Binary country code |
+| 9F58 | Lower Consecutive Offline Limit (International) | Mastercard | B | 1 | International floor count |
+| 9F59 | Upper Consecutive Offline Limit (International) | Mastercard | B | 1 | International ceiling count |
+| 9F5A | Application Program Identifier | Mastercard/Kernel | B | 9 | Program ID for contactless kernel selection |
+| 9F5C | Cumulative Total Transaction Amount Upper Limit | Mastercard | B | 6 | M/Chip CTTAUL |
+| 9F6C | Card Transaction Qualifiers (CTQ) | Visa/Kernel 3 | B | 2 | Contactless card qualifiers bitmap |
+| 9F6D | Mag-Stripe Application Version Number | Visa | B | 2 | Contactless mag-stripe version |
+| 9F6E | Form Factor Indicator / Third Party Data | Visa | B | 8 | Device type indicator |
+| 9F74 | VLP Authorisation Code | Visa | B | 6 | Visa Low-Value Payment auth code |
+| 9F7C | Customer Exclusive Data | Visa | B | 32 | Issuer proprietary; card-specific |
+| DF01 | Reference Control Parameter | Contactless kernel | B | 1 | Kernel reference parameter |
 
 ### ARQC Core Input Tags (most relevant for APC VerifyAuthRequestCryptogram)
 
@@ -8334,4 +8380,5 @@ that publish annual revisions).
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
 | 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
+| 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |
