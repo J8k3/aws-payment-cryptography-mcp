@@ -7915,6 +7915,382 @@ Result tags: `9F26` (cryptogram value) · `9F27` (CID — type: ARQC/TC/AAC)
 
 ---
 
+## EMV Issuer Cryptography
+
+Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management, v4.3, November 2011 (EMVCo).
+
+### EMV RSA Key Hierarchy
+
+```yaml
+id: concept.emv-rsa-key-hierarchy
+entity_type: concept
+canonical_name: EMV RSA Key Hierarchy
+aliases:
+  - EMV PKI
+  - EMV public key infrastructure
+summary: Three-level RSA certificate chain used for offline card authentication — CA root keys stored in terminals, Issuer Public Key certified by CA, ICC Public Key certified by Issuer.
+domain:
+  - emv
+  - cryptography
+attributes:
+  levels:
+    CA:
+      role: Trust anchor; public key stored in terminals indexed by RID + CA PK Index
+      terminal_storage: Minimum 6 CA public keys per RID
+      key_size: Up to 248-byte (1984-bit) modulus
+      exponent: Must be 3 or 65537 (2^16+1)
+    Issuer:
+      role: Certified by CA; signs ICC certificates and SSAD (SDA)
+      modulus_constraint: N_I <= N_CA
+    ICC:
+      role: Certified by Issuer; used for dynamic signature generation (DDA/CDA)
+      modulus_constraint: N_IC <= N_I
+      also: PIN Encipherment Key (PE) modulus constraint N_PE <= N_I
+  certificate_format:
+    header_byte: "6A"
+    format_bytes: "02 (Issuer cert) or 03 (ICC cert)"
+    issuer_identifier: Leftmost 3–8 digits of PAN
+    expiry: MMYY
+    serial_number: 3 bytes assigned by CA
+    hash_algorithm_indicator: "01 = SHA-1"
+    key_algorithm_indicator: "01 = RSA"
+    hash: 20-byte SHA-1 over certificate content
+    trailer_byte: "BC"
+  certification_revocation_list:
+    keyed_by: RID + CA PK Index + Certificate Serial Number
+    minimum_entries: 30 per RID
+    distribution: Acquirer pushes updates to terminals
+  offline_auth_methods:
+    SDA: Issuer signs static application data (SSAD); card carries Issuer PK cert + SSAD
+    DDA: ICC generates dynamic signature over terminal-provided unpredictable number
+    CDA: DDA combined with GENERATE AC — ICC signs cryptogram + dynamic data together
+  algorithms_v4_3:
+    asymmetric: RSA only
+    hash: SHA-1 only (hash algorithm indicator 0x01)
+relationships:
+  - type: related_to
+    target_id: operation.emv-sda
+  - type: related_to
+    target_id: operation.emv-dda
+  - type: related_to
+    target_id: operation.emv-cda
+status: active
+```
+
+### ARQC Generation
+
+```yaml
+id: operation.emv-arqc-generation
+entity_type: operation
+canonical_name: EMV ARQC Generation
+aliases:
+  - Application Request Cryptogram generation
+  - ICC cryptogram computation
+summary: Two-step process in which the ICC derives a transaction session key from its AC master key using the ATC, then computes an 8-byte MAC over a mandatory dataset to produce the ARQC.
+domain:
+  - emv
+  - cryptography
+attributes:
+  steps:
+    1_derive_session_key:
+      input: ICC Master Key MK_AC + ATC (Application Transaction Counter)
+      method: Common Option (Annex A1.3) — not mandatory; issuers may use alternatives
+      session_key: SK_AC
+    2_compute_mac:
+      input: Recommended minimum dataset (EMV Book 2, Table 26) + SK_AC
+      output: 8-byte MAC = ARQC (tag 9F26)
+  recommended_minimum_dataset_table_26:
+    from_terminal:
+      - "9F02: Amount Authorised"
+      - "9F03: Amount Other"
+      - "9F1A: Terminal Country Code"
+      - "95: TVR (Terminal Verification Results) — NOTE: TVR is an INPUT, not the ARQC"
+      - "5F2A: Transaction Currency Code"
+      - "9A: Transaction Date"
+      - "9C: Transaction Type"
+      - "9F37: Unpredictable Number"
+    from_icc:
+      - "82: Application Interchange Profile"
+      - "9F36: ATC"
+  note: These inputs are the MINIMUM; scheme or issuer profiles may add additional data (e.g., 9F10 IAD)
+  arqc_tag: "9F26 (8 bytes)"
+  cid_tag: "9F27 — Cryptogram Information Data; encodes type: ARQC=80, TC=40, AAC=00 (upper nibble)"
+relationships:
+  - type: produces
+    target_id: artifact.arqc
+  - type: uses
+    target_id: operation.emv-ac-session-key-derivation
+  - type: related_to
+    target_id: concept.emv-master-key-derivation
+status: active
+```
+
+### AC Session Key Derivation (Common Option)
+
+```yaml
+id: operation.emv-ac-session-key-derivation
+entity_type: operation
+canonical_name: EMV AC Session Key Derivation — Common Option
+aliases:
+  - EMV session key derivation
+  - EMV Annex A1.3
+summary: Common method for deriving per-transaction session keys for Application Cryptogram (ARQC/ARPC) and Secure Messaging from an ICC Master Key using a transaction-specific diversification value.
+domain:
+  - emv
+  - cryptography
+  - key_management
+attributes:
+  formula: "KS := F(KM)[R]"
+  diversification_value_R:
+    for_AC_and_ARPC: "ATC || '00' || '00' || ... (ATC in leftmost 2 bytes, remainder zero-padded to n bytes)"
+    for_secure_messaging: "Application Cryptogram || '00' || '00' || '00' (cryptogram in leftmost 8 bytes, zero-padded to n bytes)"
+  derivation_by_key_size:
+    AES_128:
+      condition: "k = 8n, n = 16 (single block)"
+      formula: "SK := AES(MK)[R]"
+    triple_DES_128_or_AES_192_256:
+      condition: "16n >= k > 8n"
+      formula: |
+        F1 = R0 || R1 || 'F0' || Rn-1
+        F2 = R0 || R1 || '0F' || Rn-1
+        SK := leftmost k-bits of { ALG(MK)[F1] || ALG(MK)[F2] }
+  scope: Same session key SK_AC used for all ARQC-related operations in a single transaction
+  note: Common Option is NOT mandatory — issuers may implement alternative derivation methods
+  separate_keys:
+    - MK_AC → SK_AC (for ARQC computation and ARPC verification)
+    - MK_MAC → SK_MAC (for issuer script MAC; diversified using Application Cryptogram, not ATC)
+    - MK_ENC → SK_ENC (for issuer script encipherment; diversified using Application Cryptogram)
+relationships:
+  - type: used_by
+    target_id: operation.emv-arqc-generation
+  - type: used_by
+    target_id: operation.emv-arpc-generation
+  - type: used_by
+    target_id: operation.emv-secure-messaging
+  - type: related_to
+    target_id: concept.emv-master-key-derivation
+status: active
+```
+
+### ARPC Generation
+
+```yaml
+id: operation.emv-arpc-generation
+entity_type: operation
+canonical_name: EMV ARPC Generation
+aliases:
+  - Application Response Cryptogram generation
+  - issuer response cryptogram
+summary: Issuer-side operation that produces an ARPC to authenticate the host response to the ICC; two methods defined — Method 1 (8-byte, XOR-then-encrypt) and Method 2 (4-byte MAC with Card Status Update).
+domain:
+  - emv
+  - cryptography
+attributes:
+  session_key: SK_AC (same key used to verify ARQC)
+  method_1:
+    output_length: 8 bytes
+    algorithm_3DES: |
+      X = ARC || 00 00 00 00 00 00  (ARC is 2-byte Authorisation Response Code, zero-padded to 8 bytes)
+      Y = ARQC XOR X
+      ARPC = 3DES(SK_AC)[Y]
+    algorithm_AES: |
+      Y = ARQC XOR X  (same X construction)
+      ARPC = leftmost 8 bytes of AES(SK_AC)[ Y || Y0 ]   where Y0 = 8 zero bytes
+    arc_examples:
+      "00": approved
+      "05": declined
+      "01": refer to card issuer
+  method_2:
+    output_length: 4 bytes
+    inputs:
+      - ARQC (8 bytes)
+      - CSU: Card Status Update (4 bytes, issuer-defined card lifecycle instructions)
+      - Proprietary Auth Data (0–8 bytes, optional)
+    formula: "Y = ARQC || CSU || Proprietary Auth Data; ARPC = MAC(SK_AC)[Y] truncated to 4 bytes"
+    mac_spec_3DES: "ISO 9797-1 Algorithm 3, s=4"
+    mac_spec_AES: "CMAC per ISO 9797-1:2011 Algorithm 5, s=4"
+    tag_91_format: "ARPC (4 bytes) || CSU (4 bytes) || Proprietary Auth Data (0–8 bytes)"
+    note: Tag 91 (Issuer Authentication Data) carries Method 2 response
+  security_rule: |
+    ARPC MUST NOT be computed from a received ARQC that fails verification.
+    If issuer policy returns ARPC on failure, it must be computed independently — not from the received ARQC.
+relationships:
+  - type: uses
+    target_id: operation.emv-ac-session-key-derivation
+  - type: verifies
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: operation.emv-arqc-generation
+status: active
+```
+
+### ICC Master Key Derivation
+
+```yaml
+id: concept.emv-master-key-derivation
+entity_type: concept
+canonical_name: EMV ICC Master Key Derivation
+aliases:
+  - ICC Master Key personalization
+  - EMV key diversification
+summary: Process used during card personalization to derive a card-unique ICC Master Key (MK) from the Issuer Master Key (IMK) using PAN and PAN Sequence Number as diversification data; three options (A, B, C) are defined in EMV Book 2 Annex A1.4.
+domain:
+  - emv
+  - cryptography
+  - key_management
+attributes:
+  inputs:
+    - Issuer Master Key (IMK)
+    - PAN (Primary Account Number)
+    - PAN Sequence Number (1 byte, often 00)
+  option_A:
+    applies_to: Triple DES only; PAN ≤ 16 significant decimal digits
+    steps: |
+      1. Y = rightmost 16 decimal digits of (PAN || SeqNo), left-padded with zeros if < 16 digits
+      2. ZL = 3DES(IMK)[Y]
+      3. ZR = 3DES(IMK)[Y XOR FF FF FF FF FF FF FF FF]
+      4. MK = ZL || ZR, each byte adjusted to odd parity
+    note: Parity adjustment applied byte-by-byte (odd parity per byte)
+  option_B:
+    applies_to: Triple DES only; PAN > 16 significant decimal digits
+    steps: |
+      1. Compute SHA-1 hash of (PAN || SeqNo) → 20-byte X
+      2. Decimalize X using table: A→0, B→1, C→2, D→3, E→4, F→5 (hex nibbles → digits)
+      3. Extract first 16 decimal digits from decimalized result → Y
+      4. Continue with Option A step 2 using Y
+  option_C:
+    applies_to: AES (128, 192, or 256-bit IMK)
+    steps: |
+      Concatenate PAN || SeqNo → 16-byte numeric value Y
+    AES_128: "MK := AES(IMK)[Y]"
+    AES_192_256: |
+      MK := leftmost k-bits of { AES(IMK)[Y] || AES(IMK)[Y XOR FF...FF] }
+  note: None of these options are mandatory — issuers may implement alternative derivation methods
+  per_key_type:
+    description: |
+      Separate IMK/MK pairs per key function. A card carries distinct master keys for:
+        - MK_AC  (application cryptogram — ARQC/ARPC)
+        - MK_MAC (secure messaging MAC)
+        - MK_ENC (secure messaging encipherment)
+      All three derived from their respective IMK using the same Option A/B/C logic.
+relationships:
+  - type: used_by
+    target_id: operation.emv-ac-session-key-derivation
+  - type: related_to
+    target_id: operation.emv-arqc-generation
+  - type: related_to
+    target_id: key-type.imk
+status: active
+```
+
+### EMV Secure Messaging
+
+```yaml
+id: operation.emv-secure-messaging
+entity_type: operation
+canonical_name: EMV Secure Messaging
+aliases:
+  - issuer script protection
+  - SM
+summary: Cryptographic protection (integrity via MAC and optionally confidentiality via encryption) applied to issuer script commands delivered through EMV messaging to the ICC after online authorization.
+domain:
+  - emv
+  - cryptography
+  - key_management
+attributes:
+  purpose: Protect issuer commands (PIN change, block/unblock) in transit from host to card
+  trigger: Applied after ARQC verification when issuer wishes to modify card state
+  session_keys:
+    SK_MAC:
+      source_key: ICC MAC Master Key (MK_MAC, derived from IMK_MAC via A1.4)
+      diversification: Application Cryptogram (ARQC value) via A1.3
+    SK_ENC:
+      source_key: ICC Encipherment Master Key (MK_ENC, derived from IMK_ENC via A1.4)
+      diversification: Application Cryptogram (ARQC value) via A1.3
+  format_1:
+    indicator: Class byte LSN = 'C'
+    structure: "Command data || Tag '8E' || MAC (4–8 bytes)"
+    encoding: BER-TLV
+    mac_chaining:
+      first_command: ARQC (8-byte cipher) or ARQC || zeros (16-byte cipher) prepended to MAC input
+      subsequent_commands: Previous MAC output chained as input to next MAC computation
+  format_2:
+    indicator: Class byte LSN = '4'
+    structure: "Command data || MAC (4–8 bytes)"
+    encoding: Non-TLV (proprietary)
+  encipherment:
+    mode: ECB or CBC per ISO/IEC 10116
+    padding: "'80' || '00'..." to block boundary
+  mac_3DES:
+    spec: ISO/IEC 9797-1
+    padding: Mandatory '80' padding (method 2)
+    iv: Zero IV
+    algorithm_1: Final block computed with single DES (H_B unchanged)
+    algorithm_3: Final block computed with 3DES
+    output: Leftmost s bytes
+  mac_AES:
+    spec: CMAC per ISO/IEC 9797-1:2011 Algorithm 5
+    subkeys: K1 and K2 derived from AES(SK)[00...00]
+    padding: Not required if message is a multiple of 16 bytes
+  common_script_commands:
+    - PUT DATA (card parameter update)
+    - CHANGE PIN (offline PIN update, Format 2 typically)
+    - BLOCK / UNBLOCK application
+relationships:
+  - type: uses
+    target_id: operation.emv-ac-session-key-derivation
+  - type: related_to
+    target_id: operation.emv-issuer-script
+  - type: related_to
+    target_id: concept.emv-master-key-derivation
+  - type: related_to
+    target_id: operation.offline-pin-update
+status: active
+```
+
+### EMV Approved Algorithms (Book 2, v4.3)
+
+```yaml
+id: concept.emv-book2-algorithms
+entity_type: concept
+canonical_name: EMV Book 2 Approved Algorithms (v4.3)
+summary: Algorithm constraints defined in EMV Book 2 Annex B that apply to all ICC/issuer symmetric and asymmetric operations; note that v4.3 (2011) restricts hashing to SHA-1 only.
+domain:
+  - emv
+  - cryptography
+attributes:
+  symmetric:
+    triple_DES:
+      key_length: 128-bit double-length key (two independent 56-bit keys)
+      standard: ISO/IEC 18033-3
+      single_DES_restriction: Approved ONLY as the final-block MAC algorithm (ISO 9797-1 Algorithm 3 last block); NOT for standalone encryption
+    AES:
+      key_lengths: [128, 192, 256]
+      approved_for: Session key derivation, ARQC/ARPC, secure messaging
+  asymmetric:
+    RSA:
+      note: Only asymmetric algorithm approved in v4.3
+      public_exponent: Must be 3 or 65537 (2^16+1)
+      max_modulus_bytes: 248 bytes (1984 bits) for CA, Issuer, ICC, and PIN encipherment keys
+      key_size_constraints:
+        - "N_IC <= N_I <= N_CA  (ICC modulus <= Issuer modulus <= CA modulus)"
+        - "N_PE <= N_I          (PIN Encipherment key modulus <= Issuer modulus)"
+  hashing:
+    SHA_1:
+      output: 20 bytes
+      hash_algorithm_indicator: "0x01"
+      note: Only hash algorithm approved in EMV Book 2 v4.3; later versions added SHA-256
+  note: These constraints apply to v4.3 (2011). Later EMVCo publications relaxed SHA-1 and added RSA-2048+ guidance.
+relationships:
+  - type: related_to
+    target_id: concept.emv-rsa-key-hierarchy
+  - type: related_to
+    target_id: operation.emv-arqc-generation
+status: active
+```
+
+---
+
 ## Reference Catalogs to Materialize Next
 
 - AID catalog
@@ -7957,4 +8333,5 @@ that publish annual revisions).
 | 2026-05-21 | PCI Mobile Payments on COTS (MPoC) Standard v1.1 (targeted read: overview/scope pp.15-35, Req 1A-3 crypto pp.56-58, Req 1A-4 key mgmt pp.60-68, Req 4A-2 back-end ops pp.168-170, Req 4A-4 compliance stack p.180, Appendix C pp.237-239) | PCI Security Standards Council | v1.1, November 2024 | compliance, key_management, cryptography, pin_processing, hsm |
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
 | 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |
+| 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |
