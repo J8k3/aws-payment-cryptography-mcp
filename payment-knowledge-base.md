@@ -5797,9 +5797,9 @@ attributes:
       requirement; key blocks recommended as best practice but not mandated — Q13)
   standards: ["ANSI TR-31", "ISO 20038"]
   rollout_phases:
-    phase_1: "2019-06-01 — internal connections (HSM-to-HSM within same entity)"
-    phase_2: "2021-06-01 — external connections to networks/associations/other acquiring entities"
-    phase_3: "2023-06-01 — merchant/ATM connections"
+    phase_1: "2019-06-01 — internal connections and key storage within Service Provider environments (all applications and databases connected to HSMs)"
+    phase_2: "2023-01-01 — external connections to Associations and Networks"
+    phase_3: "2025-01-01 — all merchant hosts, point-of-sale (POS) devices and ATMs"
   tr31_key_hierarchy:
     kbpk: "Key-Block Protection Key — wraps the payload; used for no other purpose"
     kbek: "Key-Block Encryption Key — derived from KBPK; encrypts the key payload"
@@ -5817,7 +5817,8 @@ constraints:
     with no relationship between them — complying with one does not satisfy the other (Q7)
 references:
   - "PCI PTS PIN Technical FAQs v3 June 2021, Q28 (Req 18), Q29, Q30, Q31, Q33, Q34"
-  - "PCI Information Supplement: PIN Security Req 18-3 Key Blocks, June 2019 (three-phase rollout, Q4, Q7, Q13)"
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §18-3 (normative phase dates)"
+  - "PCI Information Supplement: PIN Security Req 18-3 Key Blocks, June 2019 (Q4, Q7, Q13)"
 relationships:
   - type: related_to
     target_id: algorithm.tr31
@@ -6103,7 +6104,7 @@ constraints:
   - APC supports ISO Format 4 (TR31_P0_PIN_ENCRYPTION_KEY with AES) — use this for new deployments
   - Format 4 → Format 0/3 translation at HSM is a valid interim strategy while upstream catches up
   - Tokens used as PAN in Format 4 blocks must preserve PAN format (Luhn, length)
-  - Cleartext key injection ban: entities injecting on behalf of others (since 2021); processors (since 2023)
+  - Cleartext key injection ban (Req 32-9 normative): entities injecting into POI v5+ devices on behalf of others — 1 January 2024; processors injecting into their own devices — 1 January 2026
   - "Strong Cryptography" is defined only in the PCI DSS Glossary; PCI DSS itself has no
     cryptographic algorithm requirements — algorithm mandates come from PCI PIN, PCI PTS,
     PCI P2PE, PCI CPoC, and PCI SPoC
@@ -6120,6 +6121,1644 @@ relationships:
   - type: related_to
     target_id: rule.apc-iso-format4-required
 status: active
+```
+
+---
+
+### PCI PIN: KCV Method Rule — AES Must Use CMAC
+
+```yaml
+id: concept.pci-pin-kcv-method-rule
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 15-1 — KCV Algorithm and Bit-Length Rules
+summary: >
+  PCI PIN Req 15-1 mandates specific KCV methods per algorithm. AES keys MUST use
+  CMAC-based KCV; the ECB-zeros method (encrypt a block of zeros, take leftmost bytes)
+  is prohibited for AES. TDEA keys may use either ECB-zeros or CMAC. KCV bit lengths
+  are capped: AES KCV is the leftmost ≤40 bits (10 hex digits) of the AES-CMAC output;
+  TDEA KCV is the leftmost ≤24 bits (6 hex digits) of the ECB-zeros or CMAC output.
+  This requirement is enforced in APC — the API rejects ANSI_X9_24 KCV method for AES keys.
+domain:
+  - key_management
+  - compliance
+  - cryptography
+attributes:
+  aes_kcv_method: "CMAC only — ECB-zeros is prohibited"
+  aes_kcv_length: "leftmost ≤40 bits (up to 10 hex digits) of AES-CMAC result"
+  tdea_kcv_method: "ECB-zeros OR CMAC — both acceptable"
+  tdea_kcv_length: "leftmost ≤24 bits (up to 6 hex digits) of ECB-zeros or CMAC result"
+  apc_enforcement: "APC API enforces CMAC for AES; create_key rejects ANSI_X9_24 for AES keys"
+constraints:
+  - Never use ECB-zeros KCV for AES keys — PCI PIN violation
+  - AES KCV value must be 10 hex digits (5 bytes) or fewer — never the full 32-byte AES-CMAC output
+  - TDEA KCV value must be 6 hex digits (3 bytes) or fewer — "KCV" in most HSM UIs is the first 3 bytes
+  - When comparing KCVs between two parties, the truncation length must be agreed in advance
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §15-1"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: concept.pci-pin-key-strength-hierarchy
+status: active
+```
+
+---
+
+### PCI PIN: Key Strength Hierarchy — Annex C Equivalence Table
+
+```yaml
+id: concept.pci-pin-key-strength-hierarchy
+entity_type: compliance_rule
+canonical_name: PCI PIN Annex C — Key Strength Equivalence and Encipherment Hierarchy Rules
+summary: >
+  PCI PIN Annex C defines minimum key sizes by bits-of-security equivalence and the rule
+  that an enciphering (wrapping) key must be of equal or greater strength than the key it
+  protects. Violating this hierarchy (e.g., using TDEA to wrap AES) is treated as cleartext
+  injection for network transport. The table governs all key encipherment decisions including
+  TR-31 KBPK selection, RSA key transport wrap, and TR-34 KDH key pairs.
+domain:
+  - key_management
+  - compliance
+  - cryptography
+attributes:
+  bits_of_security_table:
+    80_bits:   ["2-key TDEA (112-bit key, effective 80-bit security)", "RSA-1024 (prohibited)"]
+    112_bits:  ["3-key TDEA (168-bit key)", "RSA-2048", "DH-2048", "EC-224 (P-224)"]
+    128_bits:  ["AES-128", "RSA-3072", "DH-3072", "EC-256 (P-256)"]
+    192_bits:  ["AES-192", "RSA-7680", "EC-384 (P-384)"]
+    256_bits:  ["AES-256", "RSA-15360", "EC-512 (P-512)"]
+  key_encipherment_rule: >
+    The enciphering key must have bits-of-security >= the bits-of-security of the key
+    it protects. Applies to all key transport and storage scenarios.
+  critical_implications:
+    tdea_cannot_protect_aes: >
+      3-key TDEA (112-bit security) cannot protect AES-128 (128-bit security) over a network.
+      Doing so is treated as cleartext injection per PCI PIN Req 10-1.
+    rsa_2048_can_protect_aes_128: >
+      RSA-2048 (112-bit security) equals 3-key TDEA strength — it CAN protect AES-128 only
+      if both are considered equivalent (per older interpretations). Strict Annex C reading:
+      RSA-2048 = 112 bits < AES-128 = 128 bits, so RSA-3072 is required for AES-128.
+      APC TR-31 import supports RSA-3072 which covers both AES-128 and AES-256 wrapping.
+    rsa_2048_cannot_protect_aes_256: >
+      RSA-2048 (112-bit security) cannot wrap AES-256 (256-bit security). Use RSA-3072+ or
+      ECDH (P-256+) for AES-256 key transport.
+    two_key_tdea_prohibited: >
+      2-key TDEA provides only 80-bit security — below the minimum for any key encipherment
+      since it fails to protect even 3-key TDEA (112-bit). Prohibited as encipherment key.
+constraints:
+  - Always use RSA-3072 or EC-256+ for wrapping AES keys in TR-31 or TR-34 flows
+  - TDEA KBPK (TR-31 key-block protection key) must be 3-key TDEA to protect 3-key TDEA payloads
+  - TDEA KBPK cannot be used to protect AES key payloads — use AES-128+ KBPK for AES keys
+  - APC import flow uses RSA-3072 OAEP by default — sufficient for all AES key sizes
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 Annex C"
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §10-1"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-tdes-aes-wrap-cleartext
+  - type: related_to
+    target_id: concept.pci-pin-kcv-method-rule
+  - type: related_to
+    target_id: algorithm.tr31
+status: active
+```
+
+---
+
+### PCI PIN: PIN Block Translation Matrix (Req 3-3)
+
+```yaml
+id: concept.pci-pin-translation-matrix
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 3-3 — Permitted PIN Block Format Translation Pairs
+summary: >
+  PCI PIN Req 3-3 defines which PIN block format translations are permitted. PAN must be
+  identical in both the incoming and outgoing PIN block for any translation that includes
+  PAN in both formats. Standard ISO 9564 formats (0–4) must never be translated to
+  non-standard or vendor-specific formats. APC enforces this: the translate_pin_data API
+  rejects PAN mismatches and disallows unsupported format pairs.
+domain:
+  - pin_processing
+  - compliance
+attributes:
+  permitted_translations:
+    format_0_to_0: "Permitted — same format retranslation (key change or network handoff)"
+    format_0_to_3: "Permitted"
+    format_0_to_4: "Permitted (recommended upgrade path)"
+    format_3_to_3: "Permitted"
+    format_3_to_4: "Permitted"
+    format_4_to_0: "Permitted (for backward compatibility with downstream systems)"
+    format_4_to_3: "Permitted"
+    format_1_to_4: "Permitted"
+  prohibited_translations:
+    format_2_to_4: "NOT Permitted — Format 2 is chip-internal only, must not appear in network flow"
+    standard_to_nonstandard: "NOT Permitted — standard formats must not be translated to non-standard/vendor formats"
+  pan_rule: >
+    For any translation where both the incoming and outgoing format include the PAN
+    (Formats 0, 3, 4), the PAN must be identical. APC enforces this at the API level —
+    IncomingTranslationAttributes.PanBlockValue and OutgoingTranslationAttributes.PanBlockValue
+    must carry the same PAN; the service rejects mismatches.
+  aes_pin_block_note: >
+    ISO Format 4 is the only format that supports AES encryption. Format 0 and Format 3
+    are TDES (64-bit block). Translating Format 4 → Format 0/3 downgrades to TDES for
+    backward-compatible downstream delivery; the incoming key must be an AES key (P0),
+    the outgoing key must be a TDES key (P0).
+constraints:
+  - APC translate_pin_data enforces PAN identity — do not pass different PANs
+  - Format 2 (chip-internal) must never leave an ICC; reject any network PIN block claiming Format 2
+  - Translations to/from non-standard formats are prohibited — only use ISO 9564 formats 0–4
+  - When translating Format 4 → Format 0 for downstream, document this as a legacy constraint
+    and plan migration to Format 4 end-to-end
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §3-3"
+  - "ISO 9564-1:2017 §9 (PIN block formats 0–4)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-tdes-sunset-and-format4-mandate
+  - type: related_to
+    target_id: format.pin-block-format-0
+  - type: related_to
+    target_id: format.pin-block-format-4
+status: active
+```
+
+---
+
+### PCI PIN: Cleartext Injection Ban Dates (Req 32-9)
+
+```yaml
+id: concept.pci-pin-cleartext-injection-ban
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 32-9 — Cleartext Key Injection Ban Effective Dates
+summary: >
+  PCI PIN Req 32-9 requires key injection into POI devices to occur only within a
+  physically secure environment (secure room). The normative text establishes specific
+  ban dates for cleartext key injection outside a secure room, phased by entity type.
+  Entities must have migrated to secure remote key injection (RKI) or a secure room
+  by these dates.
+domain:
+  - key_management
+  - compliance
+attributes:
+  cleartext_injection_ban_dates:
+    third_party_injectors: >
+      1 January 2024 — entities injecting keys into POI devices on behalf of other parties
+      (e.g., third-party KIFs, ESOs, injection bureaus) must cease cleartext injection
+      outside a secure room for POI v5+ devices by this date.
+    own_device_processors: >
+      1 January 2026 — processors and acquirers injecting keys into their own POI devices
+      must cease cleartext injection outside a secure room by this date.
+  secure_room_exception: >
+    Cleartext key injection remains permissible inside a physically secure environment
+    (secure room) meeting all Annex B controls: perimeter integrity, dual-entry control,
+    CCTV, access log, clean-desk policy. The secure room exception does not apply to
+    injection performed over a network connection.
+  rki_alternatives:
+    - "TR-34 (ANSI X9.143) asymmetric remote key injection — preferred for new deployments"
+    - "DUKPT — BDK stored in APC; only derived keys injected; avoids cleartext injection entirely"
+constraints:
+  - After 2024-01-01, third-party KIFs may not inject cleartext keys into POI v5+ devices outside a secure room
+  - After 2026-01-01, no entity may inject cleartext keys into POI devices outside a secure room
+  - APC BDK-based DUKPT avoids this constraint entirely — derived keys (IPEKs) are injected, not BDKs
+  - APC TR-34 export (get_parameters_for_export) supports secure RKI as the modern alternative
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §32-9 and Annex B"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-dukpt-initial-key-is-key-generation
+  - type: related_to
+    target_id: concept.pci-pin-cloud-hsm-compliance
+status: active
+```
+
+---
+
+### PCI PIN: Production/Test Key Separation (Req 19-4)
+
+```yaml
+id: concept.pci-pin-prod-test-separation
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 19-4 — Keys Must Never Be Shared Between Production and Test Systems
+summary: >
+  PCI PIN Req 19-4 prohibits sharing cryptographic keys between production and test/development
+  systems in either direction. A key used in production must never be present in a test system,
+  and vice versa. For logically partitioned HSMs (including managed services), if any partition
+  is used for testing the entire logical configuration — including all connected computing
+  platforms and networking equipment — must be treated and managed as production.
+domain:
+  - key_management
+  - compliance
+attributes:
+  rule: "Zero overlap between production and test key material"
+  logical_partition_note: >
+    If a physical or logical HSM partition is used for both production and test purposes,
+    the entire configuration (all connected platforms, networks) must be managed as production.
+    This effectively prohibits mixed-use HSM configurations.
+  apc_implication: >
+    APC accounts used for development/testing must use entirely separate AWS accounts
+    or at minimum separate key hierarchies with no key material reuse. There is no
+    APC-native "test mode" — the service is always production-equivalent.
+  verification_method: >
+    Assessors verify using KCV/hash/fingerprint comparison between production and test
+    keys for higher-level keys (MFKs, KEKs shared with network nodes, BDKs).
+constraints:
+  - Never import a production BDK, ZMK, or KEK into a test/development APC account or region
+  - Never use test keys generated in a dev environment in a production APC deployment
+  - APC keys tagged with environment=prod and environment=test must have no shared key material
+  - Use separate APC key aliases per environment — do not reuse alias names across prod/test accounts
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §19-4"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+  - type: related_to
+    target_id: concept.pci-pin-cloud-hsm-compliance
+status: active
+```
+
+---
+
+### PCI PIN: Key Uniqueness Per Organizational Link (Req 17)
+
+```yaml
+id: concept.pci-pin-key-uniqueness-per-link
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 17 — Unique Keys Per Organizational Link (ZPK/KEK Uniqueness)
+summary: >
+  PCI PIN Req 17 requires that unique, secret cryptographic keys are in use for each
+  identifiable link between host computer systems between two organizations or between
+  logically separate systems within the same organization. A ZPK (Zone PIN Key) or KEK
+  shared between two parties must be unique to that pair — it must not be given to any
+  other organization or system. Key uniqueness must be verified via KCV at establishment.
+domain:
+  - key_management
+  - compliance
+attributes:
+  uniqueness_scope: >
+    Each bilateral link between organizations (or logically separate systems) must use a
+    distinct key. A single ZPK must not be reused across multiple network counterparties.
+  kcv_verification: >
+    Key uniqueness is verified by generating KCVs for KEKs and comparing them between
+    the two organizations. For remote key establishment (TR-34, ECDH), public key
+    fingerprints or hash values are examined instead.
+  known_default_keys: >
+    Assessors compare KCV values against known or default keys to verify that default
+    factory keys are not in use in production links.
+  apc_implication: >
+    Each APC-managed ZPK alias should correspond to exactly one bilateral network
+    connection. Never share a ZPK across multiple acquirer–network relationships.
+    Use separate APC key aliases (e.g., alias/zpk-visanet, alias/zpk-mastercard) per link.
+constraints:
+  - One ZPK (or KEK) per bilateral link — never share a zone key across multiple counterparties
+  - KCV comparison between parties is required to prove uniqueness at key establishment
+  - Default or factory keys must not be used in production — replace all vendor defaults before go-live
+  - APC aliases must model network topology: one alias per bilateral key relationship
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §17 and §17-1"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: concept.pci-pin-kcv-method-rule
+status: active
+```
+
+---
+
+### PCI PIN: MFK Minimum Key Strength (Req 12-5)
+
+```yaml
+id: concept.pci-pin-mfk-minimum-key
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 12-5 — MFK (LMK) Must Be Double-Length TDEA or AES ≥128 bits
+summary: >
+  PCI PIN Req 12-5 sets the minimum key strength for the HSM Master File Key (MFK, also
+  called Local Master Key / LMK in Thales terminology). The MFK must be at minimum double-
+  length TDEA (112-bit effective security) or AES ≥128 bits. Single-DES MFKs and any MFK
+  below this threshold are prohibited. APC manages its internal key hierarchy as a managed
+  service — the MFK analog in APC is an AWS-managed root key; acquirers cannot access or
+  configure it, but APC's FIPS 140-2 Level 3 certification demonstrates compliance.
+domain:
+  - key_management
+  - compliance
+  - hsm
+attributes:
+  mfk_minimum: "double-length TDEA (112-bit) or AES-128 minimum"
+  mfk_prohibited: "single-DES MFK — absolute hard stop"
+  lmk_synonym: "LMK (Local Master Key) = MFK — same concept, different vendor terminology (Thales uses LMK)"
+  mfk_definition: >
+    The MFK is a symmetric key used to encrypt other cryptographic keys that are stored
+    outside the HSM. It is the root of the HSM's key hierarchy. All keys stored in the
+    HSM's key database are wrapped under the MFK.
+  mfk_variant_rule: >
+    Per Req 23, MFK variants must not be used external to the logical configuration that
+    houses the MFK. MFK variants used for local key storage cannot be used for key
+    conveyance between platforms.
+  apc_mfk_status: >
+    APC does not expose the MFK concept to users. AWS manages equivalent root key
+    material under FIPS 140-2 Level 3 controls. Acquirers do not need to configure or
+    manage an MFK when using APC.
+constraints:
+  - On physical HSMs: do not use single-DES MFK or any MFK below double-length TDEA strength
+  - APC satisfies this requirement by design — the HSM root key is AWS-managed and certified
+  - When migrating from a physical HSM to APC, do not export or expose the legacy MFK
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §12-5"
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §23 (MFK variant restrictions)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-strength-hierarchy
+  - type: related_to
+    target_id: concept.pci-pin-hsm-certification
+status: active
+```
+
+---
+
+### PCI PIN: Key Compromise Response (Req 22)
+
+```yaml
+id: concept.pci-pin-key-compromise-response
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 22 — Key Compromise Response — Replace All Derived and Subordinate Keys
+summary: >
+  When a cryptographic key is known or suspected compromised, PCI PIN Req 22 mandates
+  replacing that key plus ALL keys derived from it and ALL keys it has protected (encrypted).
+  The replacement key must not be a variant or irreversible transformation of the compromised
+  key. All affected parties sharing the key must be notified. For APC-managed keys, compromise
+  response requires deleting the APC key and creating a new one with new key material —
+  key rotation alone (same KMS key, new version) does not satisfy the PCI requirement.
+domain:
+  - key_management
+  - compliance
+attributes:
+  trigger_events:
+    - known compromise of a key component or share
+    - key component packaging showing signs of tampering
+    - key substitution or synchronization error patterns suggesting key swap
+    - missing SCD or device where key was loaded
+    - unauthorized access to system housing the key
+  replacement_rule: >
+    Replace the compromised key AND all keys encrypted under it AND all keys derived from it.
+    The replacement key must not be a variant or irreversible transformation of the original.
+  notification_requirement: >
+    Organizations currently sharing or that have previously shared the key must be notified.
+    Notification includes: identification of key personnel, damage assessment (possibly with
+    outside consultants), and specific actions for system software/hardware, other encryption
+    keys, and encrypted data.
+  apc_compromise_response:
+    step_1: "Call delete_key on the compromised APC key immediately"
+    step_2: "Create a new APC key with fresh key material — do not re-import old material"
+    step_3: "Replace all keys that were exported under the compromised KEK using a new KEK"
+    step_4: "Replace all BDKs whose IPEKs were exported under the compromised key"
+    step_5: "Notify all counterparties who shared a ZPK or KEK with the compromised entity"
+    step_6: "Re-establish all bilateral key relationships using TR-34 or fresh TR-31 exchange"
+constraints:
+  - Replacement key must not be a variant of the compromised key
+  - All derived keys (BDK → IPEK → session keys) must also be replaced
+  - All keys encrypted by the compromised KEK must be treated as compromised
+  - APC key deletion (delete_key) schedules destruction after a configurable delay — use stop_key_usage immediately on suspicion, delete after confirmation
+  - Audit trail of compromise event must be retained
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §22 and §22-1 through §22-2"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-uniqueness-per-link
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+  - type: related_to
+    target_id: concept.pci-pin-mfk-minimum-key
+status: active
+```
+
+---
+
+## PCI P2PE Standard v3.2 — Acquirer-Relevant Rules
+
+### PCI P2PE: Solution Architecture and APC Applicability
+
+```yaml
+id: concept.pci-p2pe-architecture
+entity_type: compliance_rule
+canonical_name: PCI P2PE v3.2 — Solution Architecture, Domain Structure, and APC Applicability
+summary: >
+  PCI P2PE v3.2 (June 2025) governs point-to-point encryption of account data from the moment
+  of card capture at a POI through decryption at a secure decryption environment.  The standard
+  defines 5 Domains plus Appendix A (merchant-managed).  Domain 4 covers decryption environments
+  (HSMs); Domain 5 mirrors PCI PIN's 7 Control Objectives but scoped to account-data encryption
+  keys rather than PIN keys.  AWS Payment Cryptography satisfies Domain 4 and Domain 5 HSM
+  requirements as a FIPS 140-2 Level 3 / PCI PTS HSM V3-certified managed service.
+  Decryption solutions come in two variants: Hardware (all key management AND decryption inside
+  an HSM/SCD) and Hybrid (key management in HSM, decryption performed in a non-SCD Host System).
+  Merchant-managed P2PE solutions are restricted to Hardware decryption only (Appendix A) and
+  are NOT listed on the PCI SSC website.
+domain:
+  - compliance
+  - key_management
+  - cryptography
+attributes:
+  standard: "PCI Point-to-Point Encryption (P2PE) Standard v3.2, June 2025"
+  domains:
+    domain_1: "P2PE encryption environment (POI device, SRED, account-data capture)"
+    domain_2: "P2PE applications (POI and decryption)"
+    domain_3: "P2PE solution management"
+    domain_4: "Decryption environments — HSM/SCD requirement; APC satisfies this"
+    domain_5: "P2PE device management (mirroring PCI PIN COs 1–7 for account-data keys)"
+    appendix_a: "Merchant-managed solutions — hardware decryption only, not on PCI SSC list"
+  decryption_variants:
+    hardware: "All key management AND decryption performed in an HSM/SCD"
+    hybrid: >
+      Key management in an HSM; decryption performed in a non-SCD Host System.
+      Permitted for P2PE solution providers but NOT for merchant-managed solutions.
+  sred: >
+    Secure Reading and Exchange of Data — required PTS POI function that encrypts account
+    data at the point of capture inside the POI device.
+  apc_coverage:
+    domain_4: "APC is a PCI PTS HSM V3-certified managed HSM — satisfies decryption environment requirements"
+    domain_5: "APC key management APIs satisfy all Domain 5 Control Objective requirements"
+    merchant_managed_note: >
+      APC can serve as the key-management HSM for merchant-managed solutions but the decryption
+      operation must itself occur inside an HSM (hardware path); hybrid is prohibited.
+constraints:
+  - Merchant-managed P2PE requires hardware decryption only; hybrid is explicitly prohibited (Appendix A)
+  - SRED is required for all P2PE account-data capture at POI
+  - P2PE solution providers must be listed on PCI SSC website; merchant-managed solutions are not listed
+references:
+  - "PCI P2PE Standard v3.2 §Domain structure overview, §Domain 4, §Domain 5, §Appendix A"
+relationships:
+  - type: related_to
+    target_id: concept.pci-p2pe-hybrid-ddk-controls
+  - type: related_to
+    target_id: concept.pci-pin-cloud-hsm-compliance
+status: active
+```
+
+---
+
+### PCI P2PE: Mandatory Algorithm and Key-Size Requirements (Annex C)
+
+```yaml
+id: concept.pci-p2pe-account-data-algorithms
+entity_type: compliance_rule
+canonical_name: PCI P2PE v3.2 Normative Annex C — Mandatory Algorithms and Minimum Key Sizes
+summary: >
+  PCI P2PE Normative Annex C defines the minimum key sizes and approved algorithm families for
+  all P2PE cryptographic keys.  The equivalence table is identical to PCI PIN Annex C.  AES ≥128
+  bits or TDEA ≥168 bits are the baseline minimums.  Two special exceptions apply: (1) PTS POI
+  v3.x+ devices may use 2-key TDEA ONLY when combined with DUKPT/UKPT per ISO 11568; (2) a
+  2048-bit RSA key may transport an AES-128 key for remote key distribution (exception to the
+  general rule that a KEK must be at least as strong as the key it protects).  SHA-1 is
+  prohibited for digital signatures on PTS POI v3+; SHA-2 or SHA-3 required.
+domain:
+  - compliance
+  - cryptography
+  - key_management
+attributes:
+  minimum_key_sizes:
+    TDEA: "168 bits (triple-length)"
+    AES: "128 bits minimum (AES-128, AES-192, or AES-256)"
+    RSA: "2048 bits minimum"
+    ECC: "224 bits minimum"
+    FFC: "2048/224 bits minimum"
+  equivalence_table:
+    "112 bits": "Triple-TDEA / RSA-2048 / ECC-224 / FFC-2048+224"
+    "128 bits": "AES-128 / RSA-3072 / ECC-256 / FFC-3072+256"
+    "192 bits": "AES-192 / RSA-7680 / ECC-384 / FFC-7680+384"
+    "256 bits": "AES-256 / RSA-15360 / ECC-512 / FFC-15360+512"
+  exceptions:
+    two_key_tdea: >
+      Footnote 5: PTS POI v3.x+ devices may use 2-key TDEA (double-length BDK) ONLY when
+      combined with DUKPT or UKPT per ISO 11568. This is the ONLY permitted use of 2-key TDEA.
+    rsa_2048_aes_128: >
+      Footnote 6: A 2048-bit RSA key may be used to transport an AES-128 symmetric key for
+      remote key distribution. This is an explicit exception to the general KEK ≥ protected-key
+      strength rule. RSA-2048 is 112-bit equivalent but may wrap AES-128 (128-bit) in this
+      specific remote key distribution context.
+  hash_requirements:
+    poi_v3_plus: "SHA-1 prohibited for digital signatures; use SHA-2 or SHA-3"
+    legacy_poi: "SHA-1 permitted on POI versions below v3"
+  cryptoperiod_management: >
+    All P2PE keys must have defined cryptoperiods managed per NIST SP800-57.
+    Full key documentation required including purpose, algorithm, length, and cryptoperiod.
+constraints:
+  - TDEA minimum is 168-bit (triple-length); 128-bit (double-length) 2-key TDEA only with DUKPT on POI v3+
+  - AES-128 is the absolute minimum; no AES-64 or non-standard variants
+  - SHA-1 prohibited for digital signatures on POI v3+ devices
+  - Cryptoperiods must be defined and enforced for all keys (NIST SP800-57)
+references:
+  - "PCI P2PE Standard v3.2 Normative Annex C (pages 244-246), June 2025"
+  - "NIST SP800-57 Part 1 Rev 5 — Recommendation for Key Management"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-strength-hierarchy
+  - type: related_to
+    target_id: concept.pci-pin-tdes-aes-wrap-cleartext
+  - type: related_to
+    target_id: concept.pci-p2pe-kek-transport-prohibition
+status: active
+```
+
+---
+
+### PCI P2PE: POI Key Uniqueness and BDK Loading Prohibition (Req 20)
+
+```yaml
+id: concept.pci-p2pe-poi-key-uniqueness
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 20 — All POI Keys Must Be Unique Per Device; BDKs Never Loaded to POI
+summary: >
+  PCI P2PE Req 20-1 mandates that ALL cryptographic keys loaded into or generated for a POI
+  device must be unique to that specific device.  This includes not just encryption/decryption
+  keys but also KEKs, firmware authentication keys, and any other keys resident on the POI.
+  Req 20-3 explicitly prohibits loading BDKs onto any PTS POI device — the BDK must remain
+  in the secure decryption environment (HSM); only derived IPEK or session keys are present
+  in the POI.  Req 20-5 requires separate BDKs per terminal type when terminal IDs can be
+  duplicated across types.
+domain:
+  - compliance
+  - key_management
+attributes:
+  req_20_1: >
+    ALL keys in a PTS POI device must be unique per device. This is broader than DUKPT
+    session-key uniqueness — it extends to KEKs used for remote key injection, firmware
+    authentication keys, and any other key loaded to the POI.
+  req_20_3: >
+    BDKs must NEVER be loaded to PTS POI devices. The BDK resides only in the secure
+    decryption environment (HSM). POI devices receive only derived keys (IPEKs or session
+    keys), not the BDK from which they were derived.
+  req_20_5: >
+    When terminal IDs can be duplicated across different terminal types, separate BDKs
+    must be used per terminal type to prevent key collisions.
+  apc_application: >
+    APC stores the BDK and performs DUKPT key derivation on-demand. The BDK never leaves
+    APC in cleartext. IPEKs can be exported (encrypted under KEK) for loading to POI, but
+    the BDK itself must not be exported for POI loading.
+constraints:
+  - Every key on every POI device must be device-unique (not shared across devices)
+  - BDK must never be present on a POI device in any form
+  - Separate BDKs required when terminal IDs can collide across terminal types
+  - Firmware authentication keys are in scope for per-device uniqueness (same as transaction keys)
+references:
+  - "PCI P2PE Standard v3.2 §Req 20-1, §Req 20-3, §Req 20-5 (pages 171-176)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-p2pe-bdk-segmentation
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+  - type: related_to
+    target_id: concept.pci-pin-dukpt-initial-key-is-key-generation
+status: active
+```
+
+---
+
+### PCI P2PE: BDK Segmentation for Multi-Acquirer Processors (Req 20-4)
+
+```yaml
+id: concept.pci-p2pe-bdk-segmentation
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 20-4 — BDK Segmentation Required Per Financial Institution
+summary: >
+  PCI P2PE Req 20-4 requires processors or acquirers operating on behalf of multiple financial
+  institutions to maintain separate, distinct BDKs for each financial institution.  A BDK
+  shared across financial institutions would allow transactions from one institution's terminals
+  to be decrypted using another institution's key material — a clear security boundary violation.
+  This is the P2PE normative mirror of PCI PIN Req 7-4.
+domain:
+  - compliance
+  - key_management
+attributes:
+  requirement: >
+    Processors/acquirers with multiple financial institution clients must use a separate BDK
+    per financial institution. BDKs must not be shared across institutional boundaries.
+  rationale: >
+    Shared BDKs across institutions create mutual exposure: a compromise or audit event at
+    one institution affects all institutions sharing that BDK.  Segmentation limits blast
+    radius and supports independent key lifecycle management per institution.
+  apc_implementation: >
+    Create separate APC BDK keys tagged by financial institution (e.g., alias:
+    bdk-institution-A, bdk-institution-B). Access policies on each key should restrict
+    usage to the relevant institution's processing pipelines.
+  multi_acquirer_scope: >
+    Applies to any entity acting as a processor or acquirer for two or more financial
+    institutions, even if those institutions use the same terminal estate.
+constraints:
+  - One BDK per financial institution — no sharing across institutional boundaries
+  - Separate key aliases, policies, and audit trails per institution in APC
+  - Applies even when institutions share the same physical terminal infrastructure
+references:
+  - "PCI P2PE Standard v3.2 §Req 20-4 (pages 173-174)"
+  - "PCI PIN Security Requirements v3.1 §Req 7-4 (mirror requirement)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-bdk-segmentation
+  - type: related_to
+    target_id: concept.pci-p2pe-poi-key-uniqueness
+status: active
+```
+
+---
+
+### PCI P2PE: Hybrid DDK Controls — Software Key Management Exception (Req 5H)
+
+```yaml
+id: concept.pci-p2pe-hybrid-ddk-controls
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 5H — DDK Is the Only Software-Manageable P2PE Key; Strict Usage Controls Apply
+summary: >
+  In P2PE hybrid solutions, the Data Decryption Key (DDK) is the ONLY P2PE key that may be
+  managed in software on a Host System (non-SCD).  All other P2PE keys must reside in and be
+  managed by an HSM/SCD.  DDKs must have defined cryptoperiod limits (maximum transaction
+  count AND/OR maximum time duration, e.g., "1024 transactions or 24 hours, whichever occurs
+  first") OR be unique per transaction.  DDKs must be erased from host volatile memory via an
+  irrecoverable mechanism validated by forensic testing.  The transport key that delivers the
+  DDK from the HSM to the Host System must be unique per Host System, single-purpose, and
+  at least as strong as the DDK it protects.  Hybrid decryption is NOT permitted for
+  merchant-managed P2PE solutions (Appendix A); those require hardware decryption only.
+domain:
+  - compliance
+  - key_management
+  - cryptography
+attributes:
+  ddk_definition: >
+    Data Decryption Key — the symmetric key used to decrypt account data in a P2PE hybrid
+    solution. It is the only P2PE key that may be managed outside an HSM.
+  software_management_exception: >
+    DDKs only: all other P2PE keys (KEKs, BDKs, IPEKs, ZPKs) must remain in an HSM/SCD.
+  usage_controls:
+    cryptoperiod_option: >
+      Define both a maximum transaction count AND a maximum time duration.  The DDK is
+      retired when either limit is reached first (e.g., "1024 transactions or 24 hours").
+    per_transaction_option: "Derive a unique DDK for every transaction (no reuse)."
+  memory_erasure: >
+    After use, DDKs must be erased from host volatile memory using an irrecoverable mechanism.
+    The erasure mechanism must be validated by forensic testing (not just overwrite-with-zeros
+    that a compiler might optimize away).
+  derivation_rules:
+    one_way: "If derived from a master key, derivation must be one-way (non-reversible)"
+    not_a_variant: "DDK must not be a simple variant (XOR mask) of the master key"
+    dedicated_master: "The master key used for DDK derivation must be dedicated to that purpose"
+  transport_key_rules:
+    strength: "Transport key must be at least as strong as the DDK it carries"
+    uniqueness: "Transport key must be unique per Host System"
+    single_purpose: "Transport key used ONLY for DDK delivery from HSM to Host System"
+    cryptoperiod: "Transport key must have a defined cryptoperiod"
+  merchant_managed_restriction: >
+    Merchant-managed P2PE solutions are prohibited from using hybrid decryption entirely.
+    They must use hardware decryption (all operations in HSM/SCD).
+  apc_application: >
+    APC can generate and manage DDKs as AES keys with TR-31 export under a Host System
+    transport KEK.  The Host System receives the DDK encrypted in a TR-31 key block,
+    decrypts it using its HSM-resident transport KEK, uses the DDK in volatile memory,
+    then erases it.  Cryptoperiod enforcement must be implemented in the Host System's
+    key management logic (APC does not enforce transaction counts).
+constraints:
+  - DDK is the ONLY P2PE key allowed to leave HSM custody (under transport key protection)
+  - Usage limit must be transaction-count AND/OR time-based, or DDK must be per-transaction unique
+  - Erasure from volatile memory must be forensically irrecoverable
+  - Derivation must be one-way; DDK must not be a variant of the master key
+  - Transport key: unique per Host System, single purpose, defined cryptoperiod
+  - Hybrid mode prohibited for merchant-managed solutions (Appendix A)
+references:
+  - "PCI P2PE Standard v3.2 §Req 5H (pages 240-242)"
+  - "PCI P2PE Standard v3.2 §Appendix A (page 248)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-p2pe-architecture
+  - type: related_to
+    target_id: concept.pci-pin-key-uniqueness-per-link
+  - type: related_to
+    target_id: concept.pci-p2pe-account-data-algorithms
+status: active
+```
+
+---
+
+### PCI P2PE: Cross-Level Key Variant Prohibition (Req 23)
+
+```yaml
+id: concept.pci-p2pe-key-variant-prohibition
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 23 — Reversible Cross-Level Transforms Prohibited; No DEKs Derived from KEKs
+summary: >
+  PCI P2PE Req 23 prohibits reversible transformations of keys across hierarchy levels.  A
+  DEK (data encryption key, e.g., a DDK used for account-data encryption) must not be derived
+  from a KEK (key encryption key) via a reversible or simple variant transform.  This prevents
+  an attacker who recovers a DEK from reverse-engineering the KEK and thereby compromising the
+  entire key hierarchy.  Only one-way derivation functions (e.g., a dedicated KDF) may be used
+  to produce lower-level keys from higher-level keys.  This rule is the P2PE normative mirror
+  of the same prohibition in PCI PIN.
+domain:
+  - compliance
+  - key_management
+  - cryptography
+attributes:
+  prohibited_transforms:
+    - "XOR masking a KEK to produce a DEK (variant)"
+    - "Truncating, reversing, or reordering bytes of a KEK to produce a DEK"
+    - "Any bijective (reversible) function applied to a KEK to produce a DEK"
+  permitted_approach: >
+    Use a dedicated, one-way KDF (e.g., SP800-108 CMAC-based KDF) with distinct
+    derivation parameters (labels, context) to produce DEKs from a dedicated master key.
+    The master key used for DEK derivation must NOT also serve as a KEK.
+  hierarchy_implication: >
+    Each level of the key hierarchy must be cryptographically isolated from adjacent levels.
+    Knowing a DEK must not provide any computational advantage in recovering a KEK or BDK.
+  ddk_specific: >
+    DDK derivation from a P2PE master key must follow the one-way rule.  If a DDK is
+    derived from a master encryption key, that master key must be dedicated to DDK derivation
+    and must not also be used as a KEK for transporting other keys.
+constraints:
+  - DEKs must not be derivable from KEKs via reversible transforms
+  - No variant keys: simple XOR masks on KEKs to produce DEKs are prohibited
+  - Master keys used for DEK derivation must be dedicated (single-purpose)
+  - One-way KDF required for any cross-level key derivation
+references:
+  - "PCI P2PE Standard v3.2 §Req 23 (pages 190-193)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-p2pe-hybrid-ddk-controls
+  - type: related_to
+    target_id: concept.pci-pin-key-strength-hierarchy
+status: active
+```
+
+---
+
+### PCI P2PE: KEK-Must-Be-Stronger-Than-Protected-Key Rule (Req 10-1)
+
+```yaml
+id: concept.pci-p2pe-kek-transport-prohibition
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 10-1 — KEK Must Be At Least As Strong as the Key It Protects; TDEA Cannot Protect AES
+summary: >
+  PCI P2PE Req 10-1 requires that a key encryption key (KEK) used to transport or protect
+  another key must be at least as strong (in bits of security) as the key it protects.
+  The most operationally significant consequence is that TDEA (112-bit security equivalent)
+  cannot protect (wrap or transport) an AES-128, AES-192, or AES-256 key (128/192/256-bit
+  security).  Using a TDEA KEK to transport an AES key is treated as equivalent to sending
+  the AES key in cleartext from a PCI perspective.  The normative Annex C footnote 6
+  carves out a single exception: a 2048-bit RSA key (112-bit equivalent) may transport
+  AES-128 for remote initial key distribution only.
+domain:
+  - compliance
+  - key_management
+  - cryptography
+attributes:
+  rule: >
+    KEK security strength ≥ protected key security strength.
+    TDEA (112-bit equivalent) cannot protect AES-128 (128-bit) or higher.
+  prohibited_combinations:
+    - "TDEA KEK wrapping AES-128 key (TDEA=112 bits < AES-128=128 bits)"
+    - "TDEA KEK wrapping AES-192 key"
+    - "TDEA KEK wrapping AES-256 key"
+    - "RSA-2048 KEK wrapping AES-192 or AES-256 (permitted only for AES-128 per footnote 6)"
+  permitted_combinations:
+    - "AES-128 KEK wrapping AES-128 key (equal strength — permitted)"
+    - "AES-256 KEK wrapping AES-128 or AES-256 key (stronger KEK — permitted)"
+    - "RSA-2048 KEK wrapping AES-128 for remote key distribution (footnote 6 exception)"
+    - "RSA-3072 KEK wrapping AES-128 (RSA-3072 = 128-bit equivalent — permitted)"
+  footnote_6_exception: >
+    RSA-2048 (112-bit equivalent) wrapping AES-128 is explicitly permitted for remote key
+    distribution of initial keys (Annex C footnote 6). This is the ONLY exception to the
+    KEK ≥ protected-key rule. It does NOT extend to AES-192 or AES-256.
+  apc_implication: >
+    When importing AES keys into APC via KEY_CRYPTOGRAM (asymmetric wrapping), the wrapping
+    RSA key must be RSA-3072 or larger to protect AES-128 without relying on the footnote-6
+    exception; or RSA-2048 may be used only for initial remote key load under footnote 6.
+    APC's GetParametersForImport returns RSA-3072 or RSA-4096 wrapping keys by default,
+    which satisfies this requirement.
+constraints:
+  - TDEA KEK prohibited from wrapping any AES key (TDEA < AES-128 in security strength)
+  - RSA-2048 may only wrap AES-128 for remote key distribution (footnote 6); not AES-192/256
+  - APC default import path (RSA-3072/4096 wrapping key) satisfies this requirement natively
+references:
+  - "PCI P2PE Standard v3.2 §Req 10-1 (pages 139-140)"
+  - "PCI P2PE Standard v3.2 Normative Annex C Footnote 6 (page 245)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-tdes-aes-wrap-cleartext
+  - type: related_to
+    target_id: concept.pci-p2pe-account-data-algorithms
+  - type: related_to
+    target_id: concept.pci-pin-key-strength-hierarchy
+status: active
+```
+
+---
+
+### PCI P2PE: Key Destruction Witnessing and Documentation (Req 24-2)
+
+```yaml
+id: concept.pci-p2pe-key-destruction-witnessing
+entity_type: compliance_rule
+canonical_name: PCI P2PE Requirement 24-2 — Key Component Destruction Methods, Witness Requirements, and Affidavit Retention
+summary: >
+  PCI P2PE Req 24-2 defines acceptable physical destruction methods for paper key components
+  and requires independent witnessing with a retained affidavit.  Acceptable destruction:
+  cross-cut shredding, pulping, or burning.  Strip-shredding is explicitly NOT sufficient.
+  Destruction must be witnessed by an individual who is NOT a custodian of the key being
+  destroyed (Req 24-2.2).  A destruction affidavit must be retained for at least 2 years.
+  Audit logs covering key lifecycle events must also be retained for at least 2 years (Req 25-6.1).
+domain:
+  - compliance
+  - key_management
+attributes:
+  acceptable_destruction_methods:
+    - "Cross-cut shredding (confetti/micro-cut shredder)"
+    - "Pulping (paper reduced to pulp slurry)"
+    - "Burning"
+  prohibited_methods:
+    - "Strip shredding (long strips can be reassembled)"
+  witness_requirement: >
+    The witness must be an individual who is NOT a custodian of the key being destroyed.
+    Custodians (those with knowledge of or access to the key) cannot self-witness their
+    own key destruction.
+  affidavit_retention: "Destruction affidavit must be retained for at least 2 years"
+  audit_log_retention: "Key lifecycle audit logs must be retained for at least 2 years (Req 25-6.1)"
+  electronic_keys: >
+    For electronic key material, secure erasure must be performed using cryptographic
+    erase or physical destruction of the storage medium. The same witnessing and
+    documentation principles apply.
+  apc_application: >
+    APC key deletion (delete_key or delete_key scheduling) generates audit trail entries
+    in CloudTrail. For compliance, organizations should retain CloudTrail logs covering
+    key creation through deletion for at least 2 years.  Physical key component
+    ceremonies (if used for BYOK import) require non-custodian witnesses and affidavits.
+constraints:
+  - Strip shredding is explicitly prohibited for paper key components
+  - Witness must not be a custodian of the key being destroyed
+  - Destruction affidavit retained ≥2 years
+  - Audit logs retained ≥2 years
+references:
+  - "PCI P2PE Standard v3.2 §Req 24-2 and §Req 24-2.2 (pages 195-198)"
+  - "PCI P2PE Standard v3.2 §Req 25-6.1 (pages 200-201)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-compromise-response
+status: active
+```
+
+---
+
+## PCI MPoC Standard v1.1 — Acquirer-Relevant Rules
+
+```yaml
+id: concept.pci-mpoc-architecture
+title: "PCI MPoC v1.1 — Architecture Overview and APC Applicability"
+summary: >
+  PCI Mobile Payments on COTS (MPoC) v1.1 (November 2024) governs software-based payment
+  acceptance on commercial off-the-shelf (COTS) consumer devices (smartphones, tablets).
+  The standard is organized into 5 domains:
+    Domain 1 — Software-Based PIN Entry (if PIN is entered on the COTS device screen)
+    Domain 2 — Account-Data Capture (card-present transactions without PIN on-device)
+    Domain 3 — Attestation and Monitoring (A&M): continuous back-end monitoring of COTS device integrity
+    Domain 4 — Back-End Operations: HSM requirements, key management, PIN processing compliance
+    Domain 5 — Interfaces: communication security between COTS app and back-end
+  Security model: The COTS device is treated as a hostile, uncontrolled execution environment
+  (REE — Rich Execution Environment). Security relies on software protection mechanisms
+  (white-box cryptography, obfuscation), attestation by a trusted back-end, and per-transaction
+  key uniqueness with forward secrecy rather than hardware tamper-resistance.
+  APC applicability: APC is the back-end HSM for MPoC Domain 4 operations. It satisfies
+  Req 4A-2.2 (FIPS 140-2 Level 3 + PCI PTS HSM V3) and performs cryptographic operations
+  inside the HSM (not merely key storage), making it suitable where cloud key-store-only
+  HSMs are explicitly prohibited. PIN processing environments must hold valid PCI PIN AOC.
+domain:
+  - compliance
+  - hsm
+attributes:
+  standard_version: "v1.1, November 2024"
+  publisher: "PCI Security Standards Council"
+  scope: "Software-based payment acceptance on COTS consumer devices (smartphones, tablets)"
+  domains:
+    - "Domain 1: Software-Based PIN Entry"
+    - "Domain 2: Account-Data Capture"
+    - "Domain 3: Attestation and Monitoring (A&M)"
+    - "Domain 4: Back-End Operations"
+    - "Domain 5: Interfaces"
+  security_model: >
+    COTS device is an untrusted REE. Security is achieved via software protection
+    (white-box crypto), back-end attestation, and per-transaction key uniqueness with
+    forward secrecy — not hardware tamper-resistance.
+  apc_role: "Back-end HSM for Domain 4 operations (Req 4A-2.2 satisfied)"
+  related_standards:
+    - "PCI PIN (required for PIN-on-COTS environments, Req 4A-4.2)"
+    - "PCI DSS (required for all back-end environments, Req 4A-4.1)"
+    - "PCI PTS POI (referenced for hardware PIN entry comparison)"
+constraints:
+  - COTS device itself is not a PTS-approved POI device
+  - Software protection and attestation are mandatory (not optional add-ons)
+  - PIN environments must carry valid PCI PIN AOC
+references:
+  - "PCI MPoC Standard v1.1, Section 1 Overview (pages 15-35)"
+  - "PCI MPoC Standard v1.1, Section 4A-4 (pages 180-181)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-mpoc-backend-hsm-requirement
+  - type: related_to
+    target_id: concept.apc-key-management-overview
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-mpoc-backend-hsm-requirement
+title: "PCI MPoC v1.1 Req 4A-2.2 — Back-End HSM Requirements and Cloud HSM Suitability"
+summary: >
+  MPoC Req 4A-2.2 mandates that back-end non-PIN account-data encryption/decryption keys
+  reside in an HSM meeting one of three tiers:
+    Tier 1 (Primary): FIPS 140-2 or FIPS 140-3 Level 3, OR PCI PTS HSM approved
+    Tier 2 (Controlled Environment): FIPS 140-2 or FIPS 140-3 Level 2, in an ISO 13491
+      Controlled Environment with documented physical and logical controls
+    Tier 3 (Session/Forward-Secret): Keys are unique per transaction AND implement
+      forward secrecy (so exposure of one key does not expose prior transactions)
+  Critical cloud HSM suitability rule: The standard explicitly states that "Some Cloud HSM
+  systems use the HSM only for storage of keys and allow for export of keys for cryptographic
+  operations. These types of Cloud HSM systems are unsuitable for use with MPoC Solution."
+  APC is NOT a key-store-only cloud HSM. APC performs cryptographic operations inside the
+  HSM (TranslatePinData, EncryptData, GenerateMAC, etc.) — key material never leaves the HSM
+  boundary in cleartext. APC therefore satisfies Tier 1 of Req 4A-2.2.
+  Req 4A-2.4 additionally requires that cloud HSM keys be managed by the MPoC entity and
+  NOT be accessible to the Cloud HSM provider. APC satisfies this: AWS cannot access customer
+  key material; keys are created/controlled exclusively by the account owner.
+domain:
+  - compliance
+  - hsm
+  - key_management
+attributes:
+  requirement: "Req 4A-2.2"
+  tiers:
+    tier_1_primary:
+      standard: "FIPS 140-2 or FIPS 140-3 Level 3, OR PCI PTS HSM approved"
+      apc_status: "SATISFIED — APC is FIPS 140-2 Level 3 + PCI PTS HSM V3 certified"
+    tier_2_controlled_env:
+      standard: "FIPS 140-2 or FIPS 140-3 Level 2 in ISO 13491 Controlled Environment"
+      apc_status: "Not applicable (APC qualifies at Tier 1)"
+    tier_3_session_keys:
+      standard: "Per-transaction unique keys with forward secrecy"
+      apc_status: "Possible via DUKPT-derived session keys; APC provides BDK storage + DUKPT derivation"
+  cloud_hsm_prohibition: >
+    Cloud HSMs that only store keys and export them for cryptographic operations are
+    EXPLICITLY UNSUITABLE. Operations must be performed inside the HSM boundary.
+  apc_cloud_suitability: >
+    APC performs all cryptographic operations inside the HSM. API calls (EncryptData,
+    TranslatePinData, GenerateMAC, etc.) execute within the HSM; plaintext key material
+    never leaves. APC satisfies the Req 4A-2.2 cloud HSM suitability test.
+  key_ownership_req: >
+    Req 4A-2.4: Cloud HSM keys must be managed by the MPoC entity and NOT accessible to
+    the Cloud HSM provider. APC satisfies: AWS cannot access customer key material.
+constraints:
+  - Cloud HSMs that export keys for external crypto operations are prohibited
+  - Back-end HSM must perform operations, not just store keys
+  - Keys must be owned/controlled by the MPoC entity, not the HSM provider
+references:
+  - "PCI MPoC Standard v1.1, Req 4A-2.2 (pages 168-170)"
+  - "PCI MPoC Standard v1.1, Req 4A-2.4 (page 170)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-mpoc-architecture
+  - type: related_to
+    target_id: concept.apc-key-management-overview
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-mpoc-key-session-definition
+title: "PCI MPoC v1.1 Req 1A-4.6 — Session Key Definition and HSM Residency Rule"
+summary: >
+  MPoC Req 1A-4.6 defines what constitutes a 'session' for key lifetime purposes and
+  establishes where non-session keys must reside:
+    - For PAN/account-data keys: session = a SINGLE transaction
+    - For A&M (Attestation and Monitoring) keys: session ≤ 24 hours
+  Non-session PIN and account-data keys must NEVER leave the back-end HSM in cleartext.
+  This rule drives the architecture: either use per-transaction keys (DUKPT) or keep
+  long-lived keys exclusively in APC and perform all operations via APC API calls.
+domain:
+  - compliance
+  - key_management
+  - pin_processing
+attributes:
+  requirement: "Req 1A-4.6"
+  session_definitions:
+    pan_account_data_keys: "Single transaction = one session"
+    attestation_monitoring_keys: "≤24 hours = one session"
+  non_session_key_rule: >
+    Non-session PIN and account-data keys must never leave the back-end HSM in cleartext.
+    This means long-lived BDKs, ZPKs, and similar keys must only be used via APC API
+    calls — never exported in cleartext for external crypto.
+  apc_implementation: >
+    APC enforces this natively: keys with appropriate KeyUsage/KeyModesOfUse cannot be
+    exported in cleartext. All cryptographic operations happen inside APC.
+  forward_secrecy_context: >
+    If account-data keys ARE exposed in the REE (COTS device), they must be
+    per-transaction unique AND implement forward secrecy (see Req 1A-4.11/4.12 and
+    concept.pci-mpoc-dukpt-forward-secrecy).
+constraints:
+  - Non-session account-data keys must never leave HSM in cleartext
+  - A&M session keys expire after 24 hours maximum
+  - PAN-encryption session keys expire after each transaction
+references:
+  - "PCI MPoC Standard v1.1, Req 1A-4.6 (page 65)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-mpoc-dukpt-forward-secrecy
+  - type: related_to
+    target_id: concept.pci-mpoc-backend-hsm-requirement
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-mpoc-single-purpose-key-rule
+title: "PCI MPoC v1.1 Req 1A-3.4 — Single-Purpose Key Rule"
+summary: >
+  MPoC Req 1A-3.4 mandates that each cryptographic key serve exactly one purpose.
+  A key used for encrypting account data MUST NOT also be used for protecting
+  tamper-detection or integrity data. A signing key must not also be an encryption key.
+  Exception: TLS session keys are explicitly exempt from the single-purpose rule
+  (TLS keys inherently serve authentication, key agreement, and data protection).
+  This rule is consistent with PCI PIN Req 7-1 and PCI P2PE Req 23.
+domain:
+  - compliance
+  - key_management
+attributes:
+  requirement: "Req 1A-3.4"
+  rule: >
+    One key = one purpose. Roles may not be combined: encryption keys are for
+    encryption only; authentication keys are for authentication only; integrity
+    keys are for integrity only.
+  examples_of_violations:
+    - "Using a PAN-encryption key to also MAC a tamper-detection log"
+    - "Using a signing key to also encrypt data"
+    - "Using a back-end encryption key as a KEK"
+  tls_exception: "TLS session keys are exempt — they inherently combine key agreement, authentication, and encryption"
+  cross_standard_consistency: "Consistent with PCI PIN Req 7-1 and PCI P2PE Req 23"
+  apc_implementation: >
+    APC enforces this via KeyUsage attributes (TR31_P0_PIN_ENCRYPTION,
+    TR31_D0_SYMMETRIC_DATA_ENCRYPTION, TR31_M3_ISO_9797_3_MAC_GENERATION, etc.)
+    and KeyModesOfUse (Encrypt, Decrypt, Generate, Verify). Setting a key's
+    KeyUsage at creation time is the APC mechanism for single-purpose enforcement.
+constraints:
+  - Each key must have exactly one purpose/role
+  - Account-data encryption keys cannot also serve as integrity/MAC keys
+  - TLS keys are exempt
+references:
+  - "PCI MPoC Standard v1.1, Req 1A-3.4 (page 58)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-usage-restriction
+  - type: related_to
+    target_id: concept.pci-p2pe-key-variant-prohibition
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-mpoc-dukpt-forward-secrecy
+title: "PCI MPoC v1.1 Req 1A-4.11/4.12 — REE Account-Data Keys: Per-Transaction Uniqueness and Forward Secrecy"
+summary: >
+  When account-data encryption keys are exposed in the REE (COTS device, untrusted
+  environment), MPoC Req 1A-4.11 and 1A-4.12 impose two mandatory properties:
+    1. Per-transaction uniqueness: each transaction uses a distinct key
+    2. Forward secrecy: compromise of any key must NOT allow derivation of prior
+       transaction keys (one-way key disclosure)
+  DUKPT (Derived Unique Key Per Transaction) is explicitly cited in the standard as a
+  mechanism that can satisfy these requirements. In DUKPT, the BDK never enters the COTS
+  device — only the Initial Key (IK/IPEK) is loaded, and per-transaction keys are derived
+  forward-only. Compromise of a transaction key does not expose the BDK or prior keys.
+  APC provides native DUKPT support: BDKs are stored in APC, and DUKPT key derivation
+  and PIN/data translation are performed server-side via the APC data plane.
+domain:
+  - compliance
+  - key_management
+  - pin_processing
+  - cryptography
+attributes:
+  requirements:
+    - "Req 1A-4.11: REE-exposed account-data keys must be per-transaction unique"
+    - "Req 1A-4.12: One-way key disclosure (forward secrecy); DUKPT cited as satisfying mechanism"
+  ree_definition: "Rich Execution Environment — the untrusted COTS OS/app layer"
+  dukpt_properties:
+    bdk_protection: "BDK never loaded to COTS device; only IPEK/IK is loaded"
+    forward_secrecy: "Transaction key derivation is one-way; compromise does not reveal BDK or prior keys"
+    per_transaction: "Each transaction derives a unique key via KSN counter increment"
+  apc_support: >
+    APC stores BDKs and performs DUKPT-based translation (TranslatePinData with DUKPT
+    parameters). BDK never leaves APC. IPEK derivation and per-transaction key derivation
+    happen inside APC for server-side operations, or IPEK is securely loaded to device
+    for on-device derivation.
+  key_types_covered: "Account-data encryption keys exposed in REE; applies to both AES DUKPT and TDES DUKPT"
+constraints:
+  - REE-exposed account-data keys must be per-transaction unique
+  - Compromise of one transaction key must not expose prior transaction keys
+  - DUKPT satisfies both requirements when implemented correctly
+references:
+  - "PCI MPoC Standard v1.1, Req 1A-4.11 and Req 1A-4.12 (page 68)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-mpoc-key-session-definition
+  - type: related_to
+    target_id: concept.dukpt-aes
+  - type: related_to
+    target_id: concept.pci-p2pe-hybrid-ddk-controls
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-mpoc-algorithm-requirements
+title: "PCI MPoC v1.1 — Minimum Algorithm Requirements and Key Equivalence (Appendix C)"
+summary: >
+  MPoC Appendix C Tables 7 and 8 define minimum acceptable cryptographic algorithm
+  parameters. These are NORMATIVE — algorithms below minimum are non-compliant.
+  The tables are IDENTICAL to PCI PIN Annex C and PCI P2PE Annex C: all three
+  PCI standards agree on minimum key sizes and equivalence levels.
+  Minimums (Table 7):
+    Symmetric:  AES ≥ 128 bits; TDEA ≥ 168 bits (3-key); 2-key TDEA not mentioned (prohibited for new use)
+    Asymmetric: RSA ≥ 2048 bits; ECC ≥ 224 bits; FFC (DH/DSA) ≥ 2048-bit prime / 224-bit subgroup
+    Hash:       SHA-2 > 255 bits (SHA-256, SHA-384, SHA-512); SHA-3 > 255 bits; SHA-1 NOT permitted
+    KCV:        AES: CMAC of all-zero plaintext, leftmost 10 hex digits; TDEA: ECB encrypt all-zero, leftmost 6 hex digits
+  Special rule — RSA-2048 wrapping larger AES (Req 1A-3.2):
+    RSA-2048 MAY be used to protect AES keys of ANY size (128-256 bit) when the COTS
+    platform prevents use of larger RSA keys. This is broader than the PCI P2PE footnote 6
+    exception (which was AES-128 only). KEK minimum = 128 bits of security.
+  Equivalence table (Table 8): 112 bits = RSA-2048/ECC-224/FFC-2048-224;
+    128 bits = RSA-3072/ECC-256/FFC-3072-256/AES-128; 192 bits = RSA-7680/ECC-384/AES-192;
+    256 bits = RSA-15360/ECC-512/AES-256
+domain:
+  - compliance
+  - cryptography
+  - key_management
+attributes:
+  standard_appendix: "Appendix C (pages 237-239)"
+  cross_standard_consistency: "Tables 7 and 8 are identical to PCI PIN Annex C and PCI P2PE Annex C"
+  minimum_key_sizes:
+    aes: "≥128 bits"
+    tdea: "≥168 bits (3-key TDEA only)"
+    rsa: "≥2048 bits"
+    ecc: "≥224 bits"
+    ffc: "≥2048-bit prime / 224-bit subgroup"
+  hash_requirements:
+    required: ["SHA-256", "SHA-384", "SHA-512", "SHA-3 (>255 bit variants)"]
+    prohibited: ["SHA-1 (for any security purpose)", "MD5"]
+  kcv_methods:
+    aes: "CMAC over all-zero block, take leftmost 10 hex digits (5 bytes)"
+    tdea: "ECB encrypt all-zero block, take leftmost 6 hex digits (3 bytes)"
+  rsa2048_exception: >
+    Req 1A-3.2: RSA-2048 may wrap AES keys of any size (128-256 bit) when the COTS
+    platform prevents use of RSA ≥ 3072. This is broader than P2PE footnote 6 (AES-128
+    only). The KEK must provide ≥128 bits of security.
+  equivalence_table:
+    112_bits: ["RSA-2048", "ECC-224", "FFC-2048/224"]
+    128_bits: ["RSA-3072", "ECC-256", "FFC-3072/256", "AES-128"]
+    192_bits: ["RSA-7680", "ECC-384", "AES-192"]
+    256_bits: ["RSA-15360", "ECC-512", "AES-256"]
+constraints:
+  - SHA-1 is NOT permitted for any security purpose
+  - AES KCV must use CMAC method, not legacy ECB-zero method
+  - RSA-2048 wrapping any AES size requires COTS-platform justification
+references:
+  - "PCI MPoC Standard v1.1, Appendix C Tables 7-8 (pages 237-239)"
+  - "PCI MPoC Standard v1.1, Req 1A-3.2 (page 57)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-algorithm-requirements
+  - type: related_to
+    target_id: concept.pci-p2pe-account-data-algorithms
+status: active
+```
+
+---
+
+## PCI CPoC Standard v1.0 — Acquirer-Relevant Rules
+
+```yaml
+id: concept.pci-cpoc-architecture
+title: "PCI CPoC v1.0 — Architecture Overview and Scope"
+summary: >
+  PCI Contactless Payments on COTS (CPoC) v1.0 (December 2019) governs contactless-only
+  payment acceptance on COTS devices (smartphones, tablets) using the device's native NFC
+  interface. It differs critically from MPoC:
+    - CPoC = contactless (NFC) card reading ONLY; software-based PIN entry is EXPLICITLY
+      PROHIBITED by CPoC ("Software-based PIN entry is not permitted in CPoC solution")
+    - CPoC supports only online chip-based transactions; offline EMV and deferred
+      authorization are prohibited
+    - The security model relies on software protection mechanisms, attestation, and
+      monitoring — identical in structure to MPoC but without the PIN security domain
+  Structure: 5 Modules
+    Module 1 — Core Requirements: crypto, key management, secure channels, correlatable data
+    Module 2 — CPoC Application: tamper/reverse-engineering protection, software-protected
+      cryptography, account data encryption
+    Module 3 — Back-end Systems — Monitoring/Attestation: continuous back-end monitoring
+    Module 4 — Back-end Systems — Processing: account data decryption + PCI DSS compliance
+    Module 5 — Contactless Kernel: EMV contactless kernel requirements
+  APC applicability: APC handles account data decryption in the back-end (Module 4).
+  Module 4 requires PCI DSS compliance but does NOT impose an explicit FIPS Level 3
+  HSM requirement (unlike MPoC Req 4A-2.2). Back-end key management still benefits
+  from APC for strong cryptographic isolation and audit trail.
+domain:
+  - compliance
+  - hsm
+attributes:
+  standard_version: "v1.0, December 2019"
+  publisher: "PCI Security Standards Council"
+  scope: "Contactless-only (NFC) payment acceptance on COTS devices"
+  software_pin_entry: "EXPLICITLY PROHIBITED in CPoC — use MPoC for software PIN"
+  offline_transactions: "PROHIBITED — only online chip-based transactions supported"
+  modules:
+    - "Module 1: Core Requirements (crypto, key mgmt, secure channels)"
+    - "Module 2: CPoC Application (software protection, account data encryption)"
+    - "Module 3: Back-end Monitoring/Attestation"
+    - "Module 4: Back-end Processing (PCI DSS, account data decryption)"
+    - "Module 5: Contactless Kernel (EMV contactless)"
+  vs_mpoc: >
+    CPoC = contactless NFC read only; MPoC = PIN entry + contactless + other mobile payment
+    mechanisms. Use CPoC standard for tap-to-pay acceptance without PIN on COTS device.
+    Use MPoC when PIN entry is involved.
+  related_standards:
+    - "PCI DSS (required for back-end processing environment, Module 4)"
+    - "EMVCo contactless specifications (Module 5)"
+constraints:
+  - Software-based PIN entry is prohibited in CPoC solutions
+  - Only online, chip-based contactless transactions are permitted
+  - Back-end payment processing environment must comply with PCI DSS
+references:
+  - "PCI CPoC Standard v1.0, Introduction/Purpose (pages 5-6)"
+  - "PCI CPoC Standard v1.0, Overview (pages 17-20)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-mpoc-architecture
+  - type: related_to
+    target_id: concept.pci-cpoc-account-data-encryption
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-cpoc-account-data-encryption
+title: "PCI CPoC v1.0 Req 2.9 — Account Data Encryption: Application Layer Required, Per-Transaction Keys"
+summary: >
+  CPoC Section 2.9 defines mandatory account data encryption requirements:
+  
+  Application-layer encryption is REQUIRED. TLS (secure channel alone) is NOT sufficient.
+  The standard explicitly states: "A secure channel cannot be used as the sole security
+  and encryption mechanism. Protocol-level encryption, such as TLS, does not meet this
+  requirement, which requires for application-level encryption." The account data must be
+  encrypted within the CPoC application before transmission — separate from TLS.
+  
+  Per-transaction unique keys (Req 2.9.2): The encryption key for each NFC contactless
+  reading must be unique per transaction. The key must be permanently deleted after the
+  transaction terminates (regardless of success or failure). The unique key cannot be
+  calculated from the previous key (one-way key derivation = forward secrecy). This is
+  the same forward-secrecy requirement as MPoC Req 1A-4.11/4.12.
+  
+  Key derivation techniques and key negotiation techniques are cited as acceptable
+  methods for achieving per-transaction unique key generation.
+  
+  After encryption, any remaining cleartext account data on the COTS device must be
+  permanently deleted. If a split contactless kernel implementation passes data
+  back and forth, all remnants must be deleted at transaction end.
+domain:
+  - compliance
+  - key_management
+  - cryptography
+attributes:
+  requirements:
+    - "Req 2.9.1: Application-layer encryption required; TLS alone is insufficient"
+    - "Req 2.9.2: Per-transaction unique key; key deleted after transaction; forward secrecy (one-way derivation)"
+    - "Req 2.9.3: Encrypted data protected from replay attacks; per-transaction unique keys prevent replay"
+    - "Req 2.9.4: Integrity AND confidentiality of account data; must meet Section 1.3 crypto requirements"
+  tls_insufficiency: >
+    TLS is a secure channel but does NOT satisfy account data encryption requirements.
+    Account data must be encrypted at the application layer, specifically to the elements
+    containing account data. TLS only protects data in transit, not at rest in memory.
+  per_transaction_key_rule: >
+    One key per contactless reading (transaction). Key permanently deleted after transaction
+    terminates. No subsequent key can be derived from a prior key (one-way derivation /
+    forward secrecy). Key derivation techniques (e.g., DUKPT) and key negotiation
+    techniques satisfy this requirement.
+  cleartext_deletion: >
+    After encryption, any cleartext account data on the COTS device must be permanently
+    deleted. In split contactless kernel implementations, all remnants of account data
+    must be deleted at transaction end.
+  apc_implementation: >
+    For back-end key material (BDK storage): APC is the natural home for BDKs used to
+    derive per-transaction keys via DUKPT. The CPoC application generates or derives
+    per-transaction keys from an IPEK loaded at provisioning time, with the BDK staying
+    in APC. APC decrypts the account data server-side.
+constraints:
+  - TLS/secure channel alone does NOT satisfy account data encryption
+  - Encryption must be at application layer (not just transport layer)
+  - Encryption key must be per-transaction unique
+  - Key must be permanently deleted after each transaction
+  - One-way key derivation required (compromise of tx key ≠ compromise of prior tx keys)
+references:
+  - "PCI CPoC Standard v1.0, Section 2.9 Account Data Encryption (pages 86-87)"
+  - "PCI CPoC Standard v1.0, Section 1.5.3 (page 44) — channel keys separate from data encryption keys"
+relationships:
+  - type: related_to
+    target_id: concept.pci-cpoc-architecture
+  - type: related_to
+    target_id: concept.pci-mpoc-dukpt-forward-secrecy
+  - type: related_to
+    target_id: concept.dukpt-aes
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-cpoc-backend-processing
+title: "PCI CPoC v1.0 Module 4 — Back-End Processing: Decryption Only in Back-End, PCI DSS Required"
+summary: >
+  CPoC Module 4 (Section 4.1) governs the back-end payment processing environment:
+  
+  Req 4.1.1: ALL account data decryption must occur ONLY in the back-end payment
+  processing environment. Decrypted account data must NOT be returned to the COTS device
+  after decryption (exception: a split contactless kernel that requires data round-trip
+  for processing — but only as part of the remote kernel operation, not for general use).
+  
+  Req 4.1.2: The back-end payment processing environment must comply with PCI DSS and
+  must have a valid Attestation of Compliance (AOC) covering the payment processing scope.
+  
+  Notable difference from MPoC: CPoC Module 4 does NOT impose an explicit FIPS Level 3
+  HSM requirement for account data decryption keys. It requires PCI DSS compliance for
+  the back-end environment. MPoC Req 4A-2.2, in contrast, explicitly requires FIPS 140-2/3
+  Level 3 or PCI PTS HSM for non-PIN back-end keys. For CPoC implementations, APC is
+  still the recommended choice because it provides strong key isolation, CloudTrail audit
+  trail, and satisfies PCI DSS encryption requirements by design.
+domain:
+  - compliance
+  - key_management
+  - hsm
+attributes:
+  requirements:
+    - "Req 4.1.1: Decryption only in back-end; decrypted data never returned to COTS device"
+    - "Req 4.1.2: PCI DSS compliance required; valid AOC required"
+  vs_mpoc_hsm_requirement: >
+    CPoC does NOT require FIPS Level 3 HSM explicitly. MPoC Req 4A-2.2 does. For CPoC,
+    PCI DSS compliance for the back-end processing environment is the stated requirement.
+    However, PCI DSS Req 3.6 requires strong cryptography for encryption key management,
+    which in practice is best satisfied by an HSM like APC.
+  apc_advantages: >
+    Even without an explicit HSM mandate in CPoC, APC provides: (1) FIPS 140-2 Level 3
+    certified key storage and operations, (2) immutable CloudTrail audit logs for PCI DSS
+    compliance, (3) separation of key material from application code, (4) data plane API
+    for account data decryption without key export.
+  remote_kernel_exception: >
+    If a contactless kernel is split (partially remote/cloud-hosted), the remote kernel
+    environment must also comply with PCI DSS (Req 5.2.2).
+constraints:
+  - Decryption of account data must occur exclusively in back-end environments
+  - Decrypted data must never be returned to the COTS device
+  - Back-end processing environment requires PCI DSS AOC
+references:
+  - "PCI CPoC Standard v1.0, Module 4 Section 4.1 (page 117)"
+  - "PCI CPoC Standard v1.0, Section 5.2.2 (page 121)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-cpoc-architecture
+  - type: related_to
+    target_id: concept.pci-mpoc-backend-hsm-requirement
+status: active
+```
+
+---
+
+```yaml
+id: concept.pci-cpoc-algorithm-requirements
+title: "PCI CPoC v1.0 — Algorithm Requirements: No TDEA, AES-Only Symmetric, Appendix C"
+summary: >
+  CPoC Appendix C (Table 7) lists ONLY four algorithm families as approved for the solution.
+  Notably, TDEA/3DES is NOT listed — unlike PCI PIN Annex C and PCI P2PE Annex C which
+  both include TDEA ≥ 168 bits. CPoC is the most modern of the three standards (2019) and
+  treats AES as the only approved symmetric cipher.
+  
+  Approved algorithm minimums (Table 7):
+    IFC (RSA):           ≥ 2048 bits
+    ECC (ECDSA, ECDH):   ≥ 224 bits
+    FFC (DSA, DH, MQV):  ≥ 2048-bit prime / 224-bit subgroup
+    AES:                 ≥ 128 bits
+    TDEA:                NOT LISTED (not approved in CPoC)
+  
+  Hash algorithms (Table 9): SHA-2 family >255 bits; SHA-3 family >255 bits (only).
+  
+  Equivalent key sizes (Table 8): Same as PCI PIN and P2PE:
+    112 bits = RSA-2048 / ECC-224 / FFC-2048/224
+    128 bits = RSA-3072 / ECC-256 / FFC-3072/256 / AES-128
+    192 bits = RSA-7680 / ECC-384 / AES-192
+    256 bits = RSA-15360 / ECC-512 / AES-256
+  
+  KCV (from Appendix C p.147): TDEA = ECB encrypt all-zero block, leftmost 24 bits
+  (note: standard text has a typographical inconsistency — it says "24 bits" alongside
+  "10 hexadecimal digits or 5 bytes"; per PCI PIN Annex C the correct value is 6 hex
+  digits / 3 bytes for TDEA); AES = CMAC all-zero block, leftmost 10 hex digits (5 bytes).
+  
+  Single-purpose key rule (Req 1.3.8): Each key must have a single unique purpose;
+  account data encryption keys must not be used for attestation message encryption
+  or any other purpose. This mirrors MPoC Req 1A-3.4 and PCI PIN Req 7-1.
+  
+  KEK strength rule (Req 1.3.4): A KEK must be of equal or greater strength than any
+  key it protects. A 128-bit AES KEK cannot protect a 256-bit AES key.
+  
+  Self-signed certificates (Req 1.3.6): Prohibited in CPoC solution components.
+  Exception: self-signed certificates that are part of the base COTS platform are excluded.
+domain:
+  - compliance
+  - cryptography
+  - key_management
+attributes:
+  standard_appendix: "Appendix C (pages 146-148)"
+  tdea_status: "NOT APPROVED — CPoC Appendix C Table 7 does not include TDEA as an approved algorithm"
+  tdea_comparison: >
+    PCI PIN Annex C and P2PE Annex C both list TDEA ≥ 168 bits as an approved minimum.
+    CPoC (2019) omits TDEA entirely from Table 7, making AES-128 the only approved
+    symmetric cipher for CPoC solutions.
+  minimum_key_sizes:
+    aes: "≥128 bits (ONLY approved symmetric cipher)"
+    rsa: "≥2048 bits"
+    ecc: "≥224 bits"
+    ffc: "≥2048-bit prime / 224-bit subgroup"
+    tdea: "NOT LISTED (not approved)"
+  hash_requirements:
+    required: ["SHA-256", "SHA-384", "SHA-512", "SHA-3 (>255 bit variants)"]
+    note: "MD5 and SHA-1 permitted ONLY for non-security uses (e.g., file comparison where collision resistance not needed)"
+  kcv_methods:
+    tdea: "ECB encrypt all-zero block; leftmost 3 bytes (6 hex digits) — note: CPoC Appendix C has a typographical error stating '24 bits' where it should be '40 bits / 5 bytes / 10 hex digits'"
+    aes: "CMAC over all-zero block; leftmost 10 hex digits (5 bytes)"
+  equivalence_table:
+    112_bits: ["RSA-2048", "ECC-224", "FFC-2048/224"]
+    128_bits: ["RSA-3072", "ECC-256", "FFC-3072/256", "AES-128"]
+    192_bits: ["RSA-7680", "ECC-384", "AES-192"]
+    256_bits: ["RSA-15360", "ECC-512", "AES-256"]
+  cross_standard_note: >
+    Equivalence table is identical to PCI PIN Annex C and PCI P2PE Annex C and MPoC
+    Appendix C. All four standards agree on equivalent key sizes. The only divergence
+    is CPoC's omission of TDEA from approved algorithms.
+  single_purpose_rule: "Req 1.3.8 — each key one purpose; account data encryption ≠ attestation MAC"
+  kek_strength_rule: "Req 1.3.4 — KEK must be equal or greater strength than key it protects"
+  self_signed_cert_prohibition: "Req 1.3.6 — self-signed certificates prohibited (COTS platform certs excepted)"
+constraints:
+  - TDEA/3DES is NOT an approved algorithm in CPoC (no Table 7 entry)
+  - AES-128 is the minimum symmetric cipher; AES-256 preferred
+  - SHA-256+ required for security-relevant hashing; SHA-1 only for non-security uses
+  - KEK strength ≥ protected key strength (Req 1.3.4)
+references:
+  - "PCI CPoC Standard v1.0, Appendix C Tables 7-9 (pages 146-148)"
+  - "PCI CPoC Standard v1.0, Section 1.3 Acceptable Cryptography (pages 32-36)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-algorithm-requirements
+  - type: related_to
+    target_id: concept.pci-p2pe-account-data-algorithms
+  - type: related_to
+    target_id: concept.pci-mpoc-algorithm-requirements
+status: active
+```
+
+---
+
+## PCI 3DS Core Security Standard v1.0 — Acquirer-Relevant Rules
+
+```yaml
+id: concept.pci-3ds-architecture
+title: PCI 3DS Core Security Standard — Architecture and Scope
+tags: [compliance, 3ds, emv, key_management, hsm]
+source: PCI 3DS Core Security Standard v1.0, October 2017
+status: active
+```
+
+PCI 3DS v1.0 covers security requirements for EMV 3-D Secure (3DS) protocol
+implementations. Three core entities form the 3DS ecosystem:
+
+- **ACS** (Access Control Server): issuer-side; authenticates cardholders; MUST use an HSM
+- **DS** (Directory Server): scheme-operated (e.g., Visa, Mastercard); routes between 3DSS and ACS; MUST use an HSM
+- **3DSS** (3DS Server): acquirer/merchant-side; initiates auth requests; HSM NOT required but strongly recommended
+
+The **3DE** (3DS Data Environment) is the secure boundary within which 3DS functions occur.
+The 3DSS "links to the Acquirer and initiates authorization requests" — it is the primary
+acquirer-facing component and the one most directly relevant to APC deployments.
+
+**Two parts with different scopes:**
+- Part 1 (P1-1 through P1-7): Baseline Security Requirements — generic security controls
+  analogous to PCI DSS; entities with valid PCI DSS AOC may leverage it to satisfy Part 1
+  for their 3DE (Appendix B). Part 1 covers policies, network, SDLC, access, physical,
+  monitoring, incident response.
+- Part 2 (P2-1 through P2-7): 3DS-specific requirements — ALWAYS apply regardless of
+  PCI DSS compliance status. Cannot be satisfied by PCI DSS AOC alone.
+  Part 2 covers: authentication, data protection, access control, application security,
+  Protect 3DS data (P2-5), Cryptography and Key Management (P2-6), Physical security (P2-7).
+
+**APC relevance**: APC is the natural back-end cryptographic service for 3DSS operators
+(acquirer/processor side). ACS and DS are typically issuer/scheme infrastructure outside
+acquirer scope. For acquirers building or operating 3DSS functionality, APC provides the
+strongly recommended HSM tier for key management.
+
+---
+
+```yaml
+id: concept.pci-3ds-hsm-requirement
+title: PCI 3DS HSM Requirements — Who Must Use an HSM and What Level
+tags: [compliance, 3ds, hsm, key_management, fips]
+source: PCI 3DS Core Security Standard v1.0, Req P2-6.1.2, P2-6.2, P2-6.3
+status: active
+```
+
+**Req P2-6.1.2 — HSM Requirement (ACS and DS only):**
+- HSM is MANDATORY for ACS and DS for all key management activities specified in the
+  PCI 3DS Data Matrix (key-encryption, decryption, key generation, storage).
+- HSM must be EITHER:
+  - FIPS 140-2 Level 3 (overall) certified (NIST CMVP listing with valid number), OR
+  - PCI PTS HSM approved (valid PCI SSC listing number, approval class "HSM")
+- "It is not required that 3DSS entities use an HSM to manage 3DS keys; however it is
+  strongly recommended." — 3DSS is subject to all other key management requirements.
+
+**APC satisfies both criteria for ACS/DS:**
+- APC is FIPS 140-2 Level 3 certified AND PCI PTS HSM V3 approved.
+- For ACS or DS operators migrating from physical HSMs, APC is a direct qualifying replacement.
+- For 3DSS (acquirer-side), APC satisfies the "strongly recommended" HSM tier and all
+  P2-6 key management requirements without the mandatory classification.
+
+**HSM logical access (P2-6.2, ACS and DS only):**
+- Personnel must access HSMs at console or via ISO 13491-evaluated non-console solution.
+- Single DEA message authentication codes are explicitly NOT permitted (6.2.1 note).
+- Only NIST SP 800-90A compliant RNGs allowed.
+- Loading/exporting clear-text keys, key components, or key shares over a non-console
+  connection is PROHIBITED (Req 6.2.4).
+- All non-console HSM access must originate from within the 3DE network.
+
+**Physical security (P2-6.3, P2-7 — ACS and DS only):**
+- HSMs stored in dedicated areas; physical access under dual control.
+- ACS and DS must be in data center environments with mantrap and CCTV.
+- P2-7 physical requirements do NOT apply to 3DSS.
+- APC eliminates all P2-6.2/6.3 and P2-7 burden for the HSM layer — AWS manages
+  physical security, logical access, and the certified hardware boundary.
+
+---
+
+```yaml
+id: concept.pci-3ds-key-management
+title: PCI 3DS Key Management Requirements
+tags: [compliance, 3ds, key_management, cryptography, single_purpose]
+source: PCI 3DS Core Security Standard v1.0, Req P2-6.1.5 through P2-6.1.10
+status: active
+```
+
+**Req P2-6.1.5 — Full key lifecycle management required for all 3DS entities:**
+Full lifecycle must be addressed: generation, distribution/conveyance, storage, crypto period
+establishment, rotation when crypto period reached, escrow/backup, compromise and recovery,
+emergency destroy-and-replace procedures, accountability and audit.
+
+Key management must conform to recognized national/international standards (Req 6.1.6):
+- NIST SP 800-57 (all parts) — key management recommendations
+- NIST SP 800-90A — deterministic random bit generation
+- ISO 11568 — financial services key management
+- ISO/IEC 11770 — key management techniques
+
+**Req P2-6.1.7 — Single-purpose key rule (consistent across all PCI standards):**
+"Cryptographic keys are used only for their intended purpose, and keys used for 3DS functions
+are not used for non-3DS purposes." A KEK must never be used to encrypt 3DS sensitive data
+directly. Public keys only for encryption or signature verification; private keys only for
+decryption or signature creation. Keys for 3DS must not serve any business function outside 3DS.
+
+Cross-standard consistency: same rule as PCI PIN Req 7-1, MPoC Req 1A-3.4, CPoC Req 1.3.8.
+APC enforces this via key usage attributes (KeyUsage field on every key).
+
+**Req P2-6.1.8 — Trusted CA required:**
+All digital certificates used for 3DS operations between 3DSS, ACS, and DS must use a trusted CA.
+Self-signed certificates are not addressed but implicit in the "trusted CA" framing.
+
+**Req P2-6.1.9 — Key management audit log required:**
+Audit logs for ALL key management activities and clear-text key component handling must record:
+- Identity of the individual performing the function
+- Date and time
+- Function being performed
+- Purpose of the affected key
+- Success or failure of the activity
+
+**TLS cipher suite requirements (Req P2-5.3):**
+- Approved cipher suites defined in EMV 3DS Protocol and Core Functions Specification, Annex D.
+- 3DS components (ACS, DS, 3DSS) must not offer or support cipher suites listed as
+  "not supported" in that specification.
+- TLS configurations must not support rollback to unapproved algorithms/key sizes.
+- "The use of 3DES and SHA-1 should be phased out" — flagged in the 2017 standard for
+  future deprecation. (Note: this is TLS cipher context, not symmetric key wrapping.)
+- No fallback to insecure protocols permitted (Req 5.2.2).
+
+**Application-layer encryption (Req P2-5.4.2):**
+3DS sensitive data in storage must be protected with strong cryptography beyond TLS.
+May encrypt individual data elements or the containing data packet/file. One-way hashes
+with a strong salt are acceptable where retrieval is not required.
+
+---
 ```
 
 ---
@@ -6162,3 +7801,8 @@ that publish annual revisions).
 | 2026-05-19 | PCI Information Supplement: Implementing ISO Format 4 PIN Blocks | PCI Security Standards Council | September 2021 (v1.01) | compliance, pin_processing, cryptography |
 | 2026-05-19 | PCI Information Supplement: PIN Security Requirement 18-3 – Key Blocks | PCI Security Standards Council | June 2019 | compliance, key_management |
 | 2026-05-19 | Use of triple length TDES in ep2 v7.x with regard to PCI SSC requirements (expert opinion letter) | SRC Security Research & Consulting GmbH / Technical Cooperation ep2 | October 30, 2020 | compliance, cryptography, pin_processing |
+| 2026-05-21 | PCI Point-to-Point Encryption (P2PE) Standard v3.2 — Domains 1–5, Appendix A, Normative Annex C (full standard read; pages 1-251) | PCI Security Standards Council | v3.2, June 2025 | compliance, key_management, cryptography, pin_processing, hsm |
+| 2026-05-21 | PCI PIN Security Requirements and Testing Procedures v3.1 (normative standard — all 7 Control Objectives, Req 1-33, Annex A TR-34, Annex B KIF/secure-room, Annex C key equivalence, Glossary) | PCI Security Standards Council | v3.1 March 2021 | compliance, key_management, pin_processing, hsm, cryptography |
+| 2026-05-21 | PCI Mobile Payments on COTS (MPoC) Standard v1.1 (targeted read: overview/scope pp.15-35, Req 1A-3 crypto pp.56-58, Req 1A-4 key mgmt pp.60-68, Req 4A-2 back-end ops pp.168-170, Req 4A-4 compliance stack p.180, Appendix C pp.237-239) | PCI Security Standards Council | v1.1, November 2024 | compliance, key_management, cryptography, pin_processing, hsm |
+| 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
+| 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |
