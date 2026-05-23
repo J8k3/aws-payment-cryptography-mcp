@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -65,10 +65,11 @@ Tools are registered by calling `register_*_tools(mcp: FastMCP)` functions. Each
 ## Commit Scope
 
 - Keep commits small and reviewable by default.
-- Prefer one commit per logical change — a new tool, a new compliance rule, a knowledge-base addition.
-- Group related changes (e.g., a new tool + its test + the knowledge-base entry it required) into one commit when they can't be evaluated independently.
+- Prefer one commit per logical change — a single coherent unit a reviewer can evaluate independently.
+- Group related changes (e.g., a new feature + its test + the knowledge-base entry it required) into one commit when they can't be evaluated independently.
 - Prefer squash or amend for iterative follow-ups — if a second commit only fixes or extends the immediately preceding one, squash rather than leaving noise in the log.
 - Do not split a change just to make it look smaller; split when a reviewer would genuinely benefit from evaluating the pieces independently.
+- When CI flags a lint or test failure after a push, fix locally and **amend or squash into the failing commit** (using `git push --force-with-lease`) rather than adding a new fix commit on top.
 
 ## Knowledge Contribution (Standing Instruction)
 
