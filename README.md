@@ -84,6 +84,8 @@ codex mcp add apc-agent --env AWS_REGION=us-east-1 -- apc-agent
 
 AWS credentials are consumed via the standard boto3 chain: IAM role, `~/.aws/credentials`, or environment variables. Set `AWS_REGION` to the region where your APC resources live.
 
+See [`EXAMPLES.md`](EXAMPLES.md) for end-to-end session excerpts — one per workflow — showing exact prompts, tool calls, and results.
+
 ---
 
 ## Workflow 1 — Building a new integration
