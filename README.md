@@ -190,6 +190,8 @@ aws-payment-cryptography-data-plane-use-cases.json  — APC data plane capabilit
 
 The knowledge base is exposed as an MCP resource at `payment://knowledge-base`. It covers card data, PIN blocks, card verification values, EMV tags, ISO 8583 fields, key types, HSM commands, cryptographic algorithms, and constraint rules. The agent reads it on demand; it is not injected into the system prompt. Add new entries to `payment-knowledge-base.md` and update the Sources table at the bottom — no server restart required.
 
+**HSM command mapping reference:** [`docs/hsm-apc-command-mapping.md`](docs/hsm-apc-command-mapping.md) — human-readable tables mapping Thales payShield (International/Core and Legacy) command codes to APC operations and TR-31 key types, with migration notes. Futurex Excrypt and Atalla sections are stubbed for future addition.
+
 ---
 
 ## Testimonial
