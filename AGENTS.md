@@ -112,6 +112,18 @@ python -m pytest tests/ -q
 
 Fix every ruff violation. All tests must pass. If a test catches a new bug, fix the bug — do not adjust the test to pass.
 
+## Cross-Cutting Consistency Rules
+
+These are non-obvious invariants that file-by-file review will miss. Apply them on every code change, not just when the directly edited code seems related.
+
+**Generate/verify symmetry** — every compliance guard on a `generate_X` operation must have an identical guard on the corresponding `verify_X`. If `generate_pin_data` blocks ISO_FORMAT_0, `verify_pin_data` must also block it. Same applies to `generate_mac`/`verify_mac` and any future paired operations. Missing a verify-side guard silently allows the prohibited construct through.
+
+**Exception handling uniformity** — all boto3 call sites use `_call()`. Never add a raw `client().method()` call. When adding a new tool, use `_call(client().method_name, **params)` — not `client().method_name(**params)`.
+
+**Compliance guard → test parity** — every new compliance guard must have a test that fires the guard (no AWS call) and a test that confirms the clean path reaches the AWS layer. A guard without a test will regress silently.
+
+**Docstring trigger sentence** — every `@mcp.tool()` must start its docstring with a "Call this when..." sentence describing the trigger condition. Claude Code uses this for tool selection; missing triggers degrade usability.
+
 ## Proxy Repo — Hands Off
 
 `W:\apc-hsm-proxy` is owned by a separate session. Never read, edit, or touch any file under that path.
