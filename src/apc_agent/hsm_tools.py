@@ -216,14 +216,19 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         "futurex_excrypt": {"ECHO", "TPIN"},
         "thales_payshield": {
             "CA", "CC", "CI", "G0",           # PIN translation
-            "CK", "CM", "CO", "CQ",           # DUKPT PIN verify
+            "CK", "CM", "CO", "CQ",           # DUKPT PIN verify (original single-length)
+            "DA", "DC", "EA", "EC",           # Non-DUKPT PIN verify (TPK/ZPK)
+            "GO", "GQ", "GS", "GU",           # DUKPT PIN verify (3DES & AES)
             "CW", "CY",                        # CVV generate/verify
             "C2", "C4",                        # AS2805 MAC
-            "M6", "M8",                        # MAC generate/verify
+            "M6", "M8",                        # MAC generate/verify (extended)
+            "MY",                              # MAC verify and translate
             "MA", "MC", "ME",                  # Legacy MAK
             "M0", "M2", "M4",                  # Data encrypt/decrypt/translate
             "HE", "HG",                        # Legacy TAK encrypt/decrypt
             "KQ",                              # ARQC/ARPC
+            "KW",                              # ARQC/ARPC (EMV & Cloud-Based SKD)
+            "JS",                              # ARQC/ARPC (UnionPay/CUP)
             "B2",                              # Heartbeat/diagnostics
         },
     }

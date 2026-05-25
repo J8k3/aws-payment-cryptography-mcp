@@ -8432,6 +8432,875 @@ status: active
 
 ---
 
+## Thales payShield Migration Reference
+
+### KSN Descriptor Encoding (DUKPT)
+
+```yaml
+id: concept.thales-ksn-descriptor
+entity_type: data_element
+canonical_name: KSN Descriptor
+aliases:
+  - KSN descriptor
+  - key_set_id_length + sub_key_id_length + device_id_length
+summary: >
+  A 3-digit numeric string stored alongside the BDK in Thales payShield HSM user storage.
+  Tells the HSM how many digits of the KSN represent each logical sub-field.
+  Required for all DUKPT key derivation commands that take a BDK reference.
+domain:
+  - key_management
+  - hsm
+  - pin_processing
+attributes:
+  format: 3 ASCII decimal digits "[key_set_id_len][sub_key_id_len][device_id_len]"
+  total_constraint: "sum of three digits must equal the total KSN length in digits"
+  standard_value_64bit_ksn:
+    descriptor: "605"
+    breakdown:
+      key_set_id_len: 6
+      sub_key_id_len: 0
+      device_id_len: 5
+    notes: >
+      Standard X9.24-1:2009 (TDES DUKPT) 10-byte (80-bit) KSN encodes
+      6 digits key_set_id, 0 digits sub_key_id, 5 digits device_id.
+      Total = 11 hex digits (44 bits used in practice).
+  commands_that_use_descriptor:
+    - CK  # Derive current DUKPT working key
+    - CM  # Decrypt PIN using DUKPT working key
+    - G0  # Derive DUKPT working key and translate PIN
+    - CI  # Derive DUKPT working key (generic)
+    - GW  # Derive DUKPT working key and re-encrypt data
+    - M0  # Generate DUKPT MAC
+    - M2  # Verify and translate DUKPT MAC
+    - M4  # Generate DUKPT response MAC
+  aes_dukpt_ksn_length: 24 bytes (48 hex digits); descriptor encoding follows same pattern but with larger sub-fields
+  storage: stored in the HSM command as a literal 3-char field immediately after the BDK identifier
+constraints:
+  - The descriptor must be agreed between the BDK-injector (terminal manufacturer / key-injection facility) and the acquirer host before key injection
+  - Misconfigured descriptor causes invalid key derivation silently — KSN parses, wrong key derived
+  - For AES DUKPT, the KSN is 24 bytes; payShield requires Key Block LMK (not Variant LMK) to protect the AES BDK
+relationships:
+  - type: related_to
+    target_id: concept.dukpt
+  - type: related_to
+    target_id: concept.ksn
+  - type: related_to
+    target_id: concept.thales-bdk-types
+status: active
+```
+
+### Thales Key Names → Variant LMK Codes → TR-31 / APC Usage Codes
+
+```yaml
+id: concept.thales-key-type-mapping
+entity_type: reference_list
+canonical_name: Thales payShield Key Type Code Cross-Reference
+aliases:
+  - Variant LMK key type codes
+  - Key Block and Variant Comparison Table
+summary: >
+  Maps Thales payShield key names to their Variant LMK 3-digit type codes, LMK pair/variant,
+  TR-31 Key Block usage codes, and APC TR31_* key usage constants.
+  Source: payShield 10K Host Programmer's Manual PUGD0541-003 pages 98 and 113-114.
+domain:
+  - key_management
+  - hsm
+attributes:
+  table:
+    # Format: key_name: {variant_code, lmk_pair, variant_nibble, kb_code, apc_usage}
+    ZMK:
+      variant_code: "000"
+      lmk_pair: "04-05"
+      variant: "0"
+      kb_code: K0 / 52
+      apc_usage: TR31_K0_KEY_ENCRYPTION_KEY
+      description: Zone Master Key — used to encrypt ZPKs for key exchange between acquirer and processor
+    ZPK:
+      variant_code: "001"
+      lmk_pair: "06-07"
+      variant: "0"
+      kb_code: P0 / 71
+      apc_usage: TR31_P0_PIN_ENCRYPTION_KEY
+      description: Zone PIN Key — encrypts PIN blocks for inter-zone PIN routing
+    PVK_PVVK:
+      variant_code: "002"
+      lmk_pair: "14-15"
+      variant: "0"
+      kb_code: "V0 / V1 / V2"
+      apc_usage: "TR31_V1_IBM3624_PIN_VERIFICATION_KEY or TR31_V2_VISA_PIN_VERIFICATION_KEY"
+      description: PIN Verification Key — IBM 3624 (V1) or Visa PVV (V2)
+    TAK:
+      variant_code: "003"
+      lmk_pair: "16-17"
+      variant: "0"
+      kb_code: "M0 / M1 / M3 / M5 / M6"
+      apc_usage: "TR31_M3_ISO_9797_3_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY"
+      description: Terminal Authentication Key — MAC key between terminal and host
+    WWK:
+      variant_code: "006"
+      lmk_pair: "22-23"
+      variant: "0"
+      kb_code: "01"
+      apc_usage: no direct APC equivalent
+      description: Watchword Key — HSM-specific authentication; no APC equivalent
+    ZAK:
+      variant_code: "008"
+      lmk_pair: "26-27"
+      variant: "0"
+      kb_code: "M0 / M1 / M3 / M5 / M6"
+      apc_usage: "TR31_M3_ISO_9797_3_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY"
+      description: Zone Authentication Key — MAC key for inter-zone message authentication
+    BDK_1:
+      variant_code: "009"
+      lmk_pair: "28-29"
+      variant: "0"
+      kb_code: B0
+      apc_usage: TR31_B0_BASE_DERIVATION_KEY
+      description: Base Derivation Key type 1 — standard bidirectional X9.24-1 DUKPT
+    HMAC:
+      variant_code: "10C"
+      lmk_pair: "34-35"
+      variant: "1"
+      kb_code: "61-65"
+      apc_usage: TR31_M7_HMAC_KEY
+      description: HMAC key
+    ZEK:
+      variant_code: "00A"
+      lmk_pair: "30-31"
+      variant: "0"
+      kb_code: "D0 / 22"
+      apc_usage: TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY
+      description: Zone Encryption Key — inter-zone data encryption
+    DEK_or_TEK_AS2805:
+      variant_code: "00B"
+      lmk_pair: "32-33"
+      variant: "0"
+      kb_code: "D0 / 21"
+      apc_usage: TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY
+      description: Data Encryption Key or Terminal Encryption Key (AS2805)
+    KEK:
+      variant_code: "107"
+      lmk_pair: "24-25"
+      variant: "1"
+      kb_code: "54"
+      apc_usage: TR31_K1_KEY_BLOCK_PROTECTION_KEY
+      description: Key Encryption Key — wraps other keys for transport (prefer K1 for new deployments)
+    MK_AC:
+      variant_code: "109"
+      lmk_pair: "28-29"
+      variant: "1"
+      kb_code: E0
+      apc_usage: TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS
+      description: EMV Application Cryptogram Master Key (ARQC/ARPC only — NOT for PIN change scripts)
+    MK_SMI:
+      variant_code: "209"
+      lmk_pair: "28-29"
+      variant: "2"
+      kb_code: E2
+      apc_usage: TR31_E2_EMV_MKEY_INTEGRITY
+      description: EMV Secure Messaging Integrity Master Key — script MAC generation
+    MK_SMC:
+      variant_code: "309"
+      lmk_pair: "28-29"
+      variant: "3"
+      kb_code: E1
+      apc_usage: TR31_E1_EMV_MKEY_CONFIDENTIALITY
+      description: EMV Secure Messaging Confidentiality Master Key — script encryption
+    MK_DAC:
+      variant_code: "409"
+      lmk_pair: "28-29"
+      variant: "4"
+      kb_code: E3
+      apc_usage: TR31_E3_EMV_MKEY_OTHER (if supported) or no direct APC equivalent
+      description: Dynamic Authentication Code Master Key
+    MK_DN:
+      variant_code: "509"
+      lmk_pair: "28-29"
+      variant: "5"
+      kb_code: E4
+      apc_usage: TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS
+      description: Dynamic Number Master Key (iCVV etc.)
+    BDK_2:
+      variant_code: "609"
+      lmk_pair: "28-29"
+      variant: "6"
+      kb_code: "41"
+      apc_usage: TR31_B0_BASE_DERIVATION_KEY
+      description: BDK type 2 — acquirer-only unidirectional DUKPT; 5 key types derivable
+    BDK_3:
+      variant_code: "809"
+      lmk_pair: "28-29"
+      variant: "8"
+      kb_code: "42"
+      apc_usage: TR31_B0_BASE_DERIVATION_KEY
+      description: BDK type 3 — data-only (no PIN/MAC) bidirectional; not X9.24-1 compliant
+    BDK_4:
+      variant_code: "909"
+      lmk_pair: "28-29"
+      variant: "9"
+      kb_code: "43"
+      apc_usage: TR31_B0_BASE_DERIVATION_KEY
+      description: BDK type 4 — PSP/gateway terminal role unidirectional DUKPT; 5 key types
+    IKEY:
+      variant_code: "302"
+      lmk_pair: "14-15"
+      variant: "3"
+      kb_code: B1
+      apc_usage: TR31_B1_BASE_DERIVATION_KEY_VARIANT_2 (if supported)
+      description: Initial Key — injected into terminal during key injection; deleted by terminal after initialization
+    CVK:
+      variant_code: "402"
+      lmk_pair: "14-15"
+      variant: "4"
+      kb_code: "C0 / 12 / 13"
+      apc_usage: TR31_C0_CARD_VERIFICATION_KEY
+      description: Card Verification Key — CVV, CVV2, iCVV
+    PVK_as_PEK:
+      variant_code: "70D"
+      lmk_pair: "14-15"
+      variant: "7"
+      kb_code: "P0 / 71"
+      apc_usage: TR31_P0_PIN_ENCRYPTION_KEY
+      description: PIN Encryption Key (PEK / Acquirer Working Key) — when used as an acquirer-side PEK
+    TPK:
+      variant_code: "002 or 70D"
+      kb_code: "P0 / 71"
+      apc_usage: TR31_P0_PIN_ENCRYPTION_KEY
+      description: Terminal PIN Key — encrypts PINs between terminal and acquirer host
+    TMK:
+      variant_code: "002 or 80D"
+      kb_code: "K0 / 51"
+      apc_usage: TR31_K0_KEY_ENCRYPTION_KEY
+      description: Terminal Master Key — wraps TPK/TAK for download to terminal
+    TKR:
+      variant_code: "002 or 90D"
+      kb_code: "P0 / 73"
+      apc_usage: TR31_P0_PIN_ENCRYPTION_KEY
+      description: Terminal Key for Retail — variant naming in some Thales configurations
+    TEK:
+      variant_code: "30B"
+      lmk_pair: "32-33"
+      variant: "3"
+      kb_code: "D0 / 23"
+      apc_usage: TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY
+      description: Terminal Encryption Key — encrypts data between terminal and host
+constraints:
+  - Migration note: When exporting from payShield for APC import, use TR-31 Key Block format. The Variant LMK code alone does not convey TR-31 attributes — the Key Block wrapping adds usage, algorithm, and mode-of-use attributes that APC enforces.
+  - APC does not support Variant LMK directly. Keys must be exported as TR-31 Key Blocks from payShield before import to APC.
+  - E0 (MK-AC) is ARQC/ARPC only. PIN change script MAC uses E2 (MK-SMI). PIN change script encryption uses E1 (MK-SMC). Common migration error.
+relationships:
+  - type: related_to
+    target_id: concept.thales-ksn-descriptor
+  - type: related_to
+    target_id: concept.thales-bdk-types
+  - type: related_to
+    target_id: concept.lmk-vs-apc
+status: active
+```
+
+### Thales BDK Type Taxonomy (BDK-1 through BDK-5)
+
+```yaml
+id: concept.thales-bdk-types
+entity_type: reference_list
+canonical_name: Thales DUKPT BDK Type Taxonomy
+aliases:
+  - BDK-1
+  - BDK-2
+  - BDK-3
+  - BDK-4
+  - BDK-5
+  - Thales BDK types
+summary: >
+  Thales payShield 10K uses five BDK types, each with a distinct Variant LMK code and Key Block code.
+  All map to TR31_B0_BASE_DERIVATION_KEY in APC, but differ in which derived key types are supported
+  and in terminal directionality. Source: PUGD0541-003 pages 97-98.
+domain:
+  - key_management
+  - hsm
+  - pin_processing
+attributes:
+  bdk_1:
+    variant_code: "009"
+    kb_code: B0
+    algorithm: T (TDES) or A (AES, Key Block only)
+    direction: Bidirectional (acquirer and terminal can both encrypt/decrypt)
+    x9_24_1_compliant: true
+    derived_key_types:
+      - PIN Encryption Key (PEK)
+      - Data Encryption Key (DEK)
+      - MAC generation key
+      - MAC response key
+      - PIN verification key
+    use_case: Standard acquirer DUKPT — most common; required if terminal supports both PIN and data DUKPT
+    notes: Default for new deployments
+  bdk_2:
+    variant_code: "609"
+    kb_code: "41"
+    direction: Unidirectional (acquirer receive only)
+    x9_24_1_compliant: false
+    derived_key_types: 5 (same set as BDK-1 except response key)
+    use_case: Acquirer-side only; terminal cannot encrypt responses
+    notes: Use when terminals are single-direction only
+  bdk_3:
+    variant_code: "809"
+    kb_code: "42"
+    direction: Bidirectional
+    x9_24_1_compliant: false
+    derived_key_types: Data encryption only (no PIN, no MAC)
+    use_case: Data-only DUKPT without PIN/MAC key derivation
+    notes: Not compliant with X9.24-1 — non-standard deployment only
+  bdk_4:
+    variant_code: "909"
+    kb_code: "43"
+    direction: Unidirectional
+    x9_24_1_compliant: false
+    derived_key_types: 5
+    use_case: PSP or gateway acting in terminal role — receives encrypted data, not terminal-side
+    notes: Same as BDK-2 but from the gateway/PSP perspective
+  bdk_5:
+    variant_code: none (Key Block only)
+    kb_code: "44"
+    direction: Bidirectional (like BDK-1)
+    x9_24_1_compliant: false
+    derived_key_types: Same as BDK-1 with different IKEY derivation
+    use_case: Italian payment network (Bancomat / SPE-DEF-041-112)
+    notes: Not available on all payShield configurations; requires Italian network option
+  ikey:
+    variant_code: "302"
+    kb_code: B1
+    description: Initial Key — the per-terminal derived key injected into the terminal by the key injection facility. Deleted by the terminal after successful initialization. Derived from the BDK using the terminal's KSN.
+apc_mapping:
+  note: All BDK types map to TR31_B0_BASE_DERIVATION_KEY in APC. The directional and derived-key-type distinctions are properties of the DUKPT protocol implementation, not separately enforced by APC key usage.
+constraints:
+  - BDK-3 is not X9.24-1 compliant — verify with counterparty before deploying
+  - BDK-5 requires Italian network license on payShield; no direct APC equivalent for the IKEY derivation variant
+  - AES DUKPT BDK must be in an AES Key Block (KB code requires AES Key Block LMK); Variant LMK cannot protect AES BDKs on payShield
+relationships:
+  - type: related_to
+    target_id: concept.dukpt
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+  - type: related_to
+    target_id: concept.thales-ksn-descriptor
+status: active
+```
+
+### LMK Concept and APC Migration Equivalent
+
+```yaml
+id: concept.lmk-vs-apc
+entity_type: concept
+canonical_name: Local Master Key (LMK) and APC Migration Equivalence
+aliases:
+  - LMK
+  - Local Master Key
+  - Master File Key
+summary: >
+  The LMK is the root key protecting all keys stored in a Thales payShield HSM.
+  Keys are stored as LMK-encrypted blobs (ciphertext values) in the host application or database.
+  These blobs cannot be imported directly into APC. Migration requires exporting from payShield in
+  TR-31 or TR-34 format first, then importing into APC.
+domain:
+  - key_management
+  - hsm
+  - cryptography
+attributes:
+  lmk_description:
+    definition: >
+      The LMK is a set of TDES key pairs (20 pairs, labelled 00-39 in Variant scheme) or a single
+      256-bit AES key (Key Block scheme) that the HSM uses to encrypt all keys stored outside the HSM's
+      secure boundary. The host application stores the encrypted ciphertext (the "key blob"), not the key itself.
+    two_schemes:
+      variant_lmk:
+        algorithm: TDES (always)
+        key_pairs: 20 (LMK pair 00-01 through 38-39)
+        key_separation: XOR variant applied before/after encryption; variant nibble in type code (e.g. 009 = LMK28-29 variant 0)
+        blob_format: raw ciphertext (no integrity, no attribute binding)
+        weakness: >
+          No cryptographic binding of key attributes to the ciphertext. A key can be
+          re-labeled (type code changed) by a compromised host without HSM detection.
+          PCI PIN Req 18-3 prohibited Variant LMK for PIN keys by 1 January 2025.
+      key_block_lmk:
+        algorithm: TDES or AES-256
+        format: TR-31 key block (header + ciphertext + MAC)
+        key_separation: TR-31 header attributes (usage, algorithm, mode of use) are authenticated by MAC
+        advantage: >
+          Attribute binding — the HSM verifies the header MAC before use; a re-labeled
+          key block will fail MAC verification. Required for PIN keys per PCI PIN v3.1 Req 18-3.
+  apc_equivalent:
+    description: >
+      APC manages its own equivalent of the LMK internally. There is no concept of an LMK-encrypted blob
+      that the host application stores. Instead, APC returns an opaque key ARN (Amazon Resource Name) that
+      is used as the key identifier in all API calls. The key material never leaves APC custody.
+    migration_implication: >
+      LMK-encrypted key blobs stored in a host database or application cannot be imported into APC directly.
+      They must first be exported from the payShield in TR-31 or TR-34 format (which re-encrypts under a
+      transport key negotiated with APC), then imported into APC using ImportKey.
+    import_workflow:
+      step_1: Call APC GetParametersForImport to obtain a TR-34 or TR-31 import token and APC's public key
+      step_2: On payShield, export the target key as TR-31 under a KEK that was imported from APC's public key (TR-34 KEK), or export as TR-31 under an existing shared ZMK
+      step_3: Call APC ImportKey with the TR-31 key block; APC returns a key ARN
+      step_4: Replace LMK blob references in host application with APC key ARN
+  lmk_rekeying:
+    description: >
+      payShield supports LMK re-keying (changing the LMK while preserving stored key blobs through
+      automated re-encryption). The BW command translates a BDK/IKEY from old LMK to new LMK.
+      This concept does not apply to APC — APC manages its own key protection internally.
+    apc_equivalent: none; APC handles key protection rotation internally without host involvement
+constraints:
+  - Never attempt to import a raw LMK-encrypted blob into APC. It will fail (wrong wrapping, wrong format) or — if accidentally treated as TR-31 — produce a silently wrong key.
+  - Variant LMK keys for PIN encryption are prohibited by PCI PIN v3.1 Req 18-3 from 1 January 2025.
+  - AES BDKs (AES DUKPT) cannot be protected by Variant LMK on payShield; require Key Block LMK.
+relationships:
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+  - type: related_to
+    target_id: concept.thales-bdk-types
+  - type: related_to
+    target_id: concept.dukpt
+status: active
+```
+
+### AES DUKPT Migration Guide (TDES → AES, X9.24-3:2017)
+
+```yaml
+id: concept.aes-dukpt-migration
+entity_type: concept
+canonical_name: AES DUKPT Migration from TDES DUKPT
+aliases:
+  - AES DUKPT
+  - X9.24-3
+  - X9.24-3:2017
+  - AES DUKPT migration
+summary: >
+  Key differences between TDES DUKPT (X9.24-1:2009) and AES DUKPT (X9.24-3:2017) that affect
+  migration decisions, HSM command parameters, and APC API calls.
+domain:
+  - key_management
+  - pin_processing
+  - hsm
+  - cryptography
+attributes:
+  ksn_length:
+    tdes_dukpt: 10 bytes (80 bits) — typically 3 bytes key_set_id + 5 bytes KSN counter; in Thales: 6+0+5 digit descriptor "605"
+    aes_dukpt: 24 bytes (192 bits) — 4 bytes key_set_id + 8 bytes device_id + 4 bytes transaction_counter per X9.24-3
+  bdk_algorithm:
+    tdes_dukpt: TDES (triple-length 3DES, 168-bit nominal / 112-bit effective) — Variant or Key Block LMK
+    aes_dukpt: AES-128, AES-192, or AES-256 — requires Key Block LMK (Variant LMK not supported on payShield)
+  ipek_terminology:
+    tdes_dukpt: IPEK (Initial PIN Encryption Key) — 3DES double-length key derived from BDK + KSN
+    aes_dukpt: IK (Initial Key) — AES key; terminology changed in X9.24-3; "IPEK" is not used for AES DUKPT
+  pin_block_format:
+    tdes_dukpt: ISO Format 0 (most common) or Format 3 — XOR-based, PAN-dependent
+    aes_dukpt: ISO Format 4 only — AES-CBC encryption, includes PAN in ciphertext, not XOR-based; payShield format code "48"
+    constraint: AES DUKPT mandates Format 4; Format 0/3 are not permitted with AES DUKPT
+  key_derivation:
+    tdes_dukpt: IPEK derivation from BDK + 10-byte KSN; future key register shift via left/right half operations
+    aes_dukpt: >
+      AES-CMAC-based key derivation per X9.24-3; derives working keys for: PIN encryption (PEK),
+      MAC generation (MAK), data encryption (DEK), key encryption (KEK). Each working key is
+      AES-CMAC derived, not a register-shift variant.
+  thales_payhsield_command_support:
+    aes_dukpt_commands_for_pin: supported via standard DUKPT command set with AES BDK and Format 4 indicator
+    unsupported_at_manual_date_aug_2020: "3DES and HMAC key derivation from AES DUKPT not supported (may have been added in later firmware)"
+  apc_equivalence:
+    bdk_key_type: TR31_B0_BASE_DERIVATION_KEY with algorithm AES_128, AES_192, or AES_256
+    pin_translate: TranslatePinData with IncomingDukptAttributes (AES, KSN) + OutgoingAttributes
+    pin_format: IsoFormat4 required for AES DUKPT in APC
+    ksn_format: 24-byte hex string passed as KSN in API call
+constraints:
+  - AES DUKPT BDK requires Key Block LMK on payShield — cannot use Variant LMK; migration must account for this
+  - All AES DUKPT PIN operations use ISO Format 4 — no exceptions; counterparty must support Format 4
+  - If translating from AES DUKPT (Format 4) to a downstream ZPK, ensure the downstream supports Format 4 or translate to Format 0 at the APC/acquirer host (not at the terminal)
+  - IPEK terminology is TDES-specific; never use "IPEK" for AES DUKPT (it confuses the derivation scheme); use "IK"
+relationships:
+  - type: related_to
+    target_id: concept.dukpt
+  - type: related_to
+    target_id: concept.thales-bdk-types
+  - type: related_to
+    target_id: concept.thales-ksn-descriptor
+  - type: related_to
+    target_id: concept.lmk-vs-apc
+status: active
+```
+
+### Thales payShield Wire Protocol Framing (TCP/IP)
+
+```yaml
+id: concept.thales-wire-protocol
+entity_type: concept
+canonical_name: Thales payShield TCP/IP Host Command Wire Protocol
+aliases:
+  - payShield wire protocol
+  - payShield framing
+  - payShield TCP framing
+summary: >
+  The binary framing used to send host commands to and receive responses from a Thales payShield 10K
+  over TCP/IP. Essential for proxy and protocol translation work. Source: PUGD0541-003 Chapter 3.
+domain:
+  - hsm
+attributes:
+  send_format:
+    frame: "[2-byte LENGTH][COMMAND bytes]"
+    length_field: big-endian unsigned 16-bit integer; counts COMMAND bytes only, does NOT include the 2-byte length field itself
+    no_stx_etx: true
+    example: "Command 'NC' with no data: LENGTH=0x00 0x02, COMMAND=0x4E 0x43"
+  response_format:
+    frame: "[2-byte LENGTH][RESPONSE bytes]"
+    response_code_derivation: >
+      Response code is two ASCII characters derived from the command code:
+      response[0] = command[0] (first char unchanged)
+      response[1] = command[1] + 1 (second char ASCII value incremented by 1)
+      e.g. command "NC" → response prefix "ND"; command "A0" → response prefix "A1"
+  message_structure:
+    header: "1–255 ASCII characters; arbitrary; used for session routing or message ID; returned unchanged"
+    command_code: "2 ASCII characters (e.g. 'NC', 'A0', 'CA')"
+    data: "command-specific parameter fields, positional or length-delimited"
+    optional_trailer: "Error Message (EM) byte 0x19 followed by up to 32 ASCII chars of diagnostic text; returned only when response code is '00' (success) or '02' (warning)"
+  connection_parameters:
+    default_port: 1500
+    max_connections: 64 simultaneous sockets
+    buffer_size: 32 KB per connection
+    encoding_detection: auto-detects ASCII vs EBCDIC per connection
+  proxy_implications:
+    framing_rule: >
+      Proxy must strip the 2-byte LENGTH header before parsing the COMMAND CODE (first 2 bytes
+      of the COMMAND field). Re-add the LENGTH header with correct byte count before forwarding.
+    response_code_rule: >
+      Proxy builds synthetic responses; response code = first char of command + (ASCII value of
+      second char + 1). For multi-char error codes within data field, see command-specific docs.
+    header_passthrough: proxy should echo the header field unchanged (it is used by some hosts for session correlation)
+constraints:
+  - LENGTH field covers COMMAND bytes only — do not include the 2 bytes of the LENGTH field itself in the count
+  - Response code second character is incremented by 1 in ASCII — e.g. 'C' (0x43) → 'D' (0x44); wrapping behavior at 'Z'/'z' is undefined
+  - Max header length 255 bytes; max total frame ~32 KB (buffer limit)
+relationships:
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+status: active
+```
+
+### RTKS and Australian AS2805 TKS Command Disambiguation
+
+```yaml
+id: concept.thales-rtks-australian-tks
+entity_type: concept
+canonical_name: Thales RTKS and Australian AS2805 Transaction Key Scheme Commands
+aliases:
+  - RTKS
+  - Racal Transaction Key Scheme
+  - Australian TKS
+  - AS2805 TKS
+  - R* commands
+  - H* commands
+summary: >
+  The payShield 10K supports two transaction key schemes — Racal TKS (RTKS) and Australian AS2805 TKS —
+  under the SAME two-character command codes (RI, RK, RM, RO, RQ, RS, RU, RW). The active scheme is
+  determined by a security setting on the HSM; the command code meaning changes completely depending
+  on which scheme is configured. H* commands (HI, HK, HM, HO, HQ, HS, HU, HW) provide access to
+  whichever TKS is NOT the configured default. Source: PUGD0541-003 Chapter 4.
+domain:
+  - hsm
+  - key_management
+  - pin_processing
+attributes:
+  command_disambiguation:
+    RI:
+      rtks_function: "TX Request with PIN (T/AQ Key) — processes terminal PIN using acquirer key"
+      australian_tks_function: "Verify TX Request with PIN when CD Field not Available"
+    RK:
+      rtks_function: "TX Request Without PIN — authenticates non-PIN transaction request"
+      australian_tks_function: "Generate TX Response with Auth Para by Acquirer"
+    RM:
+      rtks_function: "Administration Request — processes administrative/maintenance transaction"
+      australian_tks_function: "Generate TX Response with Auth Para by Card Issuer"
+    RO:
+      rtks_function: "TX Response with Auth Para from Card Issuer — processes issuer auth response"
+      australian_tks_function: "Translate PIN from PEK to ZPK Encryption"
+    RQ:
+      rtks_function: "Generate Auth Para and TX Response — generates auth parameters for response"
+      australian_tks_function: "Verify TX Completion Confirmation"
+    RS:
+      rtks_function: "Confirmation — confirms transaction completion"
+      australian_tks_function: "Generate TX Completion Response"
+    RU:
+      rtks_function: "TX Request with PIN (T/CI Key) — processes PIN using card issuer key"
+      australian_tks_function: "Generate Auth Para at Card Issuer"
+    RW:
+      rtks_function: "Translate KEYVAL — translates key value between formats"
+      australian_tks_function: "Generate Initial Terminal Key"
+  h_star_variants:
+    description: >
+      H* commands (HI, HK, HM, HO, HQ, HS, HU, HW) are identical in function to R* commands
+      but access the NON-configured TKS. If the HSM is configured for RTKS, HI accesses Australian TKS function.
+      If configured for Australian TKS, HI accesses RTKS function. Used when dual-scheme operation is required.
+    mapping:
+      HI: mirrors RI (non-configured TKS)
+      HK: mirrors RK (non-configured TKS)
+      HM: mirrors RM (non-configured TKS)
+      HO: mirrors RO (non-configured TKS)
+      HQ: mirrors RQ (non-configured TKS)
+      HS: mirrors RS (non-configured TKS)
+      HU: mirrors RU (non-configured TKS)
+      HW: mirrors RW (non-configured TKS)
+  apc_equivalence:
+    rtks_commands: >
+      No direct APC equivalent for RTKS as a transaction key scheme. Equivalent functionality
+      is achieved through individual APC operations: TranslatePinData (PIN translation),
+      GenerateMac/VerifyMac (authentication), and VerifyPinData (PIN verification).
+    australian_tks_commands: >
+      AS2805 MAC generation uses TR31_M0_ISO_16609_MAC_KEY in APC. PIN translation
+      equivalent: TranslatePinData. No bundled "transaction scheme" abstraction in APC —
+      each cryptographic step is a separate API call.
+    migration_note: >
+      Applications using R*/H* commands must be decomposed into individual operations.
+      The TKS abstraction bundles multiple steps (auth + MAC + PIN) into one HSM call.
+      APC separation of concerns requires identifying which cryptographic primitive each
+      R* command actually performs and mapping to the appropriate APC data-plane operation.
+constraints:
+  - The function of RI/RK/RM/RO/RQ/RS/RU/RW depends entirely on the HSM security setting (configured TKS). Identify which scheme is active before analyzing any R* command usage.
+  - If code uses both R* and H* commands, the application is accessing both TKS schemes simultaneously — extremely rare; requires dual-scheme license.
+  - AS2805 MAC key (M0) is the TR-31 key type for Australian TKS MAC operations; not to be confused with retail MAC (M3) or CMAC (M6).
+relationships:
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+  - type: related_to
+    target_id: concept.thales-wire-protocol
+status: active
+```
+
+---
+
+## Thales Legacy Command Wire Formats
+
+### JS Command — ARQC Verification and/or ARPC Generation (UnionPay / CUP)
+
+```yaml
+id: concept.thales-js-command
+entity_type: command
+canonical_name: JS — ARQC Verification and/or ARPC Generation (UnionPay)
+aliases:
+  - JS command
+  - JT response
+  - UnionPay ARQC
+  - CUP ARQC
+  - PBOC ARQC
+summary: >
+  Thales payShield 10K Legacy Host Command (PUGD0538-003 §7 pp.122-123) for
+  ARQC verification and/or ARPC generation for UnionPay (CUP) / PBOC 2.0 / 3.0 cards.
+  Response code: JT. License required: PS10-LIC-LEGACY.
+  This is distinct from KQ (Core command, PUGD0537-004) which handles Visa/MC ARQC.
+domain:
+  - hsm
+  - emv
+  - cryptography
+attributes:
+  source: "PUGD0538-003 Legacy Host Commands, Revision A, 04 August 2020, §7 pp.121-123 — AUTHORITATIVE"
+  lmk_support: "Variant LMK and Key Block LMK"
+  scheme: "UnionPay (CUP) only — Scheme ID always '1' (CUP Card Key Derivation, CUP ver4.2)"
+
+  wire_format_command:
+    note: "All fields are positional, no delimiters except where noted. Types: H=ASCII hex chars, N=ASCII decimal chars, B=raw binary bytes, A=ASCII char."
+    fields:
+      - name: Mode Flag
+        type: 1H
+        details: >
+          ASCII hex digit. Values:
+          '0' = Perform ARQC verification only (no ARPC generated)
+          '1' = Perform ARQC verification AND ARPC generation (ARC required)
+          '2' = Perform ARPC generation only (no ARQC verification; no TxnData in wire)
+          NOTE: '9' does NOT exist. Mode '2' is valid. Currently unimplemented in proxy — see migration note.
+      - name: Scheme ID
+        type: 1N
+        details: >
+          ASCII decimal digit. Only valid value: '1' = CUP Card Key Derivation (CUP ver4.2).
+          CRITICAL: This field is PRESENT in JS but ABSENT in KQ. JS has: Mode→SchemeID→Key.
+          A proxy reading JS the same as KQ (which goes Mode→SchemeID→KeyType→Key) will
+          mis-align every field after Mode Flag.
+      - name: "*MK-AC(LMK)"
+        type: "32H or 1A+32H"
+        details: >
+          Issuer Master Key for Application Cryptograms, encrypted under Variant 1 of LMK pair 28-29.
+          Encoding: 32 ASCII hex chars (double-length, no prefix) OR one ASCII prefix char ('U' or 'T') + 32H or 48H.
+          CRITICAL DIFFERENCE FROM KQ: JS has NO separate 3H Key Type field before the key.
+          KQ layout: [KeyType 3H][Key var]. JS layout: [Key var] directly after Scheme ID.
+          A proxy that skips 3H as "key type" before the key will consume the first 3 chars of actual key material.
+          Use parse_key_32 (base 32H) not parse_legacy_key (base 16H).
+      - name: "PAN/PAN Sequence No"
+        type: 8B
+        details: >
+          8 raw binary bytes. Pre-formatted BCD encoding:
+          Nibbles 0-11  (bytes 0-5 + high nibble byte 6): rightmost 12 PAN digits
+          Nibbles 12-13 (low nibble byte 6 + high nibble byte 7): PAN sequence number
+          Nibbles 14-15 (low nibble byte 7): 0xFF padding
+          Example: PAN right-12="123456789012", seq="01" → bytes [0x12,0x34,0x56,0x78,0x90,0x12,0x01,0xFF]
+          WRONG assumption: treating this as 16N ASCII chars (as in the incorrect proxy stub).
+      - name: ATC
+        type: 2B
+        details: >
+          Application Transaction Counter. 2 raw binary bytes, big-endian.
+          WRONG assumption: treating as 4H ASCII hex chars. Correct: read 2 bytes, hex-encode for APC.
+      - name: "Padding Flag [Modes 0,1 only]"
+        type: 1N
+        details: >
+          ASCII decimal digit. Present ONLY for Mode 0 and Mode 1. Absent for Mode 2.
+          '0' = Input Transaction Data is not pre-padded (HSM applies CUP Appendix D.2 padding)
+          '1' = Input Transaction Data is already padded
+          CUP padding rule: if data is multiple of 8 bytes, append 0x8000000000000000;
+          if not multiple of 8, append 0x80 then 0x00 bytes to reach next 8-byte boundary.
+          For APC: consume and discard; APC handles padding internally.
+          FIELD IS MISSING from the incorrect proxy stub.
+      - name: "Transaction Data Length [Modes 0,1 only]"
+        type: 2H
+        details: >
+          Present ONLY for Mode 0 and Mode 1. Absent for Mode 2.
+          2 ASCII hex chars encoding the byte count of Transaction Data. Range "01"-"FF" (1-255 bytes).
+          WRONG assumption in proxy stub: stub reads 4H (TXN_LEN_FIELD=4) and treats data as ASCII hex.
+          Correct: read 2 ASCII hex chars, parse as hex byte count, then read that many binary bytes.
+      - name: "Transaction Data [Modes 0,1 only]"
+        type: nB
+        details: >
+          Present ONLY for Mode 0 and Mode 1. Absent for Mode 2.
+          Variable-length raw binary bytes. Byte count = Transaction Data Length field value.
+          EMV terminal transaction data (CDOL1-related dataset used to generate the ARQC).
+          WRONG assumption in proxy stub: stub reads txn_byte_len * 2 bytes (treating as ASCII hex).
+          Correct: read txn_byte_len raw binary bytes, then hex-encode for APC.
+      - name: "Delimiter [Modes 0,1 only]"
+        type: 1A
+        details: >
+          Present ONLY for Mode 0 and Mode 1. Absent for Mode 2.
+          ASCII ';' = 0x3B. Field separator after Transaction Data.
+          Same as KQ — validate and consume.
+          MISSING from the incorrect proxy stub.
+      - name: "ARQC/TC/AAC"
+        type: 8B
+        details: >
+          8 raw binary bytes. Present for ALL modes (0, 1, 2).
+          Mode 0/1: the ARQC (Authorization Request Cryptogram) to verify.
+          Mode 2: the TC/AAC previously verified — used as input for ARPC derivation without re-verification.
+          WRONG assumption in proxy stub: reads as 16H ASCII (ARQC_LEN=16). Correct: 8 binary bytes.
+      - name: "ARC [Modes 1,2 only]"
+        type: 2B
+        details: >
+          2 raw binary bytes. Authorization Response Code for ARPC generation.
+          NOT present for Mode 0. MUST be present for Mode 1 and Mode 2.
+          ARPC Method 1 (XOR-based): ARPC = AES/3DES(ICC session key, ARQC XOR ARC||padding).
+          No ARPC Method 2 (CSU) support — JS command has no CSU field.
+          WRONG assumption in proxy stub: reads as 4H ASCII (ARC_LEN=4). Correct: 2 binary bytes.
+      - name: "Delimiter [Optional]"
+        type: 1A
+        details: "ASCII '%'. Optional. If present, LMK Identifier field follows."
+      - name: "LMK Identifier [Optional]"
+        type: 2N
+        details: "2 ASCII decimal digits. Min '00'. Present only if '%' delimiter present. Proxy: consume and ignore (proxy uses key_map for ARN resolution)."
+      - name: "End Message Delimiter [Optional]"
+        type: 1C
+        details: "Value X'19'. Present only if Message Trailer is present."
+      - name: "Message Trailer [Optional]"
+        type: nA
+        details: "Up to 32 ASCII chars."
+
+  wire_format_response:
+    response_code: JT
+    fields:
+      - name: Message Header
+        type: mA
+        details: Returned to host unchanged.
+      - name: Response Code
+        type: 2A
+        details: Value 'JT'.
+      - name: Error Code
+        type: 2N
+        details: >
+          00 = No error
+          01 = ARQC/TC/AAC verification failed (diagnostic ARQC returned in Diagnostic Data field if HSM in Authorised State)
+          03 = Invalid Padding Flag
+          04 = Mode Flag not 0, 1 or 2
+          05 = Unrecognized Scheme ID
+          10 = MK parity error
+          67 = Command not licensed (PS10-LIC-LEGACY required)
+          80 = Data length error
+          81 = Zero length Transaction Data
+          82 = Transaction Data length not multiple of 8 bytes
+      - name: "ARPC [Modes 1,2 only, if no error]"
+        type: 8B
+        details: "The calculated ARPC. Present only for Modes 1 and 2 if error code is 00."
+      - name: "Diagnostic Data [error 01 only]"
+        type: 8B
+        details: "Calculated ARQC/TC/AAC. Returned only if error code is 01 and HSM is in Authorised State."
+
+  key_differences_from_kq:
+    summary: "JS (Legacy, UnionPay) vs KQ (Core International, Visa/MC/Amex) — proxy authors must read both specs"
+    differences:
+      no_key_type_field: "KQ has a 3H Key Type field (e.g., '00E') before the key. JS does NOT. Parsing JS like KQ skips 3 chars of actual key material."
+      key_base_length: "KQ key uses parse_legacy_key (base 16H = single-length). JS key uses parse_key_32 (base 32H = always double-length minimum)."
+      scheme_id_meaning: "KQ SchemeID '0'=Visa/Amex (EmvOptionA), '1'=MC (EmvOptionB). JS SchemeID always '1'=CUP (not MC!)."
+      padding_flag: "KQ has no Padding Flag field. JS has an explicit Padding Flag (1N) for Modes 0/1."
+      txn_length_type: "KQ TxnLen is 2B binary big-endian. JS TxnLen is 2H ASCII hex (2 chars, max 'FF'=255)."
+      txn_data_type: "Both are nB binary. KQ: read n binary bytes. JS: read n binary bytes (same, but proxy stub incorrectly treats as ASCII hex)."
+      mode_values: "KQ modes: 0=verify, 1=Method1(ARC), 2=Method2(CSU), 3/4=skip-verify. JS modes: 0=verify, 1=verify+ARPC, 2=ARPC-only. JS has no CSU (Method 2) field and no modes 3/4."
+      session_key_derivation: "KQ: SessionKeyDerivation::EmvCommon (Visa/MC). JS: SessionKeyDerivation::Emv2000 (CUP/PBOC)."
+      major_key_deriv_mode: "KQ: EmvOptionA (scheme='0') or EmvOptionB (scheme='1'). JS: always EmvOptionA (CUP uses Option A-style IMK diversification)."
+
+  known_proxy_bugs:
+    file: "src/handlers/thales/unionpay_arqc.rs"
+    bugs:
+      - "Mode '9' in match arm — does not exist per PUGD0538; Mode '2' (ArpcOnly) rejected as unknown but is valid"
+      - "KEY_TYPE_LEN=3 skip before key — JS has no key type field; this consumes 3 chars of actual key"
+      - "parse_legacy_key used (base 16H) — should be parse_key_32 (base 32H)"
+      - "Scheme ID field not parsed — byte after Mode Flag is Scheme ID but is silently consumed as part of key type"
+      - "PAN read as PAN_LEN=16 ASCII bytes — should be 8 binary bytes decoded via decode_bcd_pan_seq"
+      - "ATC read as 4H ASCII — should be 2 binary bytes hex-encoded"
+      - "Padding Flag field completely absent — must consume 1N between ATC and TxnLen for Modes 0/1"
+      - "TXN_LEN_FIELD=4 (4 hex chars) — should be 2 (2 hex chars, max FF=255)"
+      - "TxnData read as ASCII hex (txn_byte_len * 2 chars) — should be txn_byte_len binary bytes"
+      - "No 0x3B delimiter check before ARQC — required for Modes 0/1"
+      - "ARQC read as 16H ASCII (ARQC_LEN=16) — should be 8 binary bytes"
+      - "ARC read as 4H ASCII (ARC_LEN=4) — should be 2 binary bytes"
+      - "[PUGD0538?] markers now resolved — remove all"
+
+  apc_mapping:
+    operation: verify_auth_request_cryptogram
+    key_type: TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS
+    session_key_derivation: SessionKeyDerivation::Emv2000
+    major_key_derivation_mode: MajorKeyDerivationMode::EmvOptionA
+    arpc_method: ArpcMethod1 (CryptogramVerificationArpcMethod1 with auth_response_code from ARC field)
+    arpc_method2_csu: "Not supported by JS command — no CSU field in wire format"
+    mode2_limitation: >
+      APC's verify_auth_request_cryptogram always verifies the cryptogram and requires TransactionData.
+      JS Mode 2 omits TransactionData from the wire. Mode 2 cannot be directly translated to APC.
+      Recommendation: reject Mode 2 with a clear error; instruct applications to use Mode 1 (verify+generate).
+
+  padding_rule:
+    source: "CUP doc JR/T 0025.5-2010, Appendix D.2"
+    rule: >
+      If Transaction Data length is a multiple of 8 bytes: append 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00 (8 bytes).
+      If not a multiple of 8 bytes: append 0x80 then 0x00 bytes until the next multiple of 8.
+      Padding Flag '1' means host already applied this; '0' means HSM applies it.
+      APC applies its own padding internally; consume Padding Flag without forwarding.
+
+constraints:
+  - "JS requires PS10-LIC-LEGACY license; if not licensed, HSM returns error 67"
+  - "Scheme ID '1' is the only valid value; other values return error 05"
+  - "Mode Flag '4' returns error 04 — same wording as PUGD0538 error code 04"
+  - "Zero-length Transaction Data returns error 81"
+  - "Transaction Data not a multiple of 8 bytes returns error 82 (if Padding Flag='0')"
+  - "ARC is NOT optional for Mode 1 or Mode 2 — omission causes a parse failure"
+
+relationships:
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+  - type: related_to
+    target_id: concept.thales-wire-protocol
+  - type: related_to
+    target_id: operation.emv-arqc-generation
+status: active
+```
+
+---
+
 ## Reference Catalogs to Materialize Next
 
 - AID catalog
@@ -8477,4 +9346,6 @@ that publish annual revisions).
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Book 2 — Security and Key Management v4.4 delta read (targeted: cover/revision log/ToC pp.1-10; Annex B Approved Algorithms pp.151-169 — Table 43 RSA modulus corrections per Bulletin 208, B2 ECC P-256/P-521 curve parameters, Table 47 hash algorithm indicators, Table 48 ECC signature suites, Table 49 ODE encryption suites; Bulletin 162 AES key derivation erratum noted) | EMVCo | v4.4, November 2023 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
+| 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 | hsm, key_management, pin_processing, cryptography |
+| 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |

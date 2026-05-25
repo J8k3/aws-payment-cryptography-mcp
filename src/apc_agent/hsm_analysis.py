@@ -994,6 +994,163 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "No APC equivalent — use AWS service health checks. "
                "snowch/hsm-guide source — reference quality.",
                confidence="medium"),
+    # ── RTKS / Australian AS2805 TKS Commands ────────────────────────────────
+    # Source: payShield 10K Host Programmer's Manual PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE
+    # CRITICAL: R* command codes are DUAL-PURPOSE. The same code has COMPLETELY DIFFERENT
+    # semantics depending on which TKS is configured as the HSM security setting:
+    # Variant A = Racal TKS (RTKS), Variant B = Australian AS2805 TKS.
+    # H* commands (HI, HK, etc.) access whichever TKS is NOT the configured default.
+    HsmCommand("Thales", "International", "RI",
+               "RTKS TX Request with PIN / AS2805 Verify TX Request (no CD field)", "PIN",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Processes terminal PIN request using T/AQ Key (acquirer key). "
+               "If Australian TKS configured: Verifies TX request with PIN when CD Field is not available. "
+               "H* equivalent (non-configured TKS): HI. Response code: RJ.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "The exact APC mapping depends on which TKS function is in use. "
+               "RTKS variant: translate_pin_data (TPK→ZPK or TPK→PEK). "
+               "AS2805 variant: verify_pin_data or translate_pin_data. "
+               "Identify active TKS before migrating. No bundled TKS abstraction in APC — "
+               "each cryptographic step becomes a separate API call."),
+    HsmCommand("Thales", "International", "RK",
+               "RTKS TX Request Without PIN / AS2805 Generate TX Response with Auth Para (Acquirer)", "MAC",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Authenticates a non-PIN transaction request (MAC-based). "
+               "If Australian TKS configured: Generates transaction response with authentication parameters, acquirer side. "
+               "H* equivalent: HK. Response code: RL.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "RTKS variant: MAC authentication → generate_mac with TAK (TR31_M3 or TR31_M6). "
+               "AS2805 variant: MAC generation per AS2805 → generate_mac with TR31_M0_ISO_16609_MAC_KEY. "
+               "AS2805 MAC key is M0 (ISO 16609), not M3 (retail MAC) or M6 (CMAC)."),
+    HsmCommand("Thales", "International", "RM",
+               "RTKS Administration Request / AS2805 Generate TX Response with Auth Para (Issuer)", "MAC",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Processes HSM administrative/maintenance transaction request. "
+               "If Australian TKS configured: Generates transaction response with authentication parameters, card-issuer side. "
+               "H* equivalent: HM. Response code: RN.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "AS2805 variant: issuer-side MAC generation, AS2805 protocol. "
+               "RTKS admin variant: administrative session management — no APC equivalent."),
+    HsmCommand("Thales", "International", "RO",
+               "RTKS TX Response with Auth Para (Issuer) / AS2805 Translate PIN from PEK to ZPK", "PIN",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Processes card issuer authentication response with auth parameters. "
+               "If Australian TKS configured: Translates a PIN block from PEK encryption to ZPK encryption. "
+               "H* equivalent: HO. Response code: RP.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "AS2805 variant is a direct PIN translation: translate_pin_data with IncomingEncryptionKey (PEK) "
+               "and OutgoingEncryptionKey (ZPK). "
+               "RTKS variant: issuer response verification — verify_mac or verify_auth_request_cryptogram depending on scheme."),
+    HsmCommand("Thales", "International", "RQ",
+               "RTKS Generate Auth Para and TX Response / AS2805 Verify TX Completion Confirmation", "MAC",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Generates authentication parameters and transaction response. "
+               "If Australian TKS configured: Verifies transaction completion confirmation (MAC verification). "
+               "H* equivalent: HQ. Response code: RR.",
+               "verify_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "AS2805 variant: verify_mac with TR31_M0_ISO_16609_MAC_KEY. "
+               "RTKS variant: generate_mac with TAK."),
+    HsmCommand("Thales", "International", "RS",
+               "RTKS Confirmation / AS2805 Generate TX Completion Response", "MAC",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Confirms transaction completion (final step of RTKS sequence). "
+               "If Australian TKS configured: Generates MAC for transaction completion response. "
+               "H* equivalent: HS. Response code: RT.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "AS2805 variant: generate_mac. RTKS variant: MAC verification or confirmation step."),
+    HsmCommand("Thales", "International", "RU",
+               "RTKS TX Request with PIN (T/CI Key) / AS2805 Generate Auth Para at Card Issuer", "PIN",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Processes terminal PIN request using T/CI Key (card issuer key). "
+               "If Australian TKS configured: Generates authentication parameters at the card issuer. "
+               "H* equivalent: HU. Response code: RV.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "RTKS variant: PIN translation with issuer-side key (CI key) → translate_pin_data. "
+               "AS2805 variant: issuer auth parameter generation → generate_mac with M0 key."),
+    HsmCommand("Thales", "International", "RW",
+               "RTKS Translate KEYVAL / AS2805 Generate Initial Terminal Key", "KEY_MGMT",
+               "DUAL-PURPOSE: "
+               "If RTKS configured: Translates a KEYVAL value between format representations. "
+               "If Australian TKS configured: Generates and distributes an initial terminal key under ZMK. "
+               "H* equivalent: HW. Response code: RX.",
+               "import_key", "TR31_K0_KEY_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "AS2805 'Generate Initial Terminal Key' maps to APC key distribution: "
+               "create_key (TR31_P0 or TR31_M0) + export_key (wrapped under ZMK/TMK). "
+               "RTKS KEYVAL translation: no direct APC equivalent."),
+    # H* cross-TKS variants — same parameters as R*, opposite TKS
+    HsmCommand("Thales", "International", "HI",
+               "Cross-TKS variant of RI (non-configured TKS)", "PIN",
+               "Provides access to the non-configured TKS function for RI. "
+               "If HSM is configured for RTKS, HI performs Australian TKS function. "
+               "If HSM is configured for Australian TKS, HI performs RTKS function. "
+               "Response code: HJ.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "APC mapping identical to RI — see RI notes. Rarely used; indicates dual-TKS deployment."),
+    HsmCommand("Thales", "International", "HK",
+               "Cross-TKS variant of RK (non-configured TKS)", "MAC",
+               "Provides access to the non-configured TKS function for RK. Response code: HL.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RK notes."),
+    HsmCommand("Thales", "International", "HM",
+               "Cross-TKS variant of RM (non-configured TKS)", "MAC",
+               "Provides access to the non-configured TKS function for RM. Response code: HN.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RM notes."),
+    HsmCommand("Thales", "International", "HO",
+               "Cross-TKS variant of RO (non-configured TKS)", "PIN",
+               "Provides access to the non-configured TKS function for RO. Response code: HP.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RO notes."),
+    HsmCommand("Thales", "International", "HQ",
+               "Cross-TKS variant of RQ (non-configured TKS)", "MAC",
+               "Provides access to the non-configured TKS function for RQ. Response code: HR.",
+               "verify_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RQ notes."),
+    HsmCommand("Thales", "International", "HS",
+               "Cross-TKS variant of RS (non-configured TKS)", "MAC",
+               "Provides access to the non-configured TKS function for RS. Response code: HT.",
+               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RS notes."),
+    HsmCommand("Thales", "International", "HU",
+               "Cross-TKS variant of RU (non-configured TKS)", "PIN",
+               "Provides access to the non-configured TKS function for RU. Response code: HV.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RU notes."),
+    HsmCommand("Thales", "International", "HW",
+               "Cross-TKS variant of RW (non-configured TKS)", "KEY_MGMT",
+               "Provides access to the non-configured TKS function for RW. Response code: HX.",
+               "import_key", "TR31_K0_KEY_ENCRYPTION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. See RW notes."),
+    # ── LMK Migration / BDK Management ────────────────────────────────────────
+    HsmCommand("Thales", "International", "BW",
+               "Translate BDK or IKEY from Old LMK to New LMK", "KEY_MGMT",
+               "Re-encrypts a BDK or IKEY from one LMK to another after an LMK re-key operation. "
+               "Takes BDK/IKEY encrypted under old LMK, returns it encrypted under new LMK. "
+               "Response code: BX.",
+               None, None,
+               "Source: PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE. "
+               "No APC equivalent. APC manages its own key protection internally — "
+               "there is no host-visible LMK re-key operation. When migrating from payShield to APC, "
+               "export the BDK as TR-31 under a transport KEK before the LMK re-key, then import into APC. "
+               "The BW command itself has no APC counterpart."),
+    HsmCommand("Thales", "International", "GK",
+               "Export BDK or IKEY Encrypted Under RSA Public Key", "KEY_MGMT",
+               "Exports a BDK or IKEY encrypted under an RSA public key for secure transport. "
+               "The RSA public key is validated by a MAC before use. Response code: GL.",
+               "export_key", "TR31_B0_BASE_DERIVATION_KEY",
+               "Source: PUGD0541-003 Rev A, Ch.5 RSA command set — AUTHORITATIVE. "
+               "APC equivalent: export_key with WrappingKeySpec RSA_OAEP_SHA_256 or similar. "
+               "Prefer TR-34 (get_parameters_for_export → export_key with TR-34 token) for "
+               "standards-compliant authenticated BDK distribution."),
 ]
 
 # ── Thales payShield 10K Legacy Commands ─────────────────────────────────────
@@ -1255,12 +1412,54 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                "In APC: verify_mac."),
     # ── UnionPay ──────────────────────────────────────────────────────────────
     HsmCommand("Thales", "Legacy", "JS",
-               "ARQC Verification and/or ARPC Generation (UnionPay)", "ARQC",
-               "Verifies a UnionPay EMV Authorization Request Cryptogram and optionally generates "
-               "an ARPC. Response code: JT. Distinct from KQ (which is the core/International command).",
+               "ARQC Verification and/or ARPC Generation (UnionPay / CUP)", "ARQC",
+               "Source: PUGD0538-003 §7 pp.122-123 — AUTHORITATIVE. "
+               "Verifies a UnionPay (CUP / PBOC 2.0/3.0) ARQC and optionally generates an ARPC. "
+               "Response code: JT. License: PS10-LIC-LEGACY. "
+               "Mode Flag (1H): '0'=verify only, '1'=verify+ARPC(ARC required), '2'=ARPC-only(no TxnData in wire). "
+               "Scheme ID (1N): always '1' (CUP Card Key Derivation CUP ver4.2). "
+               "KEY STRUCTURAL DIFFERENCE FROM KQ: "
+               "(1) JS has NO 3H Key Type field before the key — key starts immediately after Scheme ID. "
+               "(2) MK-AC is base-32H (always double-length minimum) — use parse_key_32 NOT parse_legacy_key. "
+               "(3) PAN/Seq is 8B binary BCD (same decode as KQ: nibbles 0-11=right-12 PAN, 12-13=seq, 14-15=0xFF). "
+               "(4) ATC is 2B binary (not 4H ASCII). "
+               "(5) Padding Flag (1N, '0'/'1') is a SEPARATE FIELD between ATC and TxnLen — present for Modes 0,1 only. "
+               "(6) TxnLen is 2H ASCII (2 hex chars, max 'FF'=255 bytes) NOT 4H. "
+               "(7) TxnData is nB binary (not ASCII hex). "
+               "(8) 0x3B delimiter required after TxnData (Modes 0,1). "
+               "(9) ARQC is 8B binary (not 16H ASCII). "
+               "(10) ARC is 2B binary (not 4H ASCII). "
+               "Mode 2 limitation: APC verify_auth_request_cryptogram requires TransactionData; "
+               "JS Mode 2 omits it — Mode 2 cannot be translated to APC. Reject with clear error. "
+               "CUP padding: 0x80 + 0x00 bytes to 8-byte boundary (per JR/T 0025.5-2010 Appendix D.2). "
+               "No ARPC Method 2 (CSU) — JS has no CSU field; ARPC Method 1 (XOR+ARC) only. "
+               "KB entry: payment://knowledge-base concept.thales-js-command has full field table.",
                "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
-               "UnionPay-specific ARQC/ARPC. In APC: verify_auth_request_cryptogram with "
-               "TR31_E0 master key. UnionPay uses a slightly different derivation than Visa/Mastercard."),
+               "In APC: verify_auth_request_cryptogram with TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS. "
+               "Session key derivation: SessionKeyDerivation::Emv2000 (CUP/PBOC is EMV-2000 based). "
+               "MajorKeyDerivationMode: EmvOptionA (CUP uses Option A-style IMK diversification). "
+               "ARPC: CryptogramVerificationArpcMethod1 with auth_response_code from 2B binary ARC field."),
+    HsmCommand("Thales", "Legacy", "JU",
+               "Generate Secure Message with Integrity and optional Confidentiality (UnionPay)", "ARQC",
+               "Source: PUGD0538-003 §7 pp.124-126 — AUTHORITATIVE. "
+               "Generates a UnionPay issuer-to-card Secure Message: MAC (integrity) and optionally "
+               "encrypted data or encrypted PIN block (confidentiality). Response code: JV. "
+               "License: PS10-LIC-LEGACY. "
+               "Mode Flag (1N): 0=integrity only, 1=integrity+confidentiality(same IMK), "
+               "2=integrity+confidentiality(different keys), 3=integrity+confidentiality+PIN(same IMK), "
+               "4=integrity+confidentiality+PIN(different keys). "
+               "Uses MK-SMI (Variant 2 of LMK pair 28-29) for MAC; "
+               "MK-SMC (Variant 3 of LMK pair 28-29) for encryption (Modes 2 and 4 only). "
+               "PIN change modes (3,4): accepts Source PIN Block (ZPK or TPK encrypted), "
+               "translates to session key encryption for card delivery. "
+               "Response: MAC (4B = 8H), optionally Encrypted Destination PIN Block (32H for Modes 3,4), "
+               "optionally Ciphertext Message Data (nB for Modes 1,2).",
+               "generate_mac_emv_pin_change", "TR31_E2_EMV_MKEY_INTEGRITY",
+               "In APC: generate_mac_emv_pin_change for MAC (uses TR31_E2_EMV_MKEY_INTEGRITY). "
+               "For confidentiality (Modes 1-4): also requires TR31_E1_EMV_MKEY_CONFIDENTIALITY. "
+               "APC GenerateMacEmvPinChange covers integrity MAC + PIN block encryption in one call. "
+               "No direct APC equivalent for data confidentiality (non-PIN data encryption, Modes 1-2) — "
+               "that requires a separate encrypt_data call with the session key."),
 ]
 
 # ── Atalla (HPE/Micro Focus/NCR) Commands ────────────────────────────────────
