@@ -261,27 +261,11 @@ class TestHsmAnalyzeCode:
 
 class TestProxyHandlersConsistency:
     def test_all_proxy_handler_codes_exist_in_all_commands(self, tools):
-        from apc_agent.hsm_tools import register_hsm_tools
         from apc_agent.hsm_analysis import ALL_COMMANDS
-
-        # Extract _PROXY_HANDLERS by re-registering and reading the module attribute
-        import apc_agent.hsm_tools as ht_mod
-        import importlib, types
+        from apc_agent.hsm_tools import _PROXY_HANDLERS
 
         known_codes = {c.command_code for c in ALL_COMMANDS}
-
-        class _Cap:
-            _proxy: dict = {}
-            def tool(self, **kw):
-                def d(fn): return fn
-                return d
-
-        # _PROXY_HANDLERS is a local inside register_hsm_tools; access via the closure
-        # workaround: re-read the source and extract the set literal
-        import ast, pathlib, re as _re
-        src = pathlib.Path(ht_mod.__file__).read_text()
-        # find _PROXY_HANDLERS dict in source, collect all quoted 2-char codes
-        proxy_codes = set(_re.findall(r'"([A-Z]{2,4})"', src[src.find("_PROXY_HANDLERS"):src.find("_PROXY_HANDLERS") + 2000]))
+        proxy_codes = {code for codes in _PROXY_HANDLERS.values() for code in codes}
 
         missing = proxy_codes - known_codes
         assert not missing, f"_PROXY_HANDLERS codes not in ALL_COMMANDS: {sorted(missing)}"

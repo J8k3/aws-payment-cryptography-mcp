@@ -448,11 +448,9 @@ def _default_modes_of_use(key_usage: str) -> dict:
         "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
         "TR31_D1_ASYMMETRIC_KEY_FOR_DATA_ENCRYPTION",
     }
-    mac_keys = {
+    generate_verify_keys = {
         "TR31_M0_ISO_16609_MAC_KEY", "TR31_M1_ISO_9797_1_MAC_KEY",
         "TR31_M3_ISO_9797_3_MAC_KEY", "TR31_M6_ISO_9797_5_CMAC_KEY", "TR31_M7_HMAC_KEY",
-    }
-    generate_verify_keys = {
         "TR31_V1_IBM3624_PIN_VERIFICATION_KEY", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
         "TR31_C0_CARD_VERIFICATION_KEY",
     }
@@ -471,8 +469,6 @@ def _default_modes_of_use(key_usage: str) -> dict:
 
     if key_usage in no_restrictions_keys:
         return {"NoRestrictions": True}
-    if key_usage in mac_keys:
-        return {"Generate": True, "Verify": True}
     if key_usage in generate_verify_keys:
         return {"Generate": True, "Verify": True}
     if key_usage in wrap_unwrap_keys:

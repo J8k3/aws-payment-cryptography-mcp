@@ -39,7 +39,9 @@ _KB_PATH = Path(__file__).parent.parent.parent / "payment-knowledge-base.md"
 def payment_knowledge_base() -> str:
     return _KB_PATH.read_text(encoding="utf-8")
 
+
 _APC_USE_CASE_PATH = Path(__file__).parent.parent.parent / "aws-payment-cryptography-data-plane-use-cases.json"
+
 
 @mcp.resource(
     "payment://apc-use-cases",

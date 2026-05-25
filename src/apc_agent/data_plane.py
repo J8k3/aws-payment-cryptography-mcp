@@ -443,7 +443,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             mac_length: Output MAC length in bytes (default per algorithm)
         """
         algo = generation_attributes.get("Algorithm", "")
-        if "ALGO_1" in algo:
+        if "ALGORITHM1" in algo:
             result = check_legacy_construct("CBC_MAC")
             if result:
                 return {
@@ -451,7 +451,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
                     "modern_alternative": result.modern_alternative,
                     "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
                 }
-        if "ALGO_3" in algo:
+        if "ALGORITHM3" in algo:
             result = check_legacy_construct("RETAIL_MAC")
             if result:
                 return {

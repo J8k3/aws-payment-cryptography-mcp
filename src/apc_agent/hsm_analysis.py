@@ -99,7 +99,7 @@ Socket connection patterns:
                              + variable-length fields; response = 2-char response code + fields
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -1002,6 +1002,17 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "No APC equivalent — use AWS service health checks. "
                "snowch/hsm-guide source — reference quality.",
                confidence="medium"),
+    HsmCommand("Thales", "payShield", "B2",
+               "Echo / Connectivity Test", "KEY_MGMT",
+               "Sends an echo payload to the HSM and receives the same data back. "
+               "Used to verify TCP connectivity, measure round-trip latency, and confirm "
+               "the HSM is accepting host commands. Response code: B3.",
+               None, None,
+               "No APC equivalent — replace with an APC API health probe "
+               "(e.g. list_keys with MaxResults=1) or standard HTTP/TLS connectivity test. "
+               "Wire: command code 'B2' followed by arbitrary test data; response code 'B3' "
+               "followed by same data. Proxy handler exists for integration health checks.",
+               confidence="high"),
     # ── RTKS / Australian AS2805 TKS Commands ────────────────────────────────
     # Source: payShield 10K Host Programmer's Manual PUGD0541-003 Rev A, Ch.4 — AUTHORITATIVE
     # CRITICAL: R* command codes are DUAL-PURPOSE. The same code has COMPLETELY DIFFERENT
