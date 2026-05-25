@@ -6588,6 +6588,164 @@ status: active
 
 ---
 
+### PCI PIN: Dual Control and Split Knowledge (Req 6-1.2 / Req 21-2)
+
+```yaml
+id: concept.pci-pin-dual-control-split-knowledge
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirements 6-1.2 and 21-2 — Dual Control and Split Knowledge for Key Operations
+summary: >
+  PCI PIN mandates dual control and split knowledge for all key-management operations.
+  No single individual may know or reconstruct a complete cleartext key value; at least two
+  trusted individuals must be simultaneously present for any operation on a key or its
+  components. This applies to key generation, loading, backup, and destruction — not only
+  to the physical ceremony but also to system-enforced access controls.
+domain:
+  - key_management
+  - compliance
+attributes:
+  req_6_1_2_verbatim: >
+    "Key-management operations must be performed by a minimum of two trusted individuals
+    who are simultaneously present."
+  req_21_2_verbatim: >
+    "No single person shall have access to, knowledge of, or use of any keys or key
+    components/shares enabling them to determine a key value (whether in the clear or
+    encrypted under a known key) or to place a key of their own choosing into a system."
+  applies_to:
+    - key generation ceremonies
+    - manual key loading (smart card custodians, ceremony officers)
+    - key component entry on HSM consoles
+    - backup key ceremonies
+    - key destruction events
+    - remote key distribution (TR-34 KDH ceremonies)
+  system_enforcement:
+    - HSM smart-card schemes (M-of-N) directly enforce split knowledge
+    - Single-officer logon to HSM console is insufficient where dual control is required
+    - Logging alone does not substitute for physical simultaneous presence
+  apc_posture: >
+    APC key material is never exposed in cleartext to any AWS operator (FIPS 140-2 Level 3
+    boundary). The dual-control obligation shifts to the customer's key ceremony for importing
+    key components or generating TR-31/TR-34 exchange keys. Use APC get_parameters_for_import
+    with a split-knowledge ceremony for the transport KEK.
+constraints:
+  - Minimum two individuals simultaneously present for any key management operation
+  - No single individual may know, derive, or reconstruct a complete cleartext key
+  - Smart-card or split-component schemes must enforce M-of-N (M >= 2)
+  - System roles must be segregated so no one operator can complete a key ceremony alone
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §6-1.2 (CO2 — key creation)"
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §21-2 (CO6 — key administration)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+  - type: related_to
+    target_id: concept.pci-pin-key-compromise-response
+status: active
+```
+
+---
+
+### PCI PIN: Email Prohibition for Key Conveyance (Req 8-3)
+
+```yaml
+id: concept.pci-pin-email-key-prohibition
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 8-3 — Email Must Not Be Used for Key or Component Conveyance
+summary: >
+  PCI PIN Req 8-3 explicitly prohibits email as a channel for conveying secret or private
+  keys and their components, even when the email itself is encrypted. The rationale is that
+  email exposes key material to in-memory risks during composition/rendering, and corporate
+  email systems are typically subject to administrator recovery, retention scanning, and
+  backup policies that extend the exposure window.
+domain:
+  - key_management
+  - compliance
+attributes:
+  req_8_3_verbatim: >
+    "E-mail shall not be used for the conveyance of secret or private keys or their
+    components/shares, even if encrypted."
+  rationale:
+    - "Email clients decrypt message content into addressable memory — key material is transiently cleartext on the workstation"
+    - "Corporate email systems typically have administrator-accessible recovery and backup paths"
+    - "S/MIME or PGP encryption protects channel but not in-memory exposure during composition or reading"
+    - "Email retention policies and legal hold mechanisms extend exposure window beyond intended lifecycle"
+  compliant_alternatives:
+    - "Physical courier (sealed tamper-evident envelope) with chain-of-custody log"
+    - "TR-34 remote key exchange using authenticated HSM-to-HSM channels"
+    - "TR-31 Key Block delivered over a mutually authenticated TLS session separate from email"
+    - "Smart card ceremony with M-of-N officer cards carried independently"
+  apc_posture: >
+    APC TR-34 import (get_parameters_for_import → import_key with KEY_CRYPTOGRAM) eliminates
+    the email risk by using RSA-OAEP to wrap key material for an APC-controlled public key,
+    ensuring the key never traverses email. All import traffic is over TLS to the APC endpoint.
+constraints:
+  - Email is prohibited regardless of whether the email content is encrypted
+  - Prohibition covers keys, components/shares, and key-check values used to reconstruct a key
+  - Covers both one-time and recurring key conveyance arrangements
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §8-3 (CO3 — key conveyance)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-component-channel-separation
+  - type: related_to
+    target_id: concept.pci-pin-key-block-requirements
+status: active
+```
+
+---
+
+### PCI PIN: Key Component Channel Separation (Req 8-1 Note)
+
+```yaml
+id: concept.pci-pin-component-channel-separation
+entity_type: compliance_rule
+canonical_name: PCI PIN Requirement 8-1 — Key Components Must Travel via Separate Communication Channels
+summary: >
+  PCI PIN Req 8-1 requires that the components or shares of a single key be sent via
+  different communication channels. Sending components on different days using the same
+  channel (e.g., same courier company, same network path) does NOT satisfy the requirement.
+  The channels themselves must be independent so that compromise of one channel does not
+  expose enough material to reconstruct the key.
+domain:
+  - key_management
+  - compliance
+attributes:
+  req_8_1_note_verbatim: >
+    "Components/shares of encryption keys must be conveyed using different communication
+    channels. It is not sufficient to send key components/shares for a specific key on
+    different days using the same communication channel."
+  what_counts_as_different_channels:
+    - "Different courier companies carrying different components independently"
+    - "One component by physical courier, another by TR-34 electronic channel"
+    - "One component on smart card hand-carried by officer A, another by officer B via a separate carrier"
+  what_does_not_qualify:
+    - "Component 1 on Monday via FedEx, Component 2 on Tuesday via FedEx — same channel"
+    - "Both components sent over the same TLS network path on different days"
+    - "Both components in separate emails over the same email system (also prohibited by Req 8-3)"
+  relationship_to_split_knowledge:
+    - "Channel separation is the transport enforcement of split knowledge (Req 6-1.2 / 21-2)"
+    - "Even if custodians are different, using the same channel undermines the independence goal"
+  apc_posture: >
+    APC TR-34 import eliminates multi-component channel risk by using a single cryptographic
+    ceremony where the customer generates the transport key pair independently of APC's
+    certification authority. The split-knowledge obligation is satisfied within the customer's
+    HSM ceremony, not via multi-leg transport.
+constraints:
+  - Different channels required — not just different days on the same channel
+  - Channel separation applies per-key: each key's components must use distinct channels
+  - Combination of physical courier and electronic channel (TR-34) satisfies the requirement
+references:
+  - "PCI PIN Security Requirements and Testing Procedures v3.1 §8-1 and associated Note (CO3 — key conveyance)"
+relationships:
+  - type: related_to
+    target_id: concept.pci-pin-email-key-prohibition
+  - type: related_to
+    target_id: concept.pci-pin-dual-control-split-knowledge
+status: active
+```
+
+---
+
 ## PCI P2PE Standard v3.2 — Acquirer-Relevant Rules
 
 ### PCI P2PE: Solution Architecture and APC Applicability
@@ -9339,7 +9497,7 @@ that publish annual revisions).
 | 2026-05-19 | PCI Information Supplement: PIN Security Requirement 18-3 – Key Blocks | PCI Security Standards Council | June 2019 | compliance, key_management |
 | 2026-05-19 | Use of triple length TDES in ep2 v7.x with regard to PCI SSC requirements (expert opinion letter) | SRC Security Research & Consulting GmbH / Technical Cooperation ep2 | October 30, 2020 | compliance, cryptography, pin_processing |
 | 2026-05-21 | PCI Point-to-Point Encryption (P2PE) Standard v3.2 — Domains 1–5, Appendix A, Normative Annex C (full standard read; pages 1-251) | PCI Security Standards Council | v3.2, June 2025 | compliance, key_management, cryptography, pin_processing, hsm |
-| 2026-05-21 | PCI PIN Security Requirements and Testing Procedures v3.1 (normative standard — all 7 Control Objectives, Req 1-33, Annex A TR-34, Annex B KIF/secure-room, Annex C key equivalence, Glossary) | PCI Security Standards Council | v3.1 March 2021 | compliance, key_management, pin_processing, hsm, cryptography |
+| 2026-05-21 / 2026-05-25 | PCI PIN Security Requirements and Testing Procedures v3.1 (normative standard — all 7 Control Objectives, Req 1-33, Annex A TR-34, Annex B KIF/secure-room, Annex C key equivalence, Glossary). Second pass 2026-05-25: added Dual Control/Split Knowledge (Req 6-1.2/21-2), Email Prohibition (Req 8-3), Component Channel Separation (Req 8-1 Note), and confirmed Annex C minimum key size table (DEA 112-bit, RSA 2048, ECC 224, AES 128). | PCI Security Standards Council | v3.1 March 2021 | compliance, key_management, pin_processing, hsm, cryptography |
 | 2026-05-21 | PCI Mobile Payments on COTS (MPoC) Standard v1.1 (targeted read: overview/scope pp.15-35, Req 1A-3 crypto pp.56-58, Req 1A-4 key mgmt pp.60-68, Req 4A-2 back-end ops pp.168-170, Req 4A-4 compliance stack p.180, Appendix C pp.237-239) | PCI Security Standards Council | v1.1, November 2024 | compliance, key_management, cryptography, pin_processing, hsm |
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
 | 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |

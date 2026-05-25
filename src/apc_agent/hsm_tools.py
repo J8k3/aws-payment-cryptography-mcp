@@ -226,6 +226,7 @@ def register_hsm_tools(mcp: FastMCP) -> None:
             "MA", "MC", "ME",                  # Legacy MAK
             "M0", "M2", "M4",                  # Data encrypt/decrypt/translate
             "HE", "HG",                        # Legacy TAK encrypt/decrypt
+            "GW",                              # DUKPT MAC generate/verify (3DES & AES)
             "KQ",                              # ARQC/ARPC
             "KW",                              # ARQC/ARPC (EMV & Cloud-Based SKD)
             "JS",                              # ARQC/ARPC (UnionPay/CUP)
