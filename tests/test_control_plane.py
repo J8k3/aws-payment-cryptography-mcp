@@ -6,8 +6,10 @@ moto is applied automatically by conftest but our explicit patches take preceden
 so these tests run without real AWS credentials.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, call
+
 from apc_agent.control_plane import register_control_plane_tools
 
 
@@ -74,7 +76,7 @@ class TestCreateKey:
         }
         with patch("apc_agent.control_plane.boto3") as mock_boto3:
             mock_boto3.client.return_value = mock_client
-            result = tools["create_key"](
+            tools["create_key"](
                 key_algorithm="AES_128",
                 key_usage="TR31_P0_PIN_ENCRYPTION_KEY",
                 key_class="SYMMETRIC_KEY",

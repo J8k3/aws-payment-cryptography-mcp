@@ -25,6 +25,24 @@ dependencies = [
     "moto[payment-cryptography]>=5.0.0",
 ]
 
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "F",    # pyflakes — undefined names, unused imports
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade — use modern Python syntax
+    "I",    # isort — import ordering
+    "B",    # flake8-bugbear — likely bugs and design issues
+    "SIM",  # flake8-simplify — redundant code patterns
+]
+ignore = [
+    "E501",   # line too long — docstrings and notes strings are intentionally verbose
+    "SIM108", # ternary operator — explicit if/else is clearer in compliance-critical paths
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
