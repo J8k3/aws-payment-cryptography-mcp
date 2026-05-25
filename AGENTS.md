@@ -81,6 +81,7 @@ When working in this repo or in the CyberChef payments repo, any new domain know
 | HSM command analysis | `hsm_analysis.py` (command registry) |
 | PCI compliance rule | `compliance.py` (enforcement logic) |
 | APC API constraint or gap | `AGENTS.md` → Key Constraints section, and open a GitHub issue if actionable |
+| Proxy handler completed in apc-hsm-proxy | `hsm_tools.py` → `_PROXY_HANDLERS` (see Proxy Handler Wiring section) |
 
 Do not defer knowledge updates. If the session ends without the relevant file being updated, the knowledge is lost.
 
@@ -101,6 +102,22 @@ Fix every ruff violation. All tests must pass. If a test catches a new bug, fix 
 
 `W:\apc-hsm-proxy` is owned by a separate session. Never read, edit, or touch any file under that path.
 
+## Proxy Handler Wiring
+
+`_PROXY_HANDLERS` in `src/apc_agent/hsm_tools.py` is the MCP server's registry of which proxy handlers exist. It is the source of truth for the `handler_exists` field returned by `hsm_analyze_discovery_log`.
+
+**When a handler is completed in apc-hsm-proxy, update `_PROXY_HANDLERS` in this repo in the same commit.** Until that update is pushed, `hsm_analyze_discovery_log` will report `handler_exists: false` for that command even though the handler exists — misleading any session that calls the tool.
+
+The two-repo update contract:
+
+| Event | Update here |
+|---|---|
+| New command discovered in proxy discovery log | Add `HsmCommand` entry to `hsm_analysis.py` (`ALL_COMMANDS`) |
+| New proxy handler completed in `apc-hsm-proxy` | Add command code to `_PROXY_HANDLERS` in `hsm_tools.py` |
+| Command found to be unsupported by APC | Add `apc_operation=None, apc_key_type=None` entry with migration note in `hsm_analysis.py` |
+
+**Consistency test:** `TestProxyHandlersConsistency` in `tests/test_hsm_tools.py` verifies that every code in `_PROXY_HANDLERS` exists in `ALL_COMMANDS`. It catches codes added to `_PROXY_HANDLERS` before their `HsmCommand` entry is written. Run it after any change to either structure.
+
 ## Pre-commit Checklist (Tool Changes)
 
 Before committing any new or changed MCP tool, verify all of the following are in the same commit:
@@ -108,6 +125,7 @@ Before committing any new or changed MCP tool, verify all of the following are i
 - If the tool exposes new domain knowledge: `payment-knowledge-base.md` updated
 - If the tool detects a new HSM command: `hsm_analysis.py` updated
 - If the tool enforces a new compliance rule: `compliance.py` updated and tested
+- If a proxy handler was completed: `_PROXY_HANDLERS` in `hsm_tools.py` updated
 - Ruff clean (`ruff check src/ tests/`)
 - Tests passing (`pytest`)
 - Tool docstring has a "Call this when..." trigger sentence

@@ -18,7 +18,10 @@ from .hsm_analysis import (
     lookup_command,
 )
 
-# Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy)
+# Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy).
+# Keep this in sync with the proxy's src/handlers/ directory — when a handler is completed in the proxy,
+# add its command code here. The consistency test (TestProxyHandlersConsistency) verifies every code here
+# exists in ALL_COMMANDS; it does NOT verify that the handler actually exists in the proxy source tree.
 _PROXY_HANDLERS: dict[str, set[str]] = {
     "futurex_excrypt": {"ECHO", "TPIN"},
     "thales_payshield": {
@@ -241,6 +244,12 @@ def register_hsm_tools(mcp: FastMCP) -> None:
         (a discovery.jsonl file). Returns per-command APC mappings, which proxy handlers
         already exist, which still need to be written, and migration notes.
         Works without AWS credentials.
+
+        IMPORTANT — handler_exists reflects _PROXY_HANDLERS in hsm_tools.py, not the
+        apc-hsm-proxy source tree. When a handler is completed in the proxy, update
+        _PROXY_HANDLERS in this file so handler_exists reports correctly. Until that update
+        is committed and the MCP server restarted, handler_exists will show false even for
+        commands that already have working handlers.
 
         Each log line is a JSON object:
           vendor      — "futurex_excrypt" or "thales_payshield"
