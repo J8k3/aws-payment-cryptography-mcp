@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "apc-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server for AWS Payment Cryptography — works with Claude Code, Codex CLI, and other MCP clients"
 requires-python = ">=3.11"
 dependencies = [
