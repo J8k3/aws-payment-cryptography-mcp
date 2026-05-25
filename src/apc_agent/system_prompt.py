@@ -43,6 +43,7 @@ These tools work without AWS credentials and answer payment domain questions dir
   hsm_analyze_code(source_code)   — Scan legacy code for HSM socket calls
   hsm_analyze_discovery_log(log)  — Analyze apc-hsm-proxy discovery output
   hsm_migration_notes(topic)      — LMK, DUKPT, fixed-key migration guidance
+  contribute_kb_finding(...)      — Stage a KB gap or registry update as a GitHub issue
 
 Call these even when there is no APC account configured.
 
@@ -282,6 +283,27 @@ ROTATION AND DELETION:
 
 When generating code that calls APC, always include logging statements that capture
 operation type, key ARN, and timestamp — without capturing sensitive field values.
+
+═══════════════════════════════════════════════════════
+CONTRIBUTING A FINDING BACK TO THIS SERVER
+═══════════════════════════════════════════════════════
+
+When working in any repo (apc-hsm-proxy, CyberChef-Payments, etc.) and you discover
+something that belongs in this server — a missing HSM command, a KB gap, a completed
+proxy handler, a compliance rule, an APC constraint — use contribute_kb_finding() to
+stage it as a GitHub issue. The MCP server session will apply it at the next session start.
+
+  contribute_kb_finding(
+      finding_type = "kb_entry" | "hsm_command" | "proxy_handler" | "compliance_rule" | "apc_constraint",
+      summary      = "one-line description",
+      content      = "the content to add, formatted for the target file",
+      source_repo  = "which repo revealed this",
+      context      = "optional: related files, downstream impact",
+  )
+
+The tool returns a formatted issue body and the exact gh CLI command to file it.
+Do NOT defer — call this in the same session that discovers the gap. If the session ends
+without filing the issue, the finding is lost.
 
 ═══════════════════════════════════════════════════════
 BEHAVIORAL GUIDELINES

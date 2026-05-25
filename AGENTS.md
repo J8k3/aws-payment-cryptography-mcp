@@ -62,6 +62,20 @@ Tools are registered by calling `register_*_tools(mcp: FastMCP)` functions. Each
 - Preferred command: `git pull --rebase origin master`
 - Only do this automatically when the worktree is clean. If local changes are already present, inspect before rebasing.
 
+**Flush pending KB contributions before doing other work:**
+
+```bash
+gh issue list --repo J8k3/aws-payment-cryptography-mcp --label kb-contribution --state open
+```
+
+For each open issue: read the `Target File` and `Content to Add` fields, apply the change to the relevant file, commit (following Commit Scope rules), and close the issue referencing the commit hash:
+
+```bash
+gh issue close <number> --comment "Applied in <commit-hash>."
+```
+
+Do not defer pending contributions to the end of the session.
+
 ## Commit Scope
 
 - Keep commits small and reviewable by default.

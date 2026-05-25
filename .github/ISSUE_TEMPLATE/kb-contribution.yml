@@ -1,0 +1,57 @@
+name: KB / Registry Contribution
+description: Submit a knowledge base finding, HSM command, proxy handler registration, or compliance rule discovered in another session.
+labels: ["kb-contribution"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when you discover something in **apc-hsm-proxy**, **CyberChef-Payments**, or any other session that belongs in this MCP server's knowledge base or registries.
+
+        You can also file this programmatically from any MCP-connected session:
+        ```
+        contribute_kb_finding(finding_type=..., summary=..., content=..., source_repo=...)
+        ```
+
+  - type: dropdown
+    id: finding_type
+    attributes:
+      label: Contribution type
+      description: What kind of finding is this?
+      options:
+        - kb_entry — new or updated entry for payment-knowledge-base.md
+        - hsm_command — new HSM command for hsm_analysis.py ALL_COMMANDS
+        - proxy_handler — handler completed in apc-hsm-proxy; update _PROXY_HANDLERS
+        - compliance_rule — new PCI or scheme rule for compliance.py
+        - apc_constraint — APC API gap or undocumented constraint for AGENTS.md
+    validations:
+      required: true
+
+  - type: input
+    id: source_repo
+    attributes:
+      label: Source
+      description: Which repo or context revealed this gap?
+      placeholder: "e.g. apc-hsm-proxy GW handler implementation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: content
+    attributes:
+      label: Content to add
+      description: |
+        The actual content, formatted for the target file.
+        - KB entry: use the standard YAML front-matter block format from payment-knowledge-base.md
+        - HSM command: paste a complete HsmCommand(...) constructor call
+        - Proxy handler: just the command code(s) — e.g. `"GW"` for thales_payshield
+        - Compliance rule: ComplianceResult(...) constructor or requirement text + citation
+        - APC constraint: plain prose with the constraint and PCI/API reference
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
+      description: What were you doing when you found this? Does it affect other files or create downstream obligations?
