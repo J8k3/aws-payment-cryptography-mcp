@@ -214,7 +214,18 @@ def register_hsm_tools(mcp: FastMCP) -> None:
     # Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy)
     _PROXY_HANDLERS: dict[str, set[str]] = {
         "futurex_excrypt": {"ECHO", "TPIN"},
-        "thales_payshield": {"CA", "CC", "CI", "G0", "C2", "C4", "M6", "M8", "CW", "CY", "B2"},
+        "thales_payshield": {
+            "CA", "CC", "CI", "G0",           # PIN translation
+            "CK", "CM", "CO", "CQ",           # DUKPT PIN verify
+            "CW", "CY",                        # CVV generate/verify
+            "C2", "C4",                        # AS2805 MAC
+            "M6", "M8",                        # MAC generate/verify
+            "MA", "MC", "ME",                  # Legacy MAK
+            "M0", "M2", "M4",                  # Data encrypt/decrypt/translate
+            "HE", "HG",                        # Legacy TAK encrypt/decrypt
+            "KQ",                              # ARQC/ARPC
+            "B2",                              # Heartbeat/diagnostics
+        },
     }
 
     @mcp.tool()

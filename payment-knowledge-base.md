@@ -4116,7 +4116,9 @@ attributes:
   supported_protocols:
     - thales_payshield: >
         2-byte length prefix + 2-byte command code framing. Handlers: CA/CC/CI/G0 (PIN translate),
-        C2/C4/M6/M8 (MAC generate/verify), CW/CY (CVV generate/verify), B2 (echo/heartbeat).
+        C2/C4/M6/M8 (MAC generate/verify), CW/CY (CVV generate/verify), B2 (echo/heartbeat),
+        MA/MC/ME (legacy TAK MAC generate/verify/translate, ISO 9797 Algorithm 1),
+        CK/CM (DUKPT IBM3624/Visa PVV PIN verify), CO/CQ (DUKPT Diebold/Encrypted PIN — stub 68).
     - futurex_excrypt: >
         [AOCCCC;param;param;] bracket-delimited framing. Handlers: ECHO (heartbeat), TPIN (PIN translate).
   workflow:
@@ -4151,6 +4153,58 @@ relationships:
   - type: related_to
     target_id: tool.cyberchef-payment-fork
     notes: CyberChef fork can be used to verify handler output (CVV, MAC, PIN) at the operation level.
+status: active
+```
+
+## APC SDK Implementation Notes
+
+### verify_pin_data Type Naming Trap
+
+```yaml
+id: rule.apc-verify-pin-data-types
+entity_type: constraint_rule
+canonical_name: APC verify_pin_data uses different types than generate_pin_data
+summary: >
+  The APC Rust SDK (aws-sdk-paymentcryptographydata v1.x) uses DIFFERENT struct types for
+  PIN verification vs PIN generation. Using the wrong type causes silent compile errors or
+  runtime failures. This is the most common mistake when implementing verify_pin_data handlers.
+domain:
+  - pin_processing
+  - hsm_migration
+attributes:
+  verified_against: aws-sdk-paymentcryptographydata 1.105.0
+  verify_pin_data_types:
+    ibm3624_verification: Ibm3624PinVerification
+    ibm3624_verification_fields:
+      - decimalization_table: String (required)
+      - pin_validation_data_pad_character: String (required, use "F" for IBM 3624 standard)
+      - pin_validation_data: String (required, 12 alphanumeric chars from payShield CK)
+      - pin_offset: String (required, 12H F-padded IBM offset from payShield CK)
+    visa_verification: VisaPinVerification
+    visa_verification_fields:
+      - pin_verification_key_index: i32 (required, PVKI from payShield CM)
+      - verification_value: String (required, PVV 4N from payShield CM)
+    wrong_types_for_verify:
+      - Ibm3624PinOffset: "for generate_pin_data only — NOT verify_pin_data"
+      - VisaPinVerificationValue: "for generate_pin_data only — NOT verify_pin_data"
+    pin_verification_attributes_enum:
+      ibm3624: PinVerificationAttributes::Ibm3624Pin(Ibm3624PinVerification)
+      visa: PinVerificationAttributes::VisaPin(VisaPinVerification)
+  dukpt_key_placement:
+    bdk_arn: "goes in encryption_key_identifier on the OUTER verify_pin_data() call"
+    pvk_arn: "goes in verification_key_identifier on the OUTER verify_pin_data() call"
+    pin_block: "goes in encrypted_pin_block on the OUTER verify_pin_data() call"
+    dukpt_attributes_fields:
+      - key_serial_number: String (KSN hex — required)
+      - dukpt_derivation_type: DukptDerivationType (required, use Tdes2Key for original DUKPT)
+    dukpt_attributes_does_NOT_have:
+      - key_identifier: "BDK ARN does NOT go inside DukptAttributes — it goes in encryption_key_identifier"
+      - dukpt_key_variant: "no such field — remove if copied from older SDK examples"
+constraints:
+  - "Ibm3624PinVerification has no encrypted_pin_block field — pin block is at the outer call level"
+  - "VisaPinVerification has no encrypted_pin_block field — pin block is at the outer call level"
+  - "DukptAttributes has exactly two required fields: key_serial_number and dukpt_derivation_type"
+  - "BDK ARN is passed via encryption_key_identifier (outer field), NOT inside DukptAttributes"
 status: active
 ```
 

@@ -258,6 +258,10 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
 # These command codes appear in BOTH Thales payShield and Futurex International mode codebases.
 # Fixed-length fields, no delimiters. First 2 characters = command code.
 # Thales response: 2-char response code where "00" = success.
+#
+# Wire format reference: PUGD0537-004 Rev A, August 2020 (payShield 10K Core Host Commands) — AUTHORITATIVE
+# for M0/M2/M4 (p.381/388/394), M6/M8/MY (p.363/368/373), KQ/KW/KU/KY/K2 (p.468–483).
+# PIN/MAC/CVV commands also confirmed in Futurex General Payment HSM Integration Guide (2024).
 
 INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     # PIN Translation — most common acquirer operations
@@ -350,31 +354,194 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Visa PVV PIN verification.", "verify_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY"),
     HsmCommand("Thales/Futurex", "International", "CK",
                "Verify PIN using IBM Method (DUKPT)", "PIN",
-               "IBM3624 PIN verification with DUKPT.",
-               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY"),
+               "IBM 3624 offset PIN verification with original single-length DUKPT. "
+               "Response code: CL. BDK (LMK pair 28-29) derives a 56-bit working key "
+               "from the KSN. Field layout: BDK (32H|U+32H) + PVK (16H|U+32H|T+48H, LMK 14-15 v0) "
+               "+ KSN descriptor (3H) + KSN (20H standard) + PIN block (16H ISO-0) "
+               "+ check length (2N) + account number (12N) + decimalization table (16N) "
+               "+ PIN validation data (12A) + IBM offset (12H, F-padded).",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "APC Rust SDK v1: use PinVerificationAttributes::Ibm3624Pin(Ibm3624PinVerification). "
+               "Ibm3624PinVerification fields: decimalization_table, pin_validation_data_pad_character, "
+               "pin_validation_data, pin_offset. BDK ARN goes in encryption_key_identifier on the outer "
+               "verify_pin_data call — NOT inside DukptAttributes. DukptAttributes only holds "
+               "key_serial_number + dukpt_derivation_type (DukptDerivationType::Tdes2Key). "
+               "PVK ARN goes in verification_key_identifier. PIN block goes in encrypted_pin_block at "
+               "the outer call level. Note: Ibm3624PinOffset is for generate_pin_data, not verify. "
+               "CO (Diebold) and CQ (Encrypted PIN) have no APC equivalent — return error 68."),
     HsmCommand("Thales/Futurex", "International", "CM",
-               "Verify PIN using Visa PVV Method", "PIN",
-               "Visa PVV PIN verification.", "verify_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY"),
+               "Verify PIN using Visa PVV Method (DUKPT)", "PIN",
+               "Visa PVV PIN verification with original single-length DUKPT. "
+               "Response code: CN. BDK (LMK pair 28-29) derives the working key from the KSN. "
+               "Field layout: BDK (32H|U+32H) + PVK (32H|U+32H|T+48H, LMK 14-15 v0) "
+               "+ KSN descriptor (3H) + KSN (20H) + PIN block (16H ISO-0) + PAN (12N) "
+               "+ PVKI (1N) + PVV (4N). Token mode (';' delimiter before PVKI) not mappable to APC.",
+               "verify_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+               "APC Rust SDK v1: use PinVerificationAttributes::VisaPin(VisaPinVerification). "
+               "VisaPinVerification fields: pin_verification_key_index (PVKI as i32), verification_value (PVV). "
+               "BDK ARN goes in encryption_key_identifier on the outer verify_pin_data call. "
+               "DukptAttributes only holds key_serial_number + dukpt_derivation_type. "
+               "PVK ARN goes in verification_key_identifier. PIN block goes in encrypted_pin_block "
+               "at the outer call level. Note: VisaPinVerificationValue is for generate_pin_data, not verify."),
     HsmCommand("Thales/Futurex", "International", "DE",
-               "Generate IBM PIN Offset", "PIN",
-               "Generates an IBM 3624 PIN offset from a PVK and a PIN encrypted under LMK. "
-               "The offset encodes the distance from a natural PIN to the chosen PIN. Response code: DF.",
+               "Generate an IBM PIN Offset (of an LMK-encrypted PIN)", "PIN",
+               "Generates an IBM 3624 PIN offset from a customer-selected PIN already encrypted "
+               "under LMK and a PVK. The offset encodes the delta between the natural PIN and the "
+               "customer's chosen PIN, and is stored on the card/database for later verification. "
+               "Response code: DF.",
                "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
-               "Wire params (thales-bogr): PVK (under LMK), PIN under LMK, check length (1N), "
-               "account number (12N), decimalization table (16N), validation data (12N). "
-               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY. "
-               "EFTlab + thales-bogr sources — reference quality.",
-               confidence="medium"),
+               "Source: PUGD0537-004 Rev A, p.217 — AUTHORITATIVE. "
+               "Used in card issuance flows where the customer selected their own PIN. "
+               "See also BK (offset from customer-selected PIN without LMK step). "
+               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY."),
     HsmCommand("Thales/Futurex", "International", "EE",
-               "Derive IBM 3624 PIN from Offset", "PIN",
-               "Derives the cardholder PIN from a PVK, offset, and account number. "
-               "Reverse of DE — produces the natural PIN for comparison. Response code: EF.",
+               "Derive a PIN Using the IBM Offset Method", "PIN",
+               "Derives the natural PIN for an account from the PAN using IBM 3624 DES derivation "
+               "(encrypt transformed PAN with PVK, apply decimalization table). "
+               "Response code: EF. Used in card issuance to compute the initial system-assigned PIN.",
                "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
-               "Wire params (thales-bogr): PVK (under LMK), PIN offset (4N), check length (1N), "
-               "account number (12N), decimalization table (16N), validation data (12N). "
-               "In APC: generate_pin_data. "
-               "EFTlab + thales-bogr sources — reference quality.",
-               confidence="medium"),
+               "Source: PUGD0537-004 Rev A, p.210 — AUTHORITATIVE. "
+               "IBM 3624 natural PIN derivation: PAN → transform → DES encrypt with PVK → decimalize → PIN. "
+               "The result is the 'natural PIN' that may then be printed on a mailer (NG command) "
+               "or combined with an offset via DE. "
+               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "GA",
+               "Derive a PIN Using the Diebold Method", "PIN",
+               "Derives a PIN for an account using the Diebold derivation algorithm. "
+               "Response code: GB. Used in card issuance to compute the initial system-assigned PIN.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.213 — AUTHORITATIVE. "
+               "Diebold PIN derivation variant; same APC mapping as EE (IBM 3624). "
+               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "BK",
+               "Generate an IBM PIN Offset (of a Customer-Selected PIN)", "PIN",
+               "Generates an IBM 3624 PIN offset where the customer enters their desired PIN "
+               "directly (not pre-encrypted under LMK). Response code: BL.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.220 — AUTHORITATIVE. "
+               "Customer-facing variant of DE. The clear PIN is accepted only at PCI PTS-certified "
+               "entry devices and must never be logged. In APC: generate_pin_data."),
+    HsmCommand("Thales/Futurex", "International", "CE",
+               "Generate a Diebold PIN Offset", "PIN",
+               "Generates a Diebold PIN offset for a given account. Response code: CF.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.224 — AUTHORITATIVE. "
+               "Diebold offset variant. In APC: generate_pin_data."),
+    HsmCommand("Thales/Futurex", "International", "DG",
+               "Generate an ABA PVV (of an LMK-encrypted PIN)", "PIN",
+               "Generates an ABA PVV (Visa PIN Verification Value) from a customer-selected PIN "
+               "encrypted under LMK. Response code: DH.",
+               "generate_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.225 — AUTHORITATIVE. "
+               "LMK-encrypted PIN input variant of FW. "
+               "In APC: generate_pin_data with TR31_V2_VISA_PIN_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "FW",
+               "Generate an ABA PVV (of a Customer-Selected PIN)", "PIN",
+               "Generates an ABA PVV where the customer enters their desired PIN directly. "
+               "Response code: FX.",
+               "generate_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.227 — AUTHORITATIVE. "
+               "Customer-facing variant of DG. Clear PIN accepted only at PCI PTS-certified devices. "
+               "In APC: generate_pin_data with TR31_V2_VISA_PIN_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "DU",
+               "Verify a PIN and Generate an IBM PIN Offset (of Customer-Selected New PIN)", "PIN",
+               "Verifies the cardholder's current PIN and, if correct, generates an IBM 3624 offset "
+               "for their new customer-selected PIN. Atomic PIN change. Response code: DV.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.255 — AUTHORITATIVE. "
+               "Combined verify-then-generate in a single command. "
+               "In APC: verify_pin_data followed by generate_pin_data (two calls)."),
+    HsmCommand("Thales/Futurex", "International", "CU",
+               "Verify a PIN and Generate an ABA PVV (of Customer-Selected New PIN)", "PIN",
+               "Verifies the cardholder's current PIN and, if correct, generates a new ABA PVV "
+               "for their customer-selected new PIN. Atomic PIN change. Response code: CV.",
+               "generate_pin_data", "TR31_V2_VISA_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.259 — AUTHORITATIVE. "
+               "Combined verify-then-generate in a single command. "
+               "In APC: verify_pin_data followed by generate_pin_data (two calls)."),
+    # PIN Verification — non-DUKPT variants
+    HsmCommand("Thales/Futurex", "International", "BC",
+               "Verify a Terminal PIN Using the Comparison Method", "PIN",
+               "Verifies a terminal PIN by decrypting it and comparing against a stored PIN "
+               "encrypted under LMK. Response code: BD.",
+               "verify_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.277 — AUTHORITATIVE. "
+               "Comparison method: decrypts both PIN blocks and compares clear values. "
+               "In APC: verify_pin_data with PinVerificationAttributes for comparison method."),
+    HsmCommand("Thales/Futurex", "International", "BE",
+               "Verify an Interchange PIN Using the Comparison Method", "PIN",
+               "Verifies an interchange (ZPK-encrypted) PIN by decrypting and comparing "
+               "against an LMK-stored reference PIN. Response code: BF.",
+               "verify_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.279 — AUTHORITATIVE. "
+               "Interchange variant of BC. In APC: verify_pin_data."),
+    HsmCommand("Thales/Futurex", "International", "CG",
+               "Verify a Terminal PIN Using the Diebold Method", "PIN",
+               "Verifies a terminal PIN using the Diebold PIN verification algorithm. "
+               "Response code: CH.",
+               "verify_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.269 — AUTHORITATIVE. "
+               "Terminal key (TPK) inbound. In APC: verify_pin_data."),
+    HsmCommand("Thales/Futurex", "International", "EG",
+               "Verify an Interchange PIN Using the Diebold Method", "PIN",
+               "Verifies an interchange (ZPK-encrypted) PIN using the Diebold algorithm. "
+               "Response code: EH.",
+               "verify_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.271 — AUTHORITATIVE. "
+               "ZPK inbound. In APC: verify_pin_data."),
+    # DUKPT PIN Verification — 3DES and AES (X9.24-1 and X9.24-3)
+    HsmCommand("Thales/Futurex", "International", "GO",
+               "Verify a PIN Using the IBM Offset Method (3DES & AES DUKPT)", "PIN",
+               "Verifies a DUKPT-encrypted PIN using the IBM 3624 offset method. Supports both "
+               "3DES (X9.24-1) and AES (X9.24-3) DUKPT. Response code: GP.",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.349 — AUTHORITATIVE. "
+               "BDK (LMK pair 28-29) + KSN derive the working key. "
+               "In APC: verify_pin_data with IncomingDukptAttributes (BDK ARN + KSN + dukpt_derivation_type). "
+               "For AES DUKPT: dukpt_derivation_type=AES_128 and 12-byte KSN."),
+    HsmCommand("Thales/Futurex", "International", "GQ",
+               "Verify a PIN Using the ABA PVV Method (3DES & AES DUKPT)", "PIN",
+               "Verifies a DUKPT-encrypted PIN using the ABA PVV (Visa PIN Verification Value) "
+               "method. Supports both 3DES and AES DUKPT. Response code: GR.",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.352 — AUTHORITATIVE. "
+               "In APC: verify_pin_data with IncomingDukptAttributes + "
+               "PinVerificationAttributes::VisaPin(VisaPinVerification). "
+               "PVK ARN in verification_key_identifier; BDK ARN in encryption_key_identifier."),
+    HsmCommand("Thales/Futurex", "International", "GS",
+               "Verify a PIN Using the Diebold Method (3DES & AES DUKPT)", "PIN",
+               "Verifies a DUKPT-encrypted PIN using the Diebold method. "
+               "Supports both 3DES and AES DUKPT. Response code: GT.",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.355 — AUTHORITATIVE. "
+               "In APC: verify_pin_data with IncomingDukptAttributes."),
+    HsmCommand("Thales/Futurex", "International", "GU",
+               "Verify a PIN Using the Encrypted PIN Method (3DES & AES DUKPT)", "PIN",
+               "Verifies a DUKPT-encrypted PIN by decrypting and comparing against a stored "
+               "reference PIN (Encrypted PIN comparison method). Supports 3DES and AES DUKPT. "
+               "Response code: GV.",
+               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.358 — AUTHORITATIVE. "
+               "In APC: verify_pin_data with IncomingDukptAttributes. "
+               "TDES prohibited for new deployments since Jan 2023 — migrate to AES DUKPT."),
+    # PIN Translation — additional
+    HsmCommand("Thales/Futurex", "International", "BQ",
+               "Translate PIN Algorithm (PIN Block Format Conversion)", "PIN",
+               "Translates a PIN block from one PIN block format to another without decrypting "
+               "the PIN to clear text. Response code: BR.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.294 — AUTHORITATIVE. "
+               "Used to convert between ISO Format 0, Format 1, Format 3, Format 4, etc. "
+               "In APC: translate_pin_data with explicit source and target format specifiers."),
+    HsmCommand("Thales/Futurex", "International", "AQ",
+               "Translate an RSA-encrypted PIN to a ZPK or TPK-encrypted PIN", "PIN",
+               "Translates a PIN block encrypted under an RSA public key into a symmetric "
+               "(ZPK or TPK) encrypted PIN block. Response code: AR.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.296 — AUTHORITATIVE. "
+               "Used in RSA-based remote PIN entry (OPINPad) flows. "
+               "In APC: no direct RSA PIN translate — decrypt RSA-encrypted PIN then "
+               "translate_pin_data; or use a dedicated PIN translation HSM for the RSA step."),
     # CVV
     HsmCommand("Thales/Futurex", "International", "CW",
                "Generate Visa Card Verification Value (CVV)", "CVV",
@@ -386,17 +553,61 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Verifies CVV/CVV2 for acquirer/processor card validation.",
                "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
                "Thales response code: CZ. Parameters: CVK, PAN, expiry date, service code, CVV to verify."),
+    HsmCommand("Thales/Futurex", "International", "QY",
+               "Generate a Dynamic CVV", "CVV",
+               "Generates a Dynamic Card Verification Value (dCVV) for a contactless or EMV "
+               "transaction. Response code: QZ.",
+               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.306 — AUTHORITATIVE. "
+               "dCVV is time-limited or transaction-specific; requires a DCVV-enabled CVK. "
+               "In APC: generate_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "PM",
+               "Verify a Dynamic CVV/CVC", "CVV",
+               "Verifies a Dynamic CVV or CVC value for contactless or EMV transactions. "
+               "Response code: PN.",
+               "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.308 — AUTHORITATIVE. "
+               "Validates the dCVV against the expected value derived from the card's dynamic key. "
+               "In APC: verify_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
+    HsmCommand("Thales/Futurex", "International", "RY",
+               "Calculate/Verify Card Security Codes", "CVV",
+               "Calculates or verifies card security codes (Mastercard CVC2, Visa CVV2, Amex CID). "
+               "Response code: RZ.",
+               "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.315-316 — AUTHORITATIVE. "
+               "Dual-function: generate or verify depending on parameters. "
+               "In APC: generate_card_validation_data or verify_card_validation_data with TR31_C0."),
+    HsmCommand("Thales/Futurex", "International", "NY",
+               "Generate IVCVC3 and Static CVC3", "CVV",
+               "Generates an Initial Vector CVC3 (IVCVC3) and/or Static CVC3 for Mastercard "
+               "contactless (PayPass/Tap & Go) transactions. Response code: NZ.",
+               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.493 — AUTHORITATIVE. "
+               "CVC3 is Mastercard's contactless card verification value. "
+               "IVCVC3 is a one-time initialization vector; Static CVC3 is precomputed at issuance. "
+               "In APC: generate_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
     # MAC
     HsmCommand("Thales/Futurex", "International", "M6",
                "Generate MAC using MAK (supports continuation mode)", "MAC",
                "Generates a MAC using a Message Authentication Key (MAK). "
-               "Supports multi-block continuation mode for large messages.",
+               "Supports multi-block continuation mode for large messages. Response code: M7.",
                "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY",
-               "CBC-MAC algorithm. Consider migrating to CMAC (M6 key type in APC)."),
+               "Source: PUGD0537-004 Rev A, p.363 — AUTHORITATIVE. "
+               "Wire: Mode Flag 1N + Input Format Flag 1N + MAC Size 1N + MAC Algorithm 1N "
+               "+ Padding Method 1N + Key Type 3H (003=TAK/008=ZAK variant, FFF=KB-LMK) "
+               "+ Key (16H/U+32H/T+48H or S+nA) + [Message Length 4H] + Message. "
+               "Response M7: Error 2A + MAC (8H or 16H). "
+               "Use MY for Key Block LMK keys. CBC-MAC — consider migrating to CMAC for new work. "
+               "WARNING: proxy mac.rs uses simplified format (mode 1N + key 32H fixed + msg_len 4H) "
+               "without the Input Format, MAC Size, Algorithm, Padding, or Key Type fields — "
+               "not wire-compatible with a real payShield M6."),
     HsmCommand("Thales/Futurex", "International", "M8",
                "Verify MAC using MAK (supports continuation mode)", "MAC",
-               "Verifies a MAC using a Message Authentication Key.",
-               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY"),
+               "Verifies a MAC using a Message Authentication Key. Response code: M9. "
+               "Error 01 = MAC mismatch.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.368 — AUTHORITATIVE. "
+               "Same wire layout as M6 with MAC value appended at end of command payload."),
     HsmCommand("Thales/Futurex", "International", "MA",
                "Generate MAC using MAK", "MAC",
                "Single-block MAC generation.", "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY"),
@@ -413,11 +624,97 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     HsmCommand("Thales/Futurex", "International", "C4",
                "Verify MAC (AS2805)", "MAC",
                "AS2805 MAC verification.", "verify_mac", "TR31_M0_ISO_16609_MAC_KEY"),
+    HsmCommand("Thales/Futurex", "International", "MY",
+               "Verify and Translate MAC", "MAC",
+               "Verifies a MAC under one key and generates a new MAC under a different key in a "
+               "single atomic operation. Response code: MZ. Used at network gateway boundaries "
+               "to re-MAC a message as it crosses zone boundaries.",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.371 — AUTHORITATIVE. "
+               "Core equivalent of Legacy ME command. "
+               "In APC: two separate calls — verify_mac (inbound MAK ARN) then generate_mac (outbound MAK ARN). "
+               "Both keys should be TR31_M3 or TR31_M6; prefer CMAC over CBC-MAC for new deployments."),
     # ARQC
     HsmCommand("Thales/Futurex", "International", "KQ",
-               "ARQC/TC/AAC Verification and/or ARPC Generation", "ARQC",
-               "EMV cryptogram verification (ARQC, TC, AAC) and ARPC generation.",
-               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS"),
+               "Verify ARQC / Generate ARPC (Static & MC Proprietary SKD)", "ARQC",
+               "EMV cryptogram verification (ARQC, TC, AAC) and ARPC generation. "
+               "Supports Visa Static Data Auth and Mastercard Proprietary SKD. Response code: KR.",
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Source: PUGD0537-004 Rev A, p.468 — AUTHORITATIVE. "
+               "Wire (all multibyte fields are RAW BINARY, not hex-encoded): "
+               "Mode Flag 1N (0=verify only, 1=verify+ARPC M1, 2=verify+ARPC M2, "
+               "3=skip verify+ARPC M1, 4=skip verify+ARPC M2) + Scheme ID 1N (0=Visa/Amex, 1=MC) "
+               "+ Key Type 3H (00E=IMK-AC, FFF=KB-LMK) + Key (16H/U+32H/T+48H or S+nA) "
+               "+ PAN+PAN_Seq 8 B (BCD packed, left-justified, right-padded with 0xF; includes 2-digit seq) "
+               "+ ATC 2 B + UN 4 B (Unpredictable Number) "
+               "+ Transaction Data Length 2 B + Transaction Data n B "
+               "+ ';' delimiter 0x3B + ARQC 8 B. "
+               "Mode 1/3 appends: ARC 2 B (ARPC Method 1). "
+               "Mode 2/4 appends: CSU 4 B + PAD length 1 B + PAD n B (ARPC Method 2). "
+               "Response KR: error 2A + ARPC 8 B (if mode ≠ 0). "
+               "For Visa CVN14/18/22, MC M/Chip, Amex, Discover, JCB, UnionPay, or cloud SKD use KW. "
+               "WARNING: proxy kq_arqc.rs uses hex-encoded ASCII (non-standard) — not wire-compatible "
+               "with a real payShield without format adaptation. See payshield-core-commands-ref.md."),
+    HsmCommand("Thales/Futurex", "International", "KW",
+               "Verify ARQC / Generate ARPC (EMV & Cloud-Based SKD)", "ARQC",
+               "EMV cryptogram verification and ARPC generation with extended derivation method support. "
+               "Covers Visa CVN14/18/22, Mastercard M/Chip, Amex, Discover, JCB, UnionPay, and "
+               "cloud-based (token) SKD variants. Response code: KX.",
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Source: PUGD0537-004 Rev A, p.471 — AUTHORITATIVE. Requires Premium package license. "
+               "Wire: same binary-encoded structure as KQ plus Derivation Method 1A field "
+               "(scheme-specific code identifying the CVN/SKD variant) after Scheme ID. "
+               "APC verify_auth_request_cryptogram supports the major EMV derivation methods natively; "
+               "map the Derivation Method byte to the appropriate MajorKeyDerivationMode "
+               "and SessionKeyDerivationMode in EmvCommon/VisaAmex/Mastercard attributes."),
+    HsmCommand("Thales/Futurex", "International", "KU",
+               "Generate Secure Message (EMV 3.1.1)", "ARQC",
+               "Generates an EMV 3.1.1 issuer secure message for delivery to the chip card. "
+               "Computes a MAC over the script command using the SMI (Secure Messaging Integrity) "
+               "issuer master key, and optionally encrypts sensitive data with the SMC key. "
+               "Response code: KV.",
+               "generate_mac_emv_pin_change", "TR31_E2_EMV_MKEY_INTEGRITY",
+               "Source: PUGD0537-004 Rev A, p.475 — AUTHORITATIVE. "
+               "Covers issuer script MAC generation for all EMV 3.1.1 secure messaging commands "
+               "(e.g. PUT DATA, EXTERNAL AUTHENTICATE, PIN UNBLOCK). "
+               "In APC: generate_mac_emv_pin_change for PIN-change scripts (MAC+cipher combined); "
+               "generate_mac with TR31_E2_EMV_MKEY_INTEGRITY for MAC-only scripts. "
+               "Key: SMI master key (TR31_E2). Optional SMC key (TR31_E1) for confidentiality."),
+    HsmCommand("Thales/Futurex", "International", "KY",
+               "Generate Secure Message (EMV 4.x)", "ARQC",
+               "Generates an EMV 4.x issuer secure message. Extends KU to support the EMV 4.x "
+               "secure messaging format (longer MAC, updated derivation). Response code: KZ.",
+               "generate_mac_emv_pin_change", "TR31_E2_EMV_MKEY_INTEGRITY",
+               "Source: PUGD0537-004 Rev A, p.480 — AUTHORITATIVE. "
+               "Same conceptual operation as KU but for EMV 4.x (EMV 2004+) card profiles. "
+               "In APC: same mapping as KU — generate_mac_emv_pin_change or generate_mac with TR31_E2."),
+    HsmCommand("Thales/Futurex", "International", "K2",
+               "Mastercard CAP (Chip Authentication Program) Verification", "ARQC",
+               "Verifies a Mastercard CAP one-time password or transaction authentication code. "
+               "Response code: K3.",
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Source: PUGD0537-004 Rev A, p.485 — AUTHORITATIVE. "
+               "Mastercard CAP (also known as MasterCard Secure Code / UCAF): "
+               "card-generates a 6–8 digit OTP from the AC key and transaction parameters. "
+               "In APC: verify_auth_request_cryptogram with TR31_E0 master key."),
+    HsmCommand("Thales/Futurex", "International", "KS",
+               "Data Authentication Code and Dynamic Number Verification (EMV 3.1.1)", "ARQC",
+               "Verifies an EMV 3.1.1 Data Authentication Code (DAC) and Dynamic Number "
+               "(dynamic CVV equivalent) using the issuer application cryptogram key. "
+               "Response code: KT.",
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Source: PUGD0537-004 Rev A, p.488 — AUTHORITATIVE. "
+               "Used for EMV 3.1.1 contactless/chip card SDA and DDA verification. "
+               "In APC: verify_auth_request_cryptogram with TR31_E0 master key."),
+    HsmCommand("Thales/Futurex", "International", "K0",
+               "Decrypt Encrypted Counters (EMV 4.x)", "ARQC",
+               "Decrypts the encrypted counters in an EMV 4.x chip card response using the "
+               "appropriate issuer master key. Response code: K1.",
+               "decrypt_data", "TR31_E1_EMV_MKEY_CONFIDENTIALITY",
+               "Source: PUGD0537-004 Rev A, p.490 — AUTHORITATIVE. "
+               "Used to recover plain-text ATC and other counters from an EMV 4.x card response "
+               "for risk management and velocity checking. "
+               "In APC: decrypt_data with TR31_E1_EMV_MKEY_CONFIDENTIALITY issuer master key."),
     # Key Management
     HsmCommand("Thales/Futurex", "International", "A0",
                "Generate a Key", "KEY_MGMT",
@@ -458,24 +755,47 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     # Encryption
     HsmCommand("Thales/Futurex", "International", "M0",
                "Encrypt a Block of Data", "ENCRYPT",
-               "Encrypts a data block. Response code: M1.",
+               "Encrypts a data block. Response code: M1. Supports ECB, CBC, CFB8/64, OFB, CTR, "
+               "FF1 FPE (NIST SP 800-38G), Visa Standard Encryption (mode 04), and Visa FPE (mode 13).",
                "encrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
-               "EFTlab source — reference quality.",
-               confidence="medium"),
+               "Source: PUGD0537-004 Rev A, p.381 — AUTHORITATIVE. "
+               "Mode Flag 2N: 00=ECB, 01=CBC(+IV), 02=CFB8(+IV), 03=CFB64(+IV), "
+               "04=Visa Std Enc (license), 05=OFB(+IV), 06=CTR(+IV), 11=FF1 FPE, 13=Visa FPE (license). "
+               "Input Format Flag 1N (0=binary, 1=hex, 2=text) — omitted for modes 04/13. "
+               "Output Format Flag 1N (0=binary, 1=hex) — omitted for mode 13. "
+               "Key Type 3H: 009/609/809/909=BDK-1/2/3/4, 00A=ZEK, 00B=DEK, 30B=TEK, FFF=KB-LMK. "
+               "For BDK: KSN Descriptor 3H + KSN 12-20H (24H for AES BDK). "
+               "IV 16H (DES) or 32H (AES) for modes 01-03/05-06 — use all-zeros for first block. "
+               "Modes 00-10: Message Length 4H (max 0x7D00) + Message. "
+               "Modes 04/13: Block Count 2N + [Block Type 1A (A=PAN/B=Name/C=Track1/D=Track2) + Len 4H + Data] per block. "
+               "No HSM padding — input must be a multiple of block size (8B DES/3DES, 16B AES). "
+               "Response M1 adds output IV + Message Length + Encrypted Message. "
+               "In APC: encrypt_data with TR31_D0 key."),
     HsmCommand("Thales/Futurex", "International", "M2",
                "Decrypt a Block of Data", "ENCRYPT",
-               "Decrypts a data block. Response code: M3.",
+               "Decrypts a data block. Response code: M3. Identical structure to M0 with additional "
+               "mode 10=BPS (Ingenico FPE, requires PS10-LIC-VDSP).",
                "decrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
-               "EFTlab source — reference quality.",
-               confidence="medium"),
+               "Source: PUGD0537-004 Rev A, p.388 — AUTHORITATIVE. "
+               "Same field layout as M0; mode 10 (BPS/Ingenico FPE) is decrypt-only. "
+               "BDK key restrictions: BDK-1/3=bidirectional, BDK-2=request data, BDK-4=response data. "
+               "In APC: decrypt_data with TR31_D0 key."),
     HsmCommand("Thales/Futurex", "International", "M4",
                "Translate (Re-encrypt) a Data Block", "ENCRYPT",
                "Re-encrypts a data block from one key to another without exposing plaintext. "
                "Response code: M5. Used at zone boundaries to change the protecting key.",
                "re_encrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
-               "In APC: re_encrypt_data. Both inbound and outbound keys must be TR31_D0. "
-               "EFTlab source — reference quality.",
-               confidence="medium"),
+               "Source: PUGD0537-004 Rev A, p.394 — AUTHORITATIVE. "
+               "Fields: Source Mode Flag 2N + Dest Mode Flag 2N (no BPS for dest) "
+               "+ [FPE Radix Flag/Value/Tweak if Source or Dest mode=11] "
+               "+ Input Format Flag 1N + Output Format Flag 1N "
+               "+ Source Key Type 3H + Source Key + [Source KSN Descriptor+KSN if BDK] "
+               "+ Dest Key Type 3H + Dest Key + [Dest KSN Descriptor+KSN if BDK] "
+               "+ Source IV (if mode CBC/CFB/OFB) + Dest IV (if mode CBC/CFB/OFB) "
+               "+ Message Length 4H + Encrypted Message (or Block Count+Blocks for modes 04/13). "
+               "Only Source OR Destination may be a BDK — not both. "
+               "Source BDK-1/3=bidirectional, BDK-2=request. Dest BDK-1/3=bidirectional, BDK-4=response. "
+               "In APC: re_encrypt_data; both keys must be TR31_D0."),
     # Key Management — ceremony and generation
     HsmCommand("Thales/Futurex", "International", "GC",
                "Generate ZMK Component", "KEY_MGMT",
@@ -508,6 +828,154 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "APC replaces LMK storage — the key ARN is the reference. "
                "snowch/hsm-guide source — reference quality.",
                confidence="medium"),
+    # Key Management — Core additions (authoritative sources)
+    HsmCommand("Thales/Futurex", "International", "A4",
+               "Form a Key from Encrypted Components", "KEY_MGMT",
+               "XORs 2 or 3 LMK-encrypted key components to form a working key under LMK. "
+               "Response code: A5. Variant of FK where components arrive pre-encrypted under LMK.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.50 — AUTHORITATIVE. "
+               "Components are provided as LMK-encrypted values rather than clear text. "
+               "In APC: ceremony is out-of-band; resulting key imported via import_key TR-31/TR-34."),
+    HsmCommand("Thales/Futurex", "International", "B0",
+               "Translate Key Scheme", "KEY_MGMT",
+               "Translates a key from one key block scheme to another (e.g. variant-LMK → TR-31, "
+               "or TDES → AES key block). Response code: B1.",
+               "export_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.64 — AUTHORITATIVE. "
+               "Core PCI PIN 18-3 migration tool: converts variant-encrypted keys to TR-31 key blocks. "
+               "In APC: import_key (TR-31) then export_key under KEK for redistribution."),
+    HsmCommand("Thales/Futurex", "International", "B8",
+               "Export a Key under a TR-34 Public Key", "KEY_MGMT",
+               "Exports a key wrapped under an RSA public key using the TR-34 protocol for "
+               "asymmetric remote key distribution. Response code: B9.",
+               "export_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.195 — AUTHORITATIVE. "
+               "TR-34 asymmetric key distribution: used for remote key loading (RKL) to terminals. "
+               "In APC: get_parameters_for_export + export_key with TR-34 wrapping. "
+               "TR-34 is the recommended replacement for manual TMK/ZMK key injection ceremonies."),
+    HsmCommand("Thales/Futurex", "International", "BY",
+               "Translate a ZMK from ZMK to LMK Encryption", "KEY_MGMT",
+               "Imports a ZMK from encryption under another ZMK into LMK protection. "
+               "Response code: BZ.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.65 — AUTHORITATIVE. "
+               "Used to receive a ZMK from a network partner encrypted under a pre-established ZMK. "
+               "In APC: import_key with TR-31 key block; APC ARN replaces LMK storage."),
+    HsmCommand("Thales/Futurex", "International", "HY",
+               "Import a Key Encrypted under a KTK", "KEY_MGMT",
+               "Imports a key encrypted under a Key Transfer Key (KTK) into LMK protection. "
+               "Response code: HZ.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.56 — AUTHORITATIVE. "
+               "KTK (Key Transfer Key) is a KEK used specifically for injection into secure equipment. "
+               "In APC: import_key with the KTK as the wrapping KEK (TR31_K1 usage)."),
+    HsmCommand("Thales/Futurex", "International", "K8",
+               "Export a Key under a KEK", "KEY_MGMT",
+               "Exports a key from LMK protection encrypted under a Key Encryption Key for "
+               "delivery to a network partner. Response code: K9.",
+               "export_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.82 — AUTHORITATIVE. "
+               "General-purpose key export under KEK. In APC: export_key with TR-31 wrapping "
+               "and TR31_K1 KEK. Prefer TR-34 for initial KEK establishment."),
+    HsmCommand("Thales/Futurex", "International", "KI",
+               "Derive Card Unique DES Keys", "KEY_MGMT",
+               "Derives a card-unique DES key for EMV card personalization using an issuer "
+               "derivation key and card-specific data (PAN, PAN sequence number). Response code: KJ.",
+               "create_key", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Source: PUGD0537-004 Rev A, p.76 — AUTHORITATIVE. "
+               "Used in EMV card issuance to derive per-card keys from an issuer master key. "
+               "In APC: no direct equivalent for card-personalization key derivation — "
+               "use create_key to generate a unique key per card or derive externally using "
+               "EMV Key Derivation tools."),
+    # HMAC
+    HsmCommand("Thales/Futurex", "International", "L0",
+               "Generate an HMAC Secret Key", "MAC",
+               "Generates a new HMAC secret key under LMK. Response code: L1.",
+               "create_key", "TR31_M7_HMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.402 — AUTHORITATIVE. "
+               "Supports SHA-1, SHA-256, SHA-384, and SHA-512 based HMAC keys. "
+               "In APC: create_key with TR31_M7_HMAC_KEY."),
+    HsmCommand("Thales/Futurex", "International", "LQ",
+               "Generate an HMAC on a Block of Data", "MAC",
+               "Generates an HMAC over a data block using an HMAC secret key. Response code: LR.",
+               "generate_mac", "TR31_M7_HMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.405 — AUTHORITATIVE. "
+               "Supports HMAC-SHA-1 (20 B), HMAC-SHA-256 (32 B), HMAC-SHA-384 (48 B), "
+               "HMAC-SHA-512 (64 B). Output length determined by algorithm, not truncated. "
+               "In APC: generate_mac with TR31_M7_HMAC_KEY."),
+    HsmCommand("Thales/Futurex", "International", "LS",
+               "Verify an HMAC on a Block of Data", "MAC",
+               "Verifies an HMAC over a data block. Response code: LT. Error 01 = HMAC mismatch.",
+               "verify_mac", "TR31_M7_HMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.407 — AUTHORITATIVE. "
+               "In APC: verify_mac with TR31_M7_HMAC_KEY."),
+    HsmCommand("Thales/Futurex", "International", "LU",
+               "Import an HMAC Key under a ZMK", "MAC",
+               "Imports an HMAC key from ZMK encryption into LMK protection. Response code: LV.",
+               "import_key", "TR31_M7_HMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.409 — AUTHORITATIVE. "
+               "In APC: import_key with TR31_M7_HMAC_KEY; wrapping key is TR31_K1 KEK."),
+    HsmCommand("Thales/Futurex", "International", "LW",
+               "Export an HMAC Key under a ZMK", "MAC",
+               "Exports an HMAC key from LMK protection to ZMK encryption for delivery to a "
+               "network partner. Response code: LX.",
+               "export_key", "TR31_M7_HMAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.411 — AUTHORITATIVE. "
+               "In APC: export_key with TR31_M7_HMAC_KEY; wrapping key is TR31_K1 KEK."),
+    # RSA and Data Protection
+    HsmCommand("Thales/Futurex", "International", "EW",
+               "Generate an RSA Signature", "ENCRYPT",
+               "Generates an RSA digital signature over a data block or pre-computed hash. "
+               "Response code: EX.",
+               None, None,
+               "Source: PUGD0537-004 Rev A, p.375 — AUTHORITATIVE. "
+               "RSA signing for message authentication or non-repudiation. "
+               "APC does not support RSA signature generation — "
+               "use AWS KMS for RSA signing operations in migration architectures."),
+    HsmCommand("Thales/Futurex", "International", "EY",
+               "Validate an RSA Signature", "ENCRYPT",
+               "Validates an RSA digital signature. Response code: EZ.",
+               None, None,
+               "Source: PUGD0537-004 Rev A, p.377 — AUTHORITATIVE. "
+               "RSA signature verification. APC does not support RSA signature verification — "
+               "use AWS KMS for RSA verification in migration architectures."),
+    HsmCommand("Thales/Futurex", "International", "GM",
+               "Hash a Block of Data", "ENCRYPT",
+               "Computes a cryptographic hash (SHA-1, SHA-256, SHA-384, or SHA-512) over a "
+               "data block. Response code: GN.",
+               None, None,
+               "Source: PUGD0537-004 Rev A, p.379 — AUTHORITATIVE. "
+               "Hashing utility with no APC equivalent — implement in application code using "
+               "standard libraries (Python hashlib, Java MessageDigest, Go crypto/sha256, etc.)."),
+    # HSM Management / Utility
+    HsmCommand("Thales/Futurex", "International", "N0",
+               "Generate a Random Value", "KEY_MGMT",
+               "Generates a cryptographically random value of specified byte length. "
+               "Response code: N1.",
+               None, None,
+               "Source: PUGD0537-004 Rev A, p.445 — AUTHORITATIVE. "
+               "No direct APC equivalent for standalone random number generation. "
+               "APC uses randomness internally for all key generation. "
+               "For application-level randomness: use AWS KMS GenerateRandom or language runtime CSPRNG."),
+    HsmCommand("Thales/Futurex", "International", "NO",
+               "HSM Status", "KEY_MGMT",
+               "Returns HSM operational status, firmware version, and LMK check value. "
+               "Response code: NP.",
+               None, None,
+               "Source: PUGD0537-004 Rev A, p.448 — AUTHORITATIVE. "
+               "No APC equivalent — monitor APC health via AWS CloudWatch metrics and the "
+               "AWS Management Console (namespace: AWS/PaymentCryptography)."),
+    HsmCommand("Thales/Futurex", "International", "CS",
+               "Modify Key Block Header", "KEY_MGMT",
+               "Modifies header fields of a TR-31 key block (exportability, mode of use, "
+               "key version) without changing the encrypted key value. Response code: CT.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Rev A, p.443 — AUTHORITATIVE. "
+               "Used during PCI PIN 18-3 key block migration to update key metadata. "
+               "In APC: no direct equivalent — key attributes are set at creation/import and "
+               "cannot be modified after the fact. "
+               "Workaround: export the key, modify the TR-31 header fields, re-import."),
     # Diagnostic / utility (no APC equivalent)
     HsmCommand("Thales/Futurex", "International", "NC",
                "Perform HSM Diagnostics / Self-Test", "KEY_MGMT",
@@ -1096,7 +1564,9 @@ NUMERIC_HSM_PATTERNS = [
 # Covers Thales/Futurex International shared codes (CA, CC, MA, etc.) AND
 # Thales payShield Legacy-only codes (HC, HA, BI, GG, ME, MQ, etc.).
 INTERNATIONAL_AND_THALES_PATTERNS = [
-    r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M6|M7|M8|M9|MA|MC|ME|MK|MM|MO|MQ|MS|MU|MW|A0|A6|A8|IA|BU|KQ|GW)',
+    r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M6|M7|M8|M9|MA|MC|ME|MK|MM|MO|MQ|MS|MU|MW|MY|MZ|A0|A6|A8|IA|BU|KQ|KR|KW|KX|KU|KV|KY|KZ|K2|K3|GW)',
+    r'["\'](DE|EE|GA|BK|CE|DG|FW|DU|CU|BC|BE|CG|EG|GO|GQ|GS|GU|BQ|AQ|CK|CM|JA|BA|NG|JC|JE|JG|FK|KG|NC|QH)',  # PIN/Key INTERNATIONAL (Core additions)
+    r'["\'](QY|PM|RY|NY|A4|B0|B8|BY|HY|K8|KI|L0|LQ|LS|LU|LW|EW|EY|GM|NO|N0|CS)',  # CVV/HMAC/RSA/Mgmt INTERNATIONAL (Core)
     r'["\'](HC|HD|HA|HB|HE|HF|HG|HH|BI|BJ|AS|AT|FG|FH|GG|GH|GY|GZ)',  # Thales Legacy key gen
     r'["\'](AA|AB|AE|AF|AG|AH|AC|AD|AU|AV|AW|AX|FA|FB|FC|FD|FE|FF|GC|GD|GE|GF|GY|GZ|KC|KD|KA|KB)',  # Thales Legacy translate
     r'["\'](MG|MH|MI|MJ|DW|DX|DY|DZ|CO|CP|CQ|CR|JS|JT)',  # Thales Legacy additional
