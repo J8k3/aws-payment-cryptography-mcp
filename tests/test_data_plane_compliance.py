@@ -196,3 +196,86 @@ class TestGeneratePinDataComplianceGuards:
             )
         assert "compliance_warning" not in result
         mock_client.generate_pin_data.assert_called_once()
+
+
+# ── verify_pin_data compliance guards ───────────────────────────────────────
+
+class TestVerifyPinDataComplianceGuards:
+    def test_iso_format_0_triggers_compliance_warning(self, tools):
+        result = tools["verify_pin_data"](
+            verification_key_identifier="alias/test-pvk",
+            encrypted_pin_block="AABBCCDDEEFF0011",
+            encryption_key_identifier="alias/test-pek",
+            verification_attributes={"Ibm3624Pin": {"DecimalizationTable": "0123456789012345", "PinOffset": "1234"}},
+            pin_block_format="ISO_FORMAT_0",
+            primary_account_number="123456789012",
+        )
+        assert "compliance_warning" in result, (
+            "ISO_FORMAT_0 must trigger a compliance warning on verify_pin_data"
+        )
+        assert "confirmation_required" in result
+
+    def test_iso_format_4_reaches_aws_layer(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_boto3.client.return_value = mock_client
+            mock_client.verify_pin_data.return_value = {"VerificationStatus": "SUCCESS", "PinDataLength": 4}
+            result = tools["verify_pin_data"](
+                verification_key_identifier="alias/test-pvk",
+                encrypted_pin_block="AABBCCDDEEFF0011",
+                encryption_key_identifier="alias/test-pek",
+                verification_attributes={"VisaPin": {"PinVerificationKeyIndex": 1}},
+                pin_block_format="ISO_FORMAT_4",
+                primary_account_number="123456789012",
+            )
+        assert "compliance_warning" not in result
+        mock_client.verify_pin_data.assert_called_once()
+
+
+# ── _call() exception handling ───────────────────────────────────────────────
+
+class TestCallExceptionHandling:
+    """Verifies that boto3 exceptions are caught and returned as structured dicts."""
+
+    def test_client_error_returns_structured_dict(self, tools):
+        from botocore.exceptions import ClientError
+
+        err_response = {"Error": {"Code": "ValidationException", "Message": "Invalid key"}}
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_boto3.client.return_value = mock_client
+            mock_client.generate_mac.side_effect = ClientError(err_response, "GenerateMac")
+            result = tools["generate_mac"](
+                key_identifier="alias/test-mac",
+                message_data="DEADBEEF",
+                generation_attributes={"Algorithm": "CMAC"},
+            )
+        assert result.get("error") == "Invalid key"
+        assert result.get("aws_error_code") == "ValidationException"
+
+    def test_param_validation_error_returns_structured_dict(self, tools):
+        from botocore.exceptions import ParamValidationError
+
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_boto3.client.return_value = mock_client
+            mock_client.generate_mac.side_effect = ParamValidationError(report="bad param")
+            result = tools["generate_mac"](
+                key_identifier="alias/test-mac",
+                message_data="DEADBEEF",
+                generation_attributes={"Algorithm": "CMAC"},
+            )
+        assert "error" in result
+        assert result.get("aws_error_code") == "ParamValidationError"
+
+    def test_unexpected_exception_returns_structured_dict(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_boto3.client.return_value = mock_client
+            mock_client.generate_mac.side_effect = RuntimeError("network failure")
+            result = tools["generate_mac"](
+                key_identifier="alias/test-mac",
+                message_data="DEADBEEF",
+                generation_attributes={"Algorithm": "CMAC"},
+            )
+        assert result.get("error") == "network failure"

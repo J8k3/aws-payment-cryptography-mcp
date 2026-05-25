@@ -1,12 +1,25 @@
 """APC control plane MCP tools — key lifecycle management."""
 
 import boto3
+from botocore.exceptions import ClientError, ParamValidationError
 from mcp.server.fastmcp import FastMCP
 
 from .compliance import (
     get_key_usage_info,
     list_key_usages,
 )
+
+
+def _call(method, **kwargs) -> dict:
+    try:
+        return method(**kwargs)
+    except ClientError as e:
+        err = e.response["Error"]
+        return {"error": err["Message"], "aws_error_code": err["Code"]}
+    except ParamValidationError as e:
+        return {"error": str(e), "aws_error_code": "ParamValidationError"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def register_control_plane_tools(mcp: FastMCP) -> None:
@@ -74,7 +87,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         if tags:
             params["Tags"] = tags
 
-        return client().create_key(**params)
+        return _call(client().create_key, **params)
 
     @mcp.tool()
     def get_key(key_identifier: str) -> dict:
@@ -84,7 +97,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_identifier: Key ARN (arn:aws:payment-cryptography:...) or alias (alias/name)
         """
-        return client().get_key(KeyIdentifier=key_identifier)
+        return _call(client().get_key, KeyIdentifier=key_identifier)
 
     @mcp.tool()
     def list_keys(
@@ -105,7 +118,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["KeyState"] = key_state
         if next_token:
             params["NextToken"] = next_token
-        return client().list_keys(**params)
+        return _call(client().list_keys, **params)
 
     @mcp.tool()
     def delete_key(key_identifier: str, delete_key_in_days: int = 7) -> dict:
@@ -116,7 +129,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_identifier: Key ARN or alias
             delete_key_in_days: Waiting period before deletion (3-180 days, default 7)
         """
-        return client().delete_key(
+        return _call(client().delete_key,
             KeyIdentifier=key_identifier,
             DeleteKeyInDays=delete_key_in_days,
         )
@@ -129,7 +142,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_identifier: Key ARN or alias in DELETE_PENDING state
         """
-        return client().restore_key(KeyIdentifier=key_identifier)
+        return _call(client().restore_key, KeyIdentifier=key_identifier)
 
     @mcp.tool()
     def start_key_usage(key_identifier: str) -> dict:
@@ -139,7 +152,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_identifier: Key ARN or alias
         """
-        return client().start_key_usage(KeyIdentifier=key_identifier)
+        return _call(client().start_key_usage, KeyIdentifier=key_identifier)
 
     @mcp.tool()
     def stop_key_usage(key_identifier: str) -> dict:
@@ -149,7 +162,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_identifier: Key ARN or alias
         """
-        return client().stop_key_usage(KeyIdentifier=key_identifier)
+        return _call(client().stop_key_usage, KeyIdentifier=key_identifier)
 
     # ── Alias Management ──────────────────────────────────────────────────────
 
@@ -165,7 +178,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         params: dict = {"AliasName": alias_name}
         if key_arn:
             params["KeyArn"] = key_arn
-        return client().create_alias(**params)
+        return _call(client().create_alias, **params)
 
     @mcp.tool()
     def get_alias(alias_name: str) -> dict:
@@ -175,7 +188,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             alias_name: Full alias name including 'alias/' prefix
         """
-        return client().get_alias(AliasName=alias_name)
+        return _call(client().get_alias, AliasName=alias_name)
 
     @mcp.tool()
     def update_alias(alias_name: str, key_arn: str) -> dict:
@@ -186,7 +199,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             alias_name: Full alias name including 'alias/' prefix
             key_arn: New key ARN to associate
         """
-        return client().update_alias(AliasName=alias_name, KeyArn=key_arn)
+        return _call(client().update_alias, AliasName=alias_name, KeyArn=key_arn)
 
     @mcp.tool()
     def delete_alias(alias_name: str) -> dict:
@@ -196,7 +209,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             alias_name: Full alias name including 'alias/' prefix
         """
-        return client().delete_alias(AliasName=alias_name)
+        return _call(client().delete_alias, AliasName=alias_name)
 
     @mcp.tool()
     def list_aliases(
@@ -217,7 +230,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["KeyArn"] = key_arn
         if next_token:
             params["NextToken"] = next_token
-        return client().list_aliases(**params)
+        return _call(client().list_aliases, **params)
 
     # ── Key Import / Export ───────────────────────────────────────────────────
 
@@ -237,7 +250,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
                                RootCertificatePublicKey, or TrustedCertificatePublicKey
             wrapping_key_algorithm: RSA_2048, RSA_3072, or RSA_4096
         """
-        return client().get_parameters_for_import(
+        return _call(client().get_parameters_for_import,
             KeyMaterialType=key_material_type,
             WrappingKeyAlgorithm=wrapping_key_algorithm,
         )
@@ -255,7 +268,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_material_type: Tr31KeyBlock or Tr34KeyBlock
             signing_key_algorithm: RSA_2048, RSA_3072, RSA_4096
         """
-        return client().get_parameters_for_export(
+        return _call(client().get_parameters_for_export,
             KeyMaterialType=key_material_type,
             SigningKeyAlgorithm=signing_key_algorithm,
         )
@@ -305,7 +318,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["KeyCheckValueAlgorithm"] = key_check_value_algorithm
         if tags:
             params["Tags"] = tags
-        return client().import_key(**params)
+        return _call(client().import_key, **params)
 
     @mcp.tool()
     def export_key(
@@ -327,7 +340,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         }
         if export_attributes:
             params["ExportAttributes"] = export_attributes
-        return client().export_key(**params)
+        return _call(client().export_key, **params)
 
     # ── Tags ──────────────────────────────────────────────────────────────────
 
@@ -340,7 +353,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             resource_arn: Key ARN
             tags: List of {Key, Value} dicts
         """
-        return client().tag_resource(ResourceArn=resource_arn, Tags=tags)
+        return _call(client().tag_resource, ResourceArn=resource_arn, Tags=tags)
 
     @mcp.tool()
     def untag_resource(resource_arn: str, tag_keys: list[str]) -> dict:
@@ -351,7 +364,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             resource_arn: Key ARN
             tag_keys: List of tag key names to remove
         """
-        return client().untag_resource(ResourceArn=resource_arn, TagKeys=tag_keys)
+        return _call(client().untag_resource, ResourceArn=resource_arn, TagKeys=tag_keys)
 
     @mcp.tool()
     def list_tags_for_resource(
@@ -370,7 +383,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         params: dict = {"ResourceArn": resource_arn, "MaxResults": max_results}
         if next_token:
             params["NextToken"] = next_token
-        return client().list_tags_for_resource(**params)
+        return _call(client().list_tags_for_resource, **params)
 
     # ── Resource Policies ─────────────────────────────────────────────────────
 
@@ -383,7 +396,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             resource_arn: Key ARN
             policy: JSON policy document string
         """
-        return client().put_resource_policy(ResourceArn=resource_arn, Policy=policy)
+        return _call(client().put_resource_policy, ResourceArn=resource_arn, Policy=policy)
 
     @mcp.tool()
     def get_resource_policy(resource_arn: str) -> dict:
@@ -393,7 +406,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             resource_arn: Key ARN
         """
-        return client().get_resource_policy(ResourceArn=resource_arn)
+        return _call(client().get_resource_policy, ResourceArn=resource_arn)
 
     @mcp.tool()
     def delete_resource_policy(resource_arn: str) -> dict:
@@ -403,7 +416,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             resource_arn: Key ARN
         """
-        return client().delete_resource_policy(ResourceArn=resource_arn)
+        return _call(client().delete_resource_policy, ResourceArn=resource_arn)
 
     # ── Compliance Helper ─────────────────────────────────────────────────────
 

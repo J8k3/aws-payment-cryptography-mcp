@@ -1,6 +1,7 @@
 """APC data plane MCP tools — cryptographic operations."""
 
 import boto3
+from botocore.exceptions import ClientError, ParamValidationError
 from mcp.server.fastmcp import FastMCP
 
 from .compliance import (
@@ -10,6 +11,18 @@ from .compliance import (
     check_pin_format_translation,
     format_legacy_constraint_prompt,
 )
+
+
+def _call(method, **kwargs) -> dict:
+    try:
+        return method(**kwargs)
+    except ClientError as e:
+        err = e.response["Error"]
+        return {"error": err["Message"], "aws_error_code": err["Code"]}
+    except ParamValidationError as e:
+        return {"error": str(e), "aws_error_code": "ParamValidationError"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def register_data_plane_tools(mcp: FastMCP) -> None:
@@ -59,7 +72,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if wrapped_key:
             params["WrappedKey"] = wrapped_key
-        return client().encrypt_data(**params)
+        return _call(client().encrypt_data, **params)
 
     @mcp.tool()
     def decrypt_data(
@@ -89,7 +102,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if wrapped_key:
             params["WrappedKey"] = wrapped_key
-        return client().decrypt_data(**params)
+        return _call(client().decrypt_data, **params)
 
     @mcp.tool()
     def re_encrypt_data(
@@ -129,7 +142,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             params["IncomingWrappedKey"] = incoming_wrapped_key
         if outgoing_wrapped_key:
             params["OutgoingWrappedKey"] = outgoing_wrapped_key
-        return client().re_encrypt_data(**params)
+        return _call(client().re_encrypt_data, **params)
 
     # ── PIN Operations ────────────────────────────────────────────────────────
 
@@ -221,7 +234,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         if outgoing_wrapped_key:
             params["OutgoingWrappedKey"] = outgoing_wrapped_key
 
-        return client().translate_pin_data(**params)
+        return _call(client().translate_pin_data, **params)
 
     @mcp.tool()
     def generate_pin_data(
@@ -282,7 +295,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             params["PinDataLength"] = pin_data_length
         if encryption_wrapped_key:
             params["EncryptionWrappedKey"] = encryption_wrapped_key
-        return client().generate_pin_data(**params)
+        return _call(client().generate_pin_data, **params)
 
     @mcp.tool()
     def verify_pin_data(
@@ -323,6 +336,15 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             dukpt_attributes: Required when encryption_key_identifier is a BDK
             encryption_wrapped_key: Optional TR-31 wrapped PEK (encryption_key_identifier becomes the KEK)
         """
+        if pin_block_format == "ISO_FORMAT_0":
+            result = check_legacy_construct("PIN_FORMAT_0")
+            if result:
+                return {
+                    "compliance_warning": result.message,
+                    "modern_alternative": result.modern_alternative,
+                    "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
+                }
+
         params: dict = {
             "VerificationKeyIdentifier": verification_key_identifier,
             "EncryptedPinBlock": encrypted_pin_block,
@@ -338,7 +360,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             params["DukptAttributes"] = dukpt_attributes
         if encryption_wrapped_key:
             params["EncryptionWrappedKey"] = encryption_wrapped_key
-        return client().verify_pin_data(**params)
+        return _call(client().verify_pin_data, **params)
 
     # ── Card Validation ───────────────────────────────────────────────────────
 
@@ -378,7 +400,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if validation_data_length is not None:
             params["ValidationDataLength"] = validation_data_length
-        return client().generate_card_validation_data(**params)
+        return _call(client().generate_card_validation_data, **params)
 
     @mcp.tool()
     def verify_card_validation_data(
@@ -402,7 +424,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             verification_attributes: Algorithm and card data (mirrors generate_card_validation_data)
             validation_data: The CVV/CVV2/iCVV value to verify
         """
-        return client().verify_card_validation_data(
+        return _call(client().verify_card_validation_data,
             KeyIdentifier=key_identifier,
             PrimaryAccountNumber=primary_account_number,
             VerificationAttributes=verification_attributes,
@@ -466,7 +488,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if mac_length is not None:
             params["MacLength"] = mac_length
-        return client().generate_mac(**params)
+        return _call(client().generate_mac, **params)
 
     @mcp.tool()
     def verify_mac(
@@ -513,7 +535,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if mac_length is not None:
             params["MacLength"] = mac_length
-        return client().verify_mac(**params)
+        return _call(client().verify_mac, **params)
 
     @mcp.tool()
     def generate_mac_emv_pin_change(
@@ -551,7 +573,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             pin_block_format: ISO_FORMAT_0 or ISO_FORMAT_4
             derivation_method_attributes: EMV derivation method (Visa, Mastercard, etc.)
         """
-        return client().generate_mac_emv_pin_change(
+        return _call(client().generate_mac_emv_pin_change,
             NewPinPekIdentifier=new_pin_pek_identifier,
             SecureMessagingIntegrityKeyIdentifier=secure_messaging_integrity_key_identifier,
             SecureMessagingConfidentialityKeyIdentifier=secure_messaging_confidentiality_key_identifier,
@@ -616,7 +638,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if auth_response_attributes:
             params["AuthResponseAttributes"] = auth_response_attributes
-        return client().verify_auth_request_cryptogram(**params)
+        return _call(client().verify_auth_request_cryptogram, **params)
 
     # ── Key Translation ───────────────────────────────────────────────────────
 
@@ -667,7 +689,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         }
         if key_check_value_algorithm:
             params["KeyCheckValueAlgorithm"] = key_check_value_algorithm
-        return client().translate_key_material(**params)
+        return _call(client().translate_key_material, **params)
 
     # ── AS2805 ───────────────────────────────────────────────────────────────
 
@@ -698,7 +720,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             kek_validation_type: KekValidationRequest or KekValidationResponse
             random_key_send_variant_mask: VARIANT_MASK_82C0 or VARIANT_MASK_82
         """
-        return client().generate_as2805_kek_validation(
+        return _call(client().generate_as2805_kek_validation,
             KeyIdentifier=key_identifier,
             KekValidationType=kek_validation_type,
             RandomKeySendVariantMask=random_key_send_variant_mask,
