@@ -120,7 +120,7 @@ A developer is building a new MAC integration. They ask for Retail MAC — a com
     "KeyAttributes": {
       "KeyAlgorithm": "AES_128",
       "KeyClass": "SYMMETRIC_KEY",
-      "KeyUsage": "TR31_M6_ISO_9797_5_CMAC_KEY",
+      "KeyUsage": "TR31_M3_ISO_9797_3_MAC_KEY",
       "KeyModesOfUse": { "Generate": true, "Verify": true }
     },
     "KeyCheckValue": "A1B2C3",
@@ -135,10 +135,9 @@ A developer is building a new MAC integration. They ask for Retail MAC — a com
 
 ```json
 {
-  "compliance_warning": "Retail MAC (ANSI X9.19 / ISO 9797-1 Algorithm 3) is a legacy algorithm still common in older acquiring networks. It is weaker than CMAC and HMAC. PCI PIN v3.1 permits Retail MAC on existing infrastructure as a compensating control but prohibits it for new deployments.",
-  "recommendation": "Use CMAC (ISO9797_ALGORITHM5) for all new MAC generation. It is mandatory for AES KCV and is the default for AES DUKPT.",
-  "confirmation_required": true,
-  "legacy_construct": "RETAIL_MAC"
+  "compliance_warning": "Retail MAC (ANSI X9.19 / ISO 9797-1 Algorithm 3) is a legacy algorithm still common in older acquirer networks.",
+  "modern_alternative": "CMAC (ISO 9797-1 Algorithm 5) when counterparty supports it.",
+  "confirmation_required": "LEGACY CONSTRAINT PROTOCOL — ACTION REQUIRED\n\nThe operation you are requesting uses a deprecated or non-preferred cryptographic construct.\nBefore proceeding, please confirm the following:\n\n1. Have you verified with the downstream party that the modern alternative (CMAC (ISO 9797-1 Algorithm 5) when counterparty supports it.) is NOT supported?\n2. Do you understand that implementing this construct may require a formal PCI exception or compensating\n   control documented with your QSA..."
 }
 ```
 
@@ -146,7 +145,7 @@ A developer is building a new MAC integration. They ask for Retail MAC — a com
 
 **Agent response**
 
-The key was created (`TR31_M6_ISO_9797_5_CMAC_KEY`, AES-128, KCV A1B2C3).
+The key was created (`TR31_M3_ISO_9797_3_MAC_KEY`, AES-128, KCV A1B2C3).
 
 Before generating the MAC: **Retail MAC (ISO9797_ALGORITHM3) is a legacy construct.** PCI PIN v3.1 prohibits it for new deployments. The modern replacement is CMAC — it's what APC uses for AES KCV and AES DUKPT.
 

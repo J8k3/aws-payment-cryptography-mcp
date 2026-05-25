@@ -85,6 +85,48 @@ class TestGenerateMacComplianceGuards:
         mock_client.generate_mac.assert_called_once()
 
 
+# ── verify_mac compliance guards ─────────────────────────────────────────────
+
+class TestVerifyMacComplianceGuards:
+    def test_iso9797_algorithm1_triggers_compliance_warning(self, tools):
+        result = tools["verify_mac"](
+            key_identifier="alias/test-mac",
+            message_data="DEADBEEF",
+            mac="AABBCCDD",
+            verification_attributes={"Algorithm": "ISO9797_ALGORITHM1"},
+        )
+        assert "compliance_warning" in result, (
+            "CBC-MAC (ISO9797_ALGORITHM1) must trigger a compliance warning on verify_mac"
+        )
+        assert "confirmation_required" in result
+
+    def test_iso9797_algorithm3_triggers_compliance_warning(self, tools):
+        result = tools["verify_mac"](
+            key_identifier="alias/test-mac",
+            message_data="DEADBEEF",
+            mac="AABBCCDD",
+            verification_attributes={"Algorithm": "ISO9797_ALGORITHM3"},
+        )
+        assert "compliance_warning" in result, (
+            "Retail MAC (ISO9797_ALGORITHM3) must trigger a compliance warning on verify_mac"
+        )
+        assert "confirmation_required" in result
+
+    def test_cmac_reaches_aws_layer(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_boto3.client.return_value = mock_client
+            mock_client.verify_mac.return_value = {"VerificationStatus": "SUCCESS"}
+            result = tools["verify_mac"](
+                key_identifier="alias/test-mac",
+                message_data="DEADBEEF",
+                mac="AABBCCDD",
+                verification_attributes={"Algorithm": "CMAC"},
+            )
+        assert "compliance_warning" not in result
+        mock_client.verify_mac.assert_called_once()
+
+
 # ── translate_pin_data compliance guards ─────────────────────────────────────
 
 class TestTranslatePinDataComplianceGuards:

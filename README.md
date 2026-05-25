@@ -51,7 +51,7 @@ pip install -e .
 apc-agent        # starts the MCP server over stdio
 ```
 
-**The MCP server is client-agnostic** — it speaks the standard Model Context Protocol over stdio and works with any MCP-compatible client. `CLAUDE.md` and `.claude/` are Claude Code convenience files; `.codex/` is the Codex CLI equivalent. Neither is required to run the server itself.
+**The MCP server is client-agnostic** — it speaks the standard Model Context Protocol over stdio and works with any MCP-compatible client. `.claude/` contains Claude Code settings; `.codex/` is the Codex CLI equivalent. Neither is required to run the server itself.
 
 **Claude Code** — `.claude/settings.json` in this repo registers the server automatically. For Claude Desktop, add the same block to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 

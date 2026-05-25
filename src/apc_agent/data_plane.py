@@ -487,6 +487,24 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             verification_attributes: MAC algorithm parameters (mirrors generate_mac)
             mac_length: MAC length in bytes if non-default
         """
+        algo = verification_attributes.get("Algorithm", "")
+        if "ALGORITHM1" in algo:
+            result = check_legacy_construct("CBC_MAC")
+            if result:
+                return {
+                    "compliance_warning": result.message,
+                    "modern_alternative": result.modern_alternative,
+                    "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
+                }
+        if "ALGORITHM3" in algo:
+            result = check_legacy_construct("RETAIL_MAC")
+            if result:
+                return {
+                    "compliance_warning": result.message,
+                    "modern_alternative": result.modern_alternative,
+                    "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
+                }
+
         params: dict = {
             "KeyIdentifier": key_identifier,
             "MessageData": message_data,
