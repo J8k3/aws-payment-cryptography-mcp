@@ -7,6 +7,7 @@ tests run under moto regardless of whether real credentials exist.
 """
 
 import os
+
 import pytest
 from moto import mock_aws
 

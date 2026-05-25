@@ -4,6 +4,7 @@ No AWS calls — all pure Python.
 """
 
 import pytest
+
 from apc_agent.compliance import (
     Severity,
     check_algorithm,
@@ -14,7 +15,6 @@ from apc_agent.compliance import (
     get_key_usage_info,
     list_key_usages,
 )
-
 
 # ── check_algorithm ───────────────────────────────────────────────────────────
 

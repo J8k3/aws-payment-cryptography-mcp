@@ -6,7 +6,9 @@ starting an MCP server, then calls them directly to catch interface mismatches
 between hsm_tools.py and hsm_analysis.py.
 """
 import json
+
 import pytest
+
 from apc_agent.hsm_tools import register_hsm_tools
 
 

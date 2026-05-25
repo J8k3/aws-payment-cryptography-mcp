@@ -17,6 +17,7 @@ Run:
 
 import base64
 import os
+
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 
@@ -110,7 +111,7 @@ class TestEncryptDecrypt:
             )
             assert "PlainText" in dec, f"decrypt_data failed: {dec}"
             assert dec["PlainText"].upper() == self.PLAINTEXT
-            print(f"\n  PASS  AES-128-CBC encrypt/decrypt round-trip")
+            print("\n  PASS  AES-128-CBC encrypt/decrypt round-trip")
         finally:
             await _delete_key(arn)
 
@@ -248,7 +249,7 @@ class TestPin:
                 encrypted_pin_block=pin_block,
             )
             assert "PinBlock" in result, f"translate_pin_data failed: {result}"
-            print(f"\n  PASS  translate_pin_data (Visa PVV, ISO Format 4, P0->P0)")
+            print("\n  PASS  translate_pin_data (Visa PVV, ISO Format 4, P0->P0)")
         finally:
             await _delete_key(pvk)
             await _delete_key(p0_in)
@@ -369,7 +370,7 @@ class TestEmv:
                         }
                     },
                 )
-            print(f"\n  PASS  ARQC verify — VerificationFailedException for wrong cryptogram")
+            print("\n  PASS  ARQC verify — VerificationFailedException for wrong cryptogram")
         finally:
             await _delete_key(e0)
 
@@ -403,9 +404,9 @@ class TestKeyImport:
     CMAC_EXPECTED = "51f0bebf7e3b9d92fc49741779363cfe"
 
     def _rsa_wrap(self, key_bytes: bytes, cert_b64: str) -> str:
-        from cryptography.x509 import load_pem_x509_certificate
-        from cryptography.hazmat.primitives.asymmetric import padding
         from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.x509 import load_pem_x509_certificate
         cert_pem = base64.b64decode(cert_b64)
         cert = load_pem_x509_certificate(cert_pem)
         wrapped = cert.public_key().encrypt(

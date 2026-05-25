@@ -4,12 +4,11 @@ import boto3
 from mcp.server.fastmcp import FastMCP
 
 from .compliance import (
-    Severity,
+    PAN_CHANGE_VIOLATION,
+    PIN_BLOCK_RETENTION_VIOLATION,
     check_legacy_construct,
     check_pin_format_translation,
     format_legacy_constraint_prompt,
-    PAN_CHANGE_VIOLATION,
-    PIN_BLOCK_RETENTION_VIOLATION,
 )
 
 

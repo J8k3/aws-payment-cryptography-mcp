@@ -7,17 +7,16 @@ from mcp.server.fastmcp import FastMCP
 
 from .hsm_analysis import (
     ALL_COMMANDS,
+    DUKPT_MIGRATION_NOTE,
+    FIXED_KEY_MIGRATION_NOTE,
     FUTUREX_EXCRYPT_PATTERNS,
-    NUMERIC_HSM_PATTERNS,
     HSM_SOCKET_PATTERNS,
     INTERNATIONAL_AND_THALES_PATTERNS,
     LMK_MIGRATION_NOTE,
-    DUKPT_MIGRATION_NOTE,
-    FIXED_KEY_MIGRATION_NOTE,
+    NUMERIC_HSM_PATTERNS,
     get_apc_mapping,
     lookup_command,
 )
-
 
 # Command codes with working handlers in apc-hsm-proxy (github.com/J8k3/aws-payment-cryptography-hsm-proxy)
 _PROXY_HANDLERS: dict[str, set[str]] = {

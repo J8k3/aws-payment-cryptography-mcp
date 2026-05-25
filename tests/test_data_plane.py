@@ -8,8 +8,10 @@ moto is applied automatically by conftest but our explicit patches take preceden
 so these tests run without real AWS credentials and without the moto backend.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from apc_agent.data_plane import register_data_plane_tools
 
 

@@ -2,7 +2,6 @@
 Unit tests for hsm_analysis.py pattern recognition.
 No AWS calls -- all pure Python.
 """
-import pytest
 from apc_agent.hsm_analysis import (
     ALL_COMMANDS,
     HsmCommand,

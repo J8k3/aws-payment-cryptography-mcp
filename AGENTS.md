@@ -80,11 +80,26 @@ When working in this repo or in the CyberChef payments repo, any new domain know
 | Payment algorithm research | `payment-knowledge-base.md` |
 | HSM command analysis | `hsm_analysis.py` (command registry) |
 | PCI compliance rule | `compliance.py` (enforcement logic) |
-| APC API constraint or gap | `CLAUDE.md` → Key Constraints section, and open a GitHub issue if actionable |
+| APC API constraint or gap | `AGENTS.md` → Key Constraints section, and open a GitHub issue if actionable |
 
 Do not defer knowledge updates. If the session ends without the relevant file being updated, the knowledge is lost.
 
 **Cross-repo:** If a gap or finding also affects the CyberChef payments fork, file a GitHub issue at `J8k3/CyberChef` capturing what was learned and what needs to change there.
+
+## After Every Code Change
+
+Run both before reporting work done:
+
+```bash
+python -m ruff check src/ tests/
+python -m pytest tests/ -q
+```
+
+Fix every ruff violation. All tests must pass. If a test catches a new bug, fix the bug — do not adjust the test to pass.
+
+## Proxy Repo — Hands Off
+
+`W:\apc-hsm-proxy` is owned by a separate session. Never read, edit, or touch any file under that path.
 
 ## Pre-commit Checklist (Tool Changes)
 
@@ -93,6 +108,7 @@ Before committing any new or changed MCP tool, verify all of the following are i
 - If the tool exposes new domain knowledge: `payment-knowledge-base.md` updated
 - If the tool detects a new HSM command: `hsm_analysis.py` updated
 - If the tool enforces a new compliance rule: `compliance.py` updated and tested
+- Ruff clean (`ruff check src/ tests/`)
 - Tests passing (`pytest`)
 - Tool docstring has a "Call this when..." trigger sentence
 
