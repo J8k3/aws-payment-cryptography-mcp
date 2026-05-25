@@ -164,6 +164,128 @@ class TestHsmAnalyzeCode:
         result = tools["hsm_analyze_code"](source_code=self.FUTUREX_SAMPLE)
         assert isinstance(result["migration_notes"], list)
 
+    # ── per-category pattern coverage ────────────────────────────────────────
+
+    def test_pin_tdes_dukpt_detected(self, tools):
+        # CI = TDES DUKPT PIN translate (BDK+KSN → ZPK)
+        src = 'cmd = "CI"\nresp = hsm.send(cmd + bdk + ksn + pin_block)'
+        result = tools["hsm_analyze_code"](source_code=src)
+        codes = {d["command_code"] for d in result["detected"]}
+        assert "CI" in codes
+
+    def test_pin_zpk_translate_detected(self, tools):
+        # CC = ZPK-to-ZPK PIN translate (static key, compliance risk)
+        src = 'cmd = "CC"\nresp = hsm.send(cmd + zpk_src + zpk_dst + pin_block)'
+        result = tools["hsm_analyze_code"](source_code=src)
+        codes = {d["command_code"] for d in result["detected"]}
+        assert "CC" in codes
+
+    def test_encrypt_bucket_detected(self, tools):
+        # M0/M2/M4 = data encrypt/decrypt/translate; previously missed before pattern fix
+        for code in ("M0", "M2", "M4"):
+            src = f'command = "{code}"\nresult = hsm.send(command + key + data)'
+            result = tools["hsm_analyze_code"](source_code=src)
+            codes = {d["command_code"] for d in result["detected"]}
+            assert code in codes, f"{code} not detected in ENCRYPT bucket"
+
+    def test_mac_generate_verify_detected(self, tools):
+        # M6 = generate MAC, M8 = verify MAC
+        for code in ("M6", "M8"):
+            src = f'msg = "{code}" + mak + data'
+            result = tools["hsm_analyze_code"](source_code=src)
+            codes = {d["command_code"] for d in result["detected"]}
+            assert code in codes, f"{code} not detected in MAC bucket"
+
+    def test_mac_verify_translate_detected(self, tools):
+        # MY = verify and translate MAC (added in prior session)
+        src = 'command = "MY"\nresult = hsm.send(command + mak_in + mak_out + data + mac)'
+        result = tools["hsm_analyze_code"](source_code=src)
+        codes = {d["command_code"] for d in result["detected"]}
+        assert "MY" in codes
+
+    def test_cvv_generate_verify_detected(self, tools):
+        # CW = generate CVV, CY = verify CVV
+        for code in ("CW", "CY"):
+            src = f'cmd = "{code}" + cvk + pan + expiry + service_code'
+            result = tools["hsm_analyze_code"](source_code=src)
+            codes = {d["command_code"] for d in result["detected"]}
+            assert code in codes, f"{code} not detected in CVV bucket"
+
+    def test_arqc_thales_variants_detected(self, tools):
+        # KQ = EMV/Mastercard ARQC, KW = cloud-based SKD, JS = UnionPay/CUP
+        for code in ("KQ", "KW", "JS"):
+            src = f'arqc_cmd = "{code}" + imk + pan + atc + txn_data + arqc'
+            result = tools["hsm_analyze_code"](source_code=src)
+            codes = {d["command_code"] for d in result["detected"]}
+            assert code in codes, f"{code} not detected in ARQC bucket"
+
+    def test_arqc_futurex_excrypt_detected(self, tools):
+        # EMVA = Futurex Excrypt ARQC verify
+        src = '[EMVA;AC4111111111111111;KSN001;AT0001;]'
+        result = tools["hsm_analyze_code"](source_code=src)
+        codes = {d["command_code"] for d in result["detected"]}
+        assert "EMVA" in codes
+
+    def test_dukpt_note_attached_for_ci(self, tools):
+        src = 'cmd = "CI"\nresp = hsm.send(cmd + bdk + ksn + pin_block)'
+        result = tools["hsm_analyze_code"](source_code=src)
+        notes_text = " ".join(result["migration_notes"])
+        assert "DUKPT" in notes_text
+
+    def test_key_mgmt_note_attached_for_a0(self, tools):
+        # A0 = generate key (KEY_MGMT category) → triggers LMK migration note
+        src = 'cmd = "A0"\nresp = hsm.send(cmd + key_type + lmk_flag)'
+        result = tools["hsm_analyze_code"](source_code=src)
+        notes_text = " ".join(result["migration_notes"])
+        assert "LMK" in notes_text
+
+    def test_each_detected_command_maps_to_known_apc_op(self, tools):
+        # All commands in these samples must resolve to a known APC operation
+        samples = [
+            '[TPIN;PAN=4111111111111111;KSN=FFFF9876543210E00001;]',
+            'cmd = "CI"\nresp = hsm.send(cmd)',
+            'cmd = "M6"\nresp = hsm.send(cmd)',
+            'cmd = "CW"\nresp = hsm.send(cmd)',
+            'cmd = "KQ"\nresp = hsm.send(cmd)',
+        ]
+        for src in samples:
+            result = tools["hsm_analyze_code"](source_code=src)
+            for entry in result["detected"]:
+                if entry["known"]:
+                    assert entry["apc_operation"] is not None, (
+                        f"{entry['command_code']} known=True but apc_operation is None"
+                    )
+
+
+# ── _PROXY_HANDLERS consistency ───────────────────────────────────────────────
+
+class TestProxyHandlersConsistency:
+    def test_all_proxy_handler_codes_exist_in_all_commands(self, tools):
+        from apc_agent.hsm_tools import register_hsm_tools
+        from apc_agent.hsm_analysis import ALL_COMMANDS
+
+        # Extract _PROXY_HANDLERS by re-registering and reading the module attribute
+        import apc_agent.hsm_tools as ht_mod
+        import importlib, types
+
+        known_codes = {c.command_code for c in ALL_COMMANDS}
+
+        class _Cap:
+            _proxy: dict = {}
+            def tool(self, **kw):
+                def d(fn): return fn
+                return d
+
+        # _PROXY_HANDLERS is a local inside register_hsm_tools; access via the closure
+        # workaround: re-read the source and extract the set literal
+        import ast, pathlib, re as _re
+        src = pathlib.Path(ht_mod.__file__).read_text()
+        # find _PROXY_HANDLERS dict in source, collect all quoted 2-char codes
+        proxy_codes = set(_re.findall(r'"([A-Z]{2,4})"', src[src.find("_PROXY_HANDLERS"):src.find("_PROXY_HANDLERS") + 2000]))
+
+        missing = proxy_codes - known_codes
+        assert not missing, f"_PROXY_HANDLERS codes not in ALL_COMMANDS: {sorted(missing)}"
+
 
 # ── hsm_analyze_discovery_log ─────────────────────────────────────────────────
 

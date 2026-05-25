@@ -158,6 +158,14 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "Checks a PIN against a list of weak/prohibited PINs.",
                None, None,
                "No direct APC equivalent — implement as application logic."),
+    # Diagnostics
+    HsmCommand("Futurex", "Excrypt", "ECHO", "HSM Echo / Health Check", "KEY_MGMT",
+               "Sends a test message to the HSM and receives the same data back. "
+               "Used to verify connectivity and measure round-trip latency. "
+               "No APC equivalent — replace with a lightweight APC API call (e.g. list_keys with maxResults=1).",
+               None, None,
+               "No cryptographic function. Migrate health-check logic to standard HTTP/TLS connectivity tests "
+               "or an APC list_keys probe. Wire: [AOECHO;<data>;] → [AOECHO;AE00;<data>;]"),
     # EMV / ARQC
     HsmCommand("Futurex", "Excrypt", "EMVA", "Verify ARQC and Optionally Generate ARPC", "ARQC",
                "Validates EMV Authorization Request Cryptogram and generates ARPC. "
