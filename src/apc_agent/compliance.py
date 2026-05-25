@@ -47,8 +47,8 @@ KEY_USAGE_REGISTRY = {
     },
     "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS": {
         "name": "EMV Application Cryptogram Master Key",
-        "allowed_operations": ["verify_auth_request_cryptogram", "generate_mac_emv_pin_change"],
-        "description": "Used for ARQC/ARPC verification",
+        "allowed_operations": ["verify_auth_request_cryptogram"],
+        "description": "Used for ARQC/ARPC verification. EMV PIN change scripts use E2 (integrity) and E1 (confidentiality), not E0.",
     },
     "TR31_E1_EMV_MKEY_CONFIDENTIALITY": {
         "name": "EMV Secure Messaging Confidentiality Key",
