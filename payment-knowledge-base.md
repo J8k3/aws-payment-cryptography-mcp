@@ -9459,6 +9459,672 @@ status: active
 
 ---
 
+## Thales International Command Wire Formats
+
+### KU/KY Command — EMV Issuer Script MAC (EMV 3.1.1 / EMV 4.x)
+
+```yaml
+id: concept.thales-ku-ky-command
+entity_type: command
+canonical_name: KU/KY — EMV Issuer Script MAC (International Host Commands)
+aliases:
+  - KU command
+  - KY command
+  - KV response
+  - KZ response
+  - EMV issuer script MAC
+  - MK-SMI
+  - issuer script integrity
+summary: >
+  Thales payShield 10K International Host Command (PUGD0537-004 pp.475-484) for generating
+  an EMV issuer script MAC using the Master Key for Script Integrity (MK-SMI).
+  Available in package: Classic & Premium. Authorization: Not required.
+  KU (response KV): EMV 3.1.1 — Visa VIS, MC M/Chip, Amex AEIPS, JCB, Union Pay.
+  KY (response KZ): EMV 4.x — Visa VIS CVN14/22/18, MC CVN12-15, Discover D-PAS, CCD.
+  Mode Flag '0' = integrity only → generate_mac with MK-SMI (proxy supported).
+  Modes 1-4 = confidentiality / PIN change → require generate_mac_emv_pin_change.
+  CRITICAL: there is NO 'Key Type (3H)' field. Wire goes Mode Flag → Scheme ID → MK-SMI directly.
+  CRITICAL: MK-SMI is 32H or 'U'+32H (double-length, LMK pair 28-29 variant 2). No triple-length.
+  CRITICAL: Response MAC is 8B binary (KU Scheme '6' exception: 8H). NOT 16H ASCII hex.
+domain:
+  - hsm
+  - emv
+  - cryptography
+attributes:
+  source: "PUGD0537-004 International Host Commands pp.475-479 (KU) and pp.480-484 (KY) — authoritative, verified against spec pages."
+  confidence: authoritative
+  license: "Classic & Premium (no additional license beyond Classic required)."
+
+  ku_scheme_ids:
+    note: "KU Scheme ID (1N) — identifier for card scheme and session key derivation method."
+    values:
+      "'0'": "Visa VIS (CVN 10)"
+      "'1'": "Mastercard M/Chip (CVN 10 or 11)"
+      "'2'": "American Express AEIPS (CVN 01)"
+      "'3'": "JCB (CVN 01) — EMV Option A ICC Master Key Derivation, no session key generation. Mode Flags 0,1,2 only."
+      "'4'": "JCB (CVN 02) — EMV Option A ICC Master Key Derivation + JCB session key derivation. Mode Flags 0,1,2 only."
+      "'5'": "JCB (CVN 04) — EMV Option A ICC Master Key Derivation + EMV 4.x Common Session Key Derivation. Mode Flags 0,1,2 only."
+      "'6'": "Union Pay (ver 2.4) — EMV Option A ICC Master Key Derivation + Union Pay session key derivation."
+
+  ky_scheme_ids:
+    note: "KY Scheme ID (1N) — present for Mode Flags 2, 4, or 5 only (NOT for Mode 0)."
+    values:
+      "'0'": "Visa VIS (CVN 14) — EMV 4.x Option A + EMV2000 Session Key Derivation"
+      "'1'": "Mastercard M/Chip (CVN 12 or 13) — EMV 4.x Option A + EMV2000 Session Key Derivation"
+      "'4'": "CCD — EMV 4.x Option B + EMV2000 Session Key Derivation"
+      "'5'": "Visa VIS / NSICCS — EMV 4.x Option A + EMV Common Session Key Derivation"
+      "'6'": "Mastercard M/Chip / Discover D-PAS — EMV 4.x Option A + EMV Common Session Key Derivation"
+      "'7'": "CCD — EMV 4.x Option B + EMV Common Session Key Derivation"
+      "'8'": "CCD — EMV 4.x Option C + AES Common Session Key Derivation (Mode 5 only)"
+      "'9'": "Visa VIS 1.6 — EMV 4.3 Option B + EMV Common Session Key Generation"
+      "'A'": "Visa VIS 1.6 — EMV 4.3 Option B + XOR Session Key Generation"
+
+  wire_format_ku_command:
+    note: >
+      Proxy supports Mode Flag '0' (integrity only). Variant LMK path shown for Mode 0.
+      Types: H=ASCII hex chars, N=ASCII decimal chars, B=raw binary bytes, A=ASCII char.
+      There is NO Key Type (3H) field — the prior inferred entry was incorrect.
+    fields:
+      - name: Mode Flag
+        type: 1N
+        details: >
+          ASCII decimal digit.
+          '0' = Integrity only → APC generate_mac with MK-SMI. Proxy supported.
+          '1' = Integrity + Confidentiality (same Master Key) → generate_mac_emv_pin_change.
+          '2' = Integrity + Confidentiality (different Master Keys) → generate_mac_emv_pin_change.
+          '3' = Integrity + PIN Change (same Master Key) → generate_mac_emv_pin_change.
+          '4' = Integrity + PIN Change (different Master Keys) → generate_mac_emv_pin_change.
+          Proxy returns error 15 for modes 1-4.
+      - name: Scheme ID
+        type: 1N
+        details: >
+          ASCII decimal digit. See ku_scheme_ids table above.
+          All seven Scheme IDs ('0'-'6') are valid for KU Mode 0.
+      - name: MK-SMI
+        type: var
+        details: >
+          Master Key for Script Integrity. Encrypted under LMK pair 28-29 variant 2.
+          Variant LMK: 32H (double-length, no scheme prefix) or 'U' + 32H (double-length with prefix).
+          No triple-length ('T'+48H) — MK-SMI is always double-length 3DES.
+          Key Block LMK: 'S' + nA; Key Usage 'E2', Algorithm 'T', Mode of Use 'N'.
+          APC key type: TR31_E2_EMV_MKEY_APP_SCRIPTS.
+      - name: PAN/PAN Sequence No
+        type: 8B
+        details: >
+          Present for Scheme IDs '0'-'6' (all KU schemes).
+          8 raw binary bytes. Pre-formatted PAN/PAN Sequence number in BCD format.
+          Host is responsible for correct EMV Option A BCD formatting.
+          Layout: rightmost digits of PAN + 2-digit PAN seq no, right-justified, packed BCD.
+      - name: Integrity Session Key Data
+        type: 8B (or 2B for Schemes '3','4')
+        details: >
+          Present for Scheme IDs '0'-'6'. Content is scheme-dependent:
+          Scheme '0' (Visa VIS), '2' (Amex AEIPS), '6' (Union Pay):
+            2-byte ATC right-justified, padded on the left with 6 zero bytes → 8B total.
+          Scheme '1' (MC M/Chip):
+            8-byte random number, RANDi.
+          Scheme '5' (JCB CVN04):
+            Application Cryptogram (8B) from card's first GENERATE AC response.
+          Schemes '3','4' (JCB CVN01/02):
+            2-byte ATC only (2B — not padded to 8B).
+      - name: Padding Flag
+        type: 1N
+        details: >
+          Present only for Scheme ID '6' (Union Pay).
+          '0' = Plaintext Message Data is not padded.
+          '1' = Plaintext Message Data is padded.
+      - name: Plaintext Message Data Length
+        type: 4H
+        details: >
+          Present only for Scheme IDs '3','4','5','6'.
+          Length in bytes of the Plaintext Message Data field that follows.
+          For Scheme IDs '0','1','2': message data has no preceding length field —
+          it is read until the terminal ';' delimiter.
+      - name: Plaintext Message Data
+        type: nB
+        details: >
+          The issuer script command bytes to be MAC'd (ISO 7816 APDUs, or PIN Unblock APDU).
+          Raw binary. Hex-encode for APC MessageData.
+          Length: from Plaintext Message Data Length field (Schemes '3'-'6') or inferred from
+          delimiter position (Schemes '0'-'2').
+      - name: Delimiter
+        type: 1A
+        details: >
+          ASCII ';' = 0x3B. Terminates Plaintext Message Data for all schemes and modes.
+      - name: MK-SMC (modes 2,4 only)
+        type: var
+        details: >
+          Master Key for Secure Messaging with Confidentiality.
+          LMK pair 28-29 variant 3. 32H or 'U'+32H (Variant LMK).
+          APC key type: TR31_E1_EMV_MKEY_CONFIDENTIALITY.
+          Only present if Mode Flag = '2' or '4'.
+
+  wire_format_ky_differences:
+    note: >
+      KY performs the same function as KU but uses EMV2000 or EMV Common Session Key Derivation.
+      For Mode '0': Scheme ID field is NOT present; IV-SMI (16B) IS always present.
+      For Mode '5': Scheme ID IS present (specifies derivation method only; no padding).
+      KY does not support Mode Flags '1' or '3' (reserved).
+    additional_fields:
+      - name: IV-SMI
+        type: 16B
+        details: >
+          KY only. Present for Mode '0', or when Scheme ID = '0', '1', or '4'.
+          IV for EMV2000 Secure Messaging for Integrity session key derivation.
+      - name: PAN Length (KY Schemes '4','7','8','9','A' only)
+        type: 2N
+        details: >
+          Number of bytes in the PAN/PAN Sequence Number field. Valid values '01'-'19'.
+          Not present for Schemes '0','1','5','6' (fixed 8B PAN/PSN).
+      - name: Application Cryptogram (KY Schemes '5','6','7','8','9' only)
+        type: 8B
+        details: >
+          Application Cryptogram returned by card in response to first GENERATE AC.
+          Used for session key derivation in these schemes.
+      - name: Application Transaction Counter (KY Mode '0' or Schemes '0','1','4','A')
+        type: 2B
+        details: >
+          2-byte ATC from the card. Used for session key generation.
+
+  wire_format_response:
+    response_code_ku: KV
+    response_code_ky: KZ
+    fields:
+      - name: Error Code
+        type: 2A
+        details: >
+          KU ('KV'): '00'=No error, '04'=Invalid Mode Flag (not 0-4), '05'=Unrecognized Scheme ID,
+          '06'=Invalid Offset, '07'=Invalid ciphertext message length parameter,
+          '08'=Ciphertext message length error, '09'=TK or ZPK/TPK parity error,
+          '10'=MK-SMI parity error, '11'=MK-SMC parity error,
+          '50'=Source PIN Encryption Key Type not 0 or 1, '51'=Invalid message header,
+          '68'=Command disabled, '69'=PIN Block format disabled, or standard error code.
+          KY ('KZ'): same plus '52'=Invalid Branch/Height.
+      - name: MAC
+        type: 8B (or 8H for KU Scheme '6')
+        details: >
+          Present if Error Code = '00'.
+          KU Scheme IDs '0'-'5': 8 raw binary bytes (64-bit MAC).
+          KU Scheme '6' (Union Pay): 8H ASCII hex chars (4-byte MAC = 8 hex chars).
+          KY all schemes: 8 raw binary bytes (64-bit MAC).
+          CRITICAL: prior inferred entry said 16H — this was wrong.
+
+  apc_mapping:
+    mode_0:
+      operation: generate_mac
+      key_type: TR31_E2_EMV_MKEY_APP_SCRIPTS
+      algorithm: Iso9797Algorithm3
+      session_key_derivation_by_scheme: >
+        KU '0' (Visa), '2' (Amex), '3'-'5' (JCB): EmvOptionA.
+        KU '1' (MC): EmvOptionB.
+        KU '6' (Union Pay): EmvOptionA.
+        KY Mode 0: EMV2000 derivation (IV-SMI required).
+        KY Schemes '5','6': EMV Common Session Key Derivation.
+      session_key_input: >
+        PAN (BCD), PAN Sequence Number, and scheme-specific session key data
+        (ATC padded to 8B for Visa/Amex; RANDi for MC; App Cryptogram for Schemes using AC).
+        APC derives SK-SMI from MK-SMI internally.
+      mac_input: "Plaintext Message Data (binary, hex-encoded for APC)."
+    modes_1_to_4:
+      operation: generate_mac_emv_pin_change
+      status: NOT_SUPPORTED_BY_PROXY
+      reason: >
+        Requires two key ARNs (MK-SMI: TR31_E2_EMV_MKEY_APP_SCRIPTS plus
+        MK-SMC: TR31_E1_EMV_MKEY_CONFIDENTIALITY) and a pre-translated PIN block.
+        Cannot be implemented by changing generate_mac parameters.
+
+constraints:
+  - "NO 'Key Type (3H)' field in KU or KY — wire format goes Mode Flag → Scheme ID → MK-SMI directly."
+  - "MK-SMI: 32H or 'U'+32H only (double-length 3DES, LMK pair 28-29 variant 2). No triple-length format."
+  - "Response MAC is 8B binary for KU Schemes '0'-'5' and all KY schemes. KU Scheme '6' (Union Pay) returns 8H (4-byte MAC)."
+  - "Integrity Session Key Data content is scheme-dependent — not just the ATC. MC uses RANDi; JCB CVN04/Scheme '5' uses App Cryptogram."
+  - "Schemes '0','1','2' in Mode 0: Plaintext Message Data is delimited by ';', no preceding 4H length field."
+  - "Schemes '3','4','5','6': Plaintext Message Data Length (4H) precedes the data."
+  - "Mode '0' is the only proxy-supported mode. Modes 1-4 return proxy error 15 — see AGENTS.md Key Constraints."
+  - "MK-SMI key type is TR31_E2_EMV_MKEY_APP_SCRIPTS — not E0 (ARQC) or E1 (confidentiality)."
+  - "KY Mode '0': Scheme ID NOT present; IV-SMI (16B) IS present. KY Mode '5': Scheme ID present."
+  - "KU Schemes '3','4','5' are only permitted with Mode Flags '0','1','2' (not '3' or '4')."
+
+relationships:
+  - type: related_to
+    target_id: concept.thales-js-command
+  - type: related_to
+    target_id: operation.emv-issuer-script
+  - type: related_to
+    target_id: concept.emv-secure-messaging
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+status: active
+```
+
+### LQ/LS Command — HMAC Generate / Verify
+
+```yaml
+id: concept.thales-lq-ls-command
+entity_type: command
+canonical_name: LQ/LS — HMAC Generate / Verify (International Host Commands)
+aliases:
+  - LQ command
+  - LS command
+  - LR response
+  - LT response
+  - HMAC generate
+  - HMAC verify
+summary: >
+  Thales payShield 10K International Host Command (PUGD0537-004 pp.405-408) for HMAC
+  generation (LQ) and verification (LS). Available in package: Premium. Authorization: Not required.
+  Supports SHA-1, SHA-224, SHA-256, SHA-384, SHA-512 (Hash Identifier 2N: '01','05','06','07','08').
+  HMAC output length is configurable (HMAC Length 4N), subject to L/2 ≤ t ≤ L.
+  CRITICAL: HMAC Key is nB binary under LMK pair 34-35 variant 1 — NOT parse_legacy_key; no 'U'/'T' prefix.
+  CRITICAL: Message data is nB binary, not hex-encoded. Data Length is 5N decimal (not 4H hex).
+  CRITICAL: In LS, the HMAC to verify appears after Hash Identifier + HMAC Length, BEFORE key fields.
+  Response codes: LR (generate), LT (verify).
+  APC mapping: generate_mac / verify_mac with TR31_M7_HMAC_KEY.
+domain:
+  - hsm
+  - cryptography
+attributes:
+  source: "PUGD0537-004 International Host Commands pp.405-408 — authoritative, verified against spec pages."
+  confidence: authoritative
+  license: "Premium package required."
+
+  wire_format_lq_generate:
+    note: >
+      All fields positional. Types: H=ASCII hex chars, N=ASCII decimal chars, B=raw binary bytes, A=ASCII char.
+      Variant LMK path shown; Key Block LMK has minor differences noted per field.
+    fields:
+      - name: Hash Identifier
+        type: 2N
+        details: >
+          2 ASCII decimal chars. Selects HMAC hash algorithm:
+          '01' = HMAC-SHA-1   (output L=20 bytes; 10 ≤ t ≤ 20)
+          '05' = HMAC-SHA-224 (no APC equivalent — proxy must return migration error)
+          '06' = HMAC-SHA-256 → APC MacAlgorithm::HmacSha256 (L=32; 16 ≤ t ≤ 32)
+          '07' = HMAC-SHA-384 → APC MacAlgorithm::HmacSha384 (L=48; 24 ≤ t ≤ 48)
+          '08' = HMAC-SHA-512 → APC MacAlgorithm::HmacSha512 (L=64; 32 ≤ t ≤ 64)
+          For Key Block LMK: 2H field, ignored; should be 'FF'.
+          CRITICAL: 2N (two chars), not 1N. Misreading as 1N shifts all subsequent fields.
+      - name: HMAC Length
+        type: 4N
+        details: >
+          4 ASCII decimal chars. Length (t) in bytes of the output HMAC.
+          Must satisfy L/2 ≤ t ≤ L, where L is the full hash output size.
+          Example: for SHA-256 (L=32), valid range 0016-0032.
+          Maps to APC MacLength parameter; use full L if APC does not support truncated HMAC.
+      - name: HMAC Key Format
+        type: 2N
+        details: >
+          2 ASCII decimal chars. Format of the stored key.
+          Variant LMK: '00' = Thales HMAC Key format.
+          Key Block LMK: '04' = Thales HMAC Key Block format.
+      - name: HMAC Key Length
+        type: 4N
+        details: >
+          4 ASCII decimal chars (Variant LMK): length in bytes of the HMAC Key field that follows.
+          Key Block LMK: ignored; send 'FFFF'.
+      - name: HMAC Key
+        type: nB
+        details: >
+          Raw binary bytes (Variant LMK). Length from HMAC Key Length field.
+          Encrypted under LMK pair 34-35 variant 1.
+          CRITICAL: key is NOT prefixed with a key scheme character ('U', 'T', etc.).
+          Do not apply parse_legacy_key — read nB binary directly.
+          Key Block LMK: nA; Key Usage '61'-'65', Algorithm 'H', Mode of Use 'C','G','N'.
+          APC key type: TR31_M7_HMAC_KEY.
+      - name: Delimiter
+        type: 1A
+        details: "ASCII ';' = 0x3B. Required only when using Variant LMK. Not sent with Key Block LMK."
+      - name: Data Length
+        type: 5N
+        details: >
+          5 ASCII decimal chars. Length in bytes of the message to be authenticated.
+          Example: '00128' = 128 bytes of binary message data follow.
+          CRITICAL: 5N decimal, not 4H hex. Wrong type shifts all subsequent fields.
+      - name: Message Data
+        type: nB
+        details: >
+          Raw binary bytes. Byte count from Data Length field.
+          CRITICAL: message is binary, not hex-encoded on the wire.
+          Hex-encode after reading from the wire before passing to APC MessageData.
+
+  wire_format_lq_response:
+    response_code: LR
+    fields:
+      - name: Error Code
+        type: 2A
+        details: >
+          '00': No error.
+          '04': HMAC Length error (t outside valid range for selected hash).
+          '05': Invalid Hash Identifier.
+          '06': Invalid Key Usage.
+          '07': Invalid Key Format.
+          '08': HMAC Key error (parity or decryption failure).
+          '67': Command not licensed (Premium package required).
+          '68': Command disabled.
+          Or a standard error code.
+      - name: HMAC Length
+        type: 4N
+        details: "Present if Error Code = '00'. Length (t) in bytes of the HMAC output, as specified in command."
+      - name: HMAC
+        type: nB
+        details: "Present if Error Code = '00'. HMAC value, t raw binary bytes."
+
+  wire_format_ls_verify:
+    note: >
+      IMPORTANT: LS field ordering differs from LQ. Hash Identifier and HMAC Length come first,
+      then the HMAC to verify, then key fields, then message data. The HMAC is NOT appended at the end.
+    fields:
+      - name: Hash Identifier
+        type: 2N
+        details: "Same as LQ — 2N decimal, selects algorithm and determines full output length L."
+      - name: HMAC Length
+        type: 4N
+        details: "Length (t) in bytes of the HMAC to be verified. Must satisfy L/2 ≤ t ≤ L."
+      - name: HMAC
+        type: nB
+        details: >
+          The HMAC value to verify. Raw binary, t bytes.
+          Appears BEFORE the key fields — different from LQ which has no HMAC in the command.
+          Hex-encode for APC verify_mac MacAuthCode parameter.
+      - name: HMAC Key Format
+        type: 2N
+        details: "Same as LQ. '00' (Variant LMK) or '04' (Key Block LMK)."
+      - name: HMAC Key Length
+        type: 4N
+        details: "Same as LQ. Length in bytes of HMAC Key (Variant LMK) or 'FFFF' (Key Block LMK)."
+      - name: HMAC Key
+        type: nB
+        details: >
+          Same as LQ. Raw binary under LMK pair 34-35 variant 1. No key scheme prefix.
+          APC key type: TR31_M7_HMAC_KEY.
+      - name: Delimiter
+        type: 1A
+        details: "ASCII ';'. Required for Variant LMK only."
+      - name: Data Length
+        type: 5N
+        details: "Same as LQ. 5 ASCII decimal chars. Length of message to be authenticated."
+      - name: Message Data
+        type: nB
+        details: "Same as LQ. Raw binary. Hex-encode for APC after reading from wire."
+
+  wire_format_ls_response:
+    response_code: LT
+    fields:
+      - name: Error Code
+        type: 2A
+        details: >
+          '00': HMAC verified successfully.
+          '01': HMAC verification failure (HMAC mismatch).
+          '04': HMAC Length error.
+          '05': Invalid Hash Identifier.
+          '06': Invalid Key Usage.
+          '07': Invalid Key Format.
+          '08': HMAC Key error.
+          '67': Command not licensed.
+          '68': Command disabled.
+          Or a standard error code.
+
+  apc_mapping:
+    generate:
+      operation: generate_mac
+      key_type: TR31_M7_HMAC_KEY
+      algorithm_by_hash_identifier:
+        "'01'": "MacAlgorithm::Hmac (HMAC-SHA-1) — weak; flag for migration to SHA-256 or SHA-512"
+        "'05'": "NO APC EQUIVALENT — SHA-224 not supported; return proxy migration error"
+        "'06'": "MacAlgorithm::HmacSha256"
+        "'07'": "MacAlgorithm::HmacSha384"
+        "'08'": "MacAlgorithm::HmacSha512"
+      message_data: "Message Data field (nB binary from wire), hex-encoded before passing to APC."
+      mac_length: "HMAC Length field (4N) → APC MacLength; use full hash output if APC does not support truncation."
+    verify:
+      operation: verify_mac
+      key_type: TR31_M7_HMAC_KEY
+      algorithm: "Same Hash Identifier → MacAlgorithm mapping as generate."
+      mac_to_verify: "HMAC field (nB binary from LS wire), hex-encoded for APC MacAuthCode."
+  implementation: "src/handlers/thales/hmac.rs — HmacHandler"
+
+constraints:
+  - "HMAC Key is nB binary under LMK pair 34-35 variant 1 — NO key scheme prefix ('U'/'T'). Do not use parse_legacy_key."
+  - "Hash Identifier is 2N decimal ('01','05','06','07','08') — NOT 1N. Misreading as 1N shifts all subsequent fields."
+  - "Data Length is 5N decimal (not 4H hex). '00128' = 128 bytes."
+  - "Message Data is nB binary — hex-encode only after reading from wire for APC."
+  - "In LS, HMAC to verify appears AFTER Hash Identifier + HMAC Length, BEFORE key fields."
+  - "SHA-224 ('05') has no APC equivalent — proxy must return an error for this Hash Identifier."
+  - "HMAC Length (4N) governs actual output byte count; it appears in both command and LR response."
+  - "Premium license required. Error '67' = Command not licensed."
+  - "HMAC-SHA-1 is cryptographically weak; recommend migration to SHA-256 or SHA-512."
+
+relationships:
+  - type: related_to
+    target_id: concept.thales-ku-ky-command
+  - type: related_to
+    target_id: concept.thales-wire-protocol
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+status: active
+```
+
+### QY/PM Command — Dynamic CVV Generate / Verify
+
+```yaml
+id: concept.thales-qy-pm-command
+entity_type: command
+canonical_name: QY/PM — Dynamic CVV Generate / Verify (International Host Commands)
+aliases:
+  - QY command
+  - PM command
+  - QZ response
+  - PN response
+  - dCVV generate
+  - dCVV verify
+  - dynamic CVV
+summary: >
+  Thales payShield 10K International Host Command (PUGD0537-004 pp.306-315) for generating
+  (QY) and verifying (PM) dynamic card verification values. QY supports Visa dCVV (Scheme '0'),
+  Visa AV (Scheme '1'), and Visa dCVV2 time-based (Scheme '5'). PM supports 8 schemes
+  (Visa, Mastercard CVC3, Amex, Discover, Oberthur, JCB, Gemalto dCV) with sub-variants.
+  Response codes: QZ (QY), PN (PM). Source: PUGD0537-004 pp.306-315 — AUTHORITATIVE.
+  Note: a prior inferred entry for this command was materially wrong on key encoding
+  (parse_legacy_key, not fixed 32H), Scheme ID presence, Key Derivation Method presence,
+  PAN delimiter, and ATC encoding (6N decimal, not 4H hex). All fields below are spec-verified.
+domain:
+  - hsm
+  - emv
+  - card_validation
+  - cryptography
+attributes:
+  source: "PUGD0537-004 Core Host Commands V1, pp.306-315 — AUTHORITATIVE. Local copy at Downloads\\payment knowledge\\PUGD0537-004 Core Host Commands V1.pdf."
+  confidence: authoritative
+  scope_note: "Entry documents Scheme '0' (Visa dCVV) fully as the primary acquirer use case. Other schemes noted but not fully expanded."
+
+  wire_format_qy_generate:
+    note: "Types: H=ASCII hex, N=ASCII decimal, A=ASCII char, B=raw binary bytes. PAN is variable-length terminated by ';'."
+    common_fields:
+      - name: Scheme ID
+        type: 1N
+        details: >
+          '0' = Visa dCVV (primary acquirer use case).
+          '1' = Visa Authentication Value (AV).
+          '5' = Visa dCVV2 Time Based.
+          '2','3','4','6'-'9' = Reserved / other schemes not in acquirer scope.
+      - name: Master Key (MK-DCVV)
+        type: var
+        details: >
+          For Variant LMK: 32H (single-length) | 'U' + 32H (double-length) | 'T' + 48H (triple-length).
+          For Key Block LMK: 'S' + n A (TR-31 block); Key Usage 'E0', Algorithm 'T', Mode of Use 'N'.
+          CORRECTION from prior inferred entry: this IS parse_legacy_key style — NOT fixed 32H.
+          The prior entry incorrectly stated "fixed 32H, no prefix."
+      - name: Key Derivation Method
+        type: 1A
+        details: >
+          'A' = EMV 4.1 Book 2 Option A method.
+          'B' = EMV 4.1 Book 2 Option B method.
+          Field was entirely absent from the prior inferred entry.
+      - name: PAN
+        type: nN
+        details: >
+          Primary Account Number. Variable length — max 19 digits for Scheme '0' or '1'.
+          NOT fixed 16N as the prior inferred entry stated.
+      - name: Delimiter
+        type: 1A
+        details: >
+          ASCII ';'. Marks end of PAN field. Field was absent from the prior inferred entry.
+    scheme_0_visa_dcvv_fields:
+      - name: Expiration Date
+        type: 4N
+        details: "Card Expiry Date, MMYY format."
+      - name: Service Code
+        type: 3N
+        details: >
+          Must be '998' for Scheme '0' (Visa dCVV). Any other value returns error code '07'.
+          The prior inferred entry treated this as a caller-supplied track service code — incorrect.
+          The HSM appends a zero byte to the PAN when generating the DK-DCVV for Scheme '0'.
+      - name: ATC
+        type: 6N
+        details: >
+          Application Transaction Counter. 6 ASCII decimal digits, right-justified, zero-padded left.
+          Example: ATC value 17 → '000017'.
+          CORRECTION: prior inferred entry said 4H (ASCII hex). Spec says 6N (decimal).
+
+  wire_format_qy_response:
+    response_code: QZ
+    fields:
+      - name: Error Code
+        type: 2A
+        details: >
+          '00' = No error.
+          '05' = Unrecognized Scheme or Key Derivation Method.
+          '07' = Invalid Service Code (Scheme '0' requires '998').
+          '10' = Master Key Parity Error.
+          Or a standard error code.
+      - name: dCVV
+        type: 3N
+        details: "Present only if Error Code '00' and Scheme '0'. The calculated 3-digit dCVV."
+
+  wire_format_pm_verify:
+    note: >
+      PM is a multi-scheme command (8 schemes, multiple versions each). Common fields are
+      the same structure as QY. Scheme-specific fields follow after the Delimiter and optional
+      PAN Sequence No. The dCVV/cryptogram to verify is always at the END of the scheme-specific
+      section — not before the PAN as the prior inferred entry incorrectly stated.
+    common_fields:
+      - name: Scheme ID
+        type: 1N
+        details: >
+          '0'=Visa, '1'=Mastercard, '2'=Amex ExpressPay, '3'=Discover,
+          '4'=Oberthur, '5'=Visa dCVV2, '6'=JCB, '7'=Gemalto dCV.
+      - name: Version
+        type: 1N
+        details: >
+          Scheme-specific sub-type. For Scheme '0' (Visa):
+          '0'=Visa DCVV verification, '1'=Visa LUC, '2'=LUC with host value, '3'=LUC with consumer device reporting.
+          Field was absent from the prior inferred entry.
+      - name: MK-DCVV
+        type: var
+        details: >
+          Same parse_legacy_key encoding as QY. LMK variant depends on scheme:
+          Scheme '0','2','5' → MK-AC (LMK 28-29 variant 1).
+          Scheme '1' (most versions) → MK-CVC3 (LMK 28-29 variant 7).
+          Key Block LMK: scheme-specific Key Usage (E0, E6, '32', etc.).
+      - name: Key Derivation Method
+        type: 1A
+        details: "Same as QY — 'A'=Option A, 'B'=Option B. Scheme/version combinations restrict valid values."
+      - name: PAN
+        type: nN
+        details: >
+          Variable length. Max 16 for Scheme '0'; max 19 for Scheme '1'/'5'.
+          For Key Derivation Method '2','3','6': 20N (16-digit PAN + 4-digit expiry concatenated).
+          For Scheme '6': 16N fixed.
+      - name: Delimiter
+        type: 1A
+        details: "ASCII ';'. End of PAN field."
+      - name: PAN Sequence No.
+        type: 2N
+        details: >
+          Conditional — present only for: Scheme '1' Versions '1'-'4'; Scheme '2';
+          Scheme '3' Version '2' with Key Derivation Method '5'; Scheme '4'; Scheme '6'; Scheme '7'.
+          NOT present for Scheme '0' Version '0' (Visa dCVV) — PSN assumed '00', zero appended to PAN.
+    scheme_0_version_0_visa_dcvv_fields:
+      - name: Expiration Date
+        type: 4N
+        details: "Card Expiry Date, MMYY format."
+      - name: Service Code
+        type: 3N
+        details: "Track 2 Service Code."
+      - name: ATC
+        type: 6N
+        details: "Application Transaction Counter. 6 decimal digits, right-justified, zero-padded."
+      - name: dCVV
+        type: 3N
+        details: "The dCVV value to validate. Placed at END of scheme-specific fields."
+
+  wire_format_pm_response:
+    response_code: PN
+    fields:
+      - name: Error Code
+        type: 2A
+        details: >
+          '00' = No error (verified).
+          '01' = Cryptogram verification failure.
+          '05' = Unrecognized Scheme, Version, or Key Derivation Method.
+          '06' = Invalid YHHHHCC value.
+          '10' = MK-DCVV Parity Error.
+          '52' = Invalid Discretionary Data CVS.
+          '68' = Command disabled.
+          'E9' = Invalid CVC3 mask value.
+          'EA' = Invalid Modified PSN Flag.
+      - name: Diagnostic Data
+        type: var
+        details: >
+          Present only if Error Code '01' and HSM in Authorised State.
+          Contains the correct (calculated) cryptogram for debugging.
+          Length is scheme/version dependent (3N, 5N, 6N, or nN).
+
+  apc_mapping:
+    scheme_0_visa_dcvv:
+      generate:
+        operation: generate_card_validation_data
+        key_type: TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS
+        primary_account_number: "PAN field (variable, stripped of leading zeros for APC if needed)."
+        generation_attributes:
+          type: DynamicCardVerificationValue
+          application_transaction_counter: "ATC field (6N decimal string)."
+          card_expiry_date: "Expiration Date field (4N, MMYY)."
+          service_code: "Service Code field — pass '998' (spec mandates this for Scheme 0)."
+          pan_sequence_number: "'00' — PSN is not on the wire for Scheme 0; spec assumes zero."
+        validation_data_length: 3
+      verify:
+        operation: verify_card_validation_data
+        key_type: TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS
+        validation_data: "dCVV field (3N) from end of PM Scheme 0 Version 0 fields."
+        verification_attributes:
+          type: DynamicCardVerificationValue
+          fields: "Same as generate — ATC (6N decimal), ExpiryDate (MMYY), ServiceCode, PanSequenceNumber '00'."
+  implementation: "src/handlers/thales/dynamic_cvv.rs — DynamicCvvHandler"
+
+constraints:
+  - "Master Key uses parse_legacy_key encoding (32H | 'U'+32H | 'T'+48H) — NOT fixed 32H. Prior inferred entry had this backwards."
+  - "Scheme ID (1N) is the first field after the command code — must be parsed before the key."
+  - "Key Derivation Method (1A) follows the Master Key — absent from the prior inferred entry."
+  - "PAN is variable-length (nN), terminated by ';' delimiter — NOT fixed 16N."
+  - "ATC is 6N decimal (zero-padded right-justified) — NOT 4H hex. '000017' for ATC value 17."
+  - "Service Code for QY Scheme '0' MUST be '998' — any other value returns error '07'."
+  - "PAN Sequence No. is NOT present in PM Scheme '0' Version '0'; PSN is assumed '00' by the HSM."
+  - "dCVV to verify in PM appears at the END of scheme-specific fields — NOT immediately after the key."
+  - "APC key type is TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS, not TR31_C0_CARD_VERIFICATION_KEY (static CVV)."
+
+relationships:
+  - type: related_to
+    target_id: concept.thales-lq-ls-command
+  - type: related_to
+    target_id: concept.thales-wire-protocol
+  - type: related_to
+    target_id: concept.thales-key-type-mapping
+status: active
+```
+
+---
+
 ## Reference Catalogs to Materialize Next
 
 - AID catalog
@@ -9506,4 +10172,7 @@ that publish annual revisions).
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
 | 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 | hsm, key_management, pin_processing, cryptography |
 | 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
+| 2026-05-25 | KU/KY (EMV issuer script MAC) wire format inferred from JU (PUGD0538-003 pp.124-126). PUGD0537-004 pp.475/480 not available as text. Wire family identical (BCD PAN+seq, binary ATC, 4H length, binary message data, ';' delimiter). Key difference from JS/JU: Key Type field (3H) present in KU/KY. Mode 0 → generate_mac (TR31_E2, Iso9797Algorithm3); modes 1-4 → generate_mac_emv_pin_change (unsupported by proxy). | Thales | PUGD0537-004 (inferred) / PUGD0538-003 pp.124-126 (authoritative reference) | hsm, emv, cryptography |
+| 2026-05-25 | LQ/LS (HMAC generate/verify) wire format inferred from M6/M8 (Retail MAC) pattern. PUGD0537-004 pp.405/407 not available as text. Wire layout: 1N SHA variant, var HMAC key (parse_legacy_key), 4H message byte count, nH message (ASCII hex). LS adds nH expected HMAC at end. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY; algorithm per SHA variant (Hmac/HmacSha256/HmacSha384/HmacSha512). | Thales | PUGD0537-004 (inferred) / M6/M8 pattern | hsm, cryptography |
+| 2026-05-25 | QY/PM (dCVV generate/verify) — prior inferred entry corrected against PUGD0537-004 pp.306-315 (AUTHORITATIVE, local PDF). Major corrections: (1) Master Key uses parse_legacy_key, NOT fixed 32H; (2) Scheme ID (1N) precedes the key; (3) Key Derivation Method (1A) follows the key; (4) PAN is variable-length nN with ';' delimiter, NOT fixed 16N; (5) ATC is 6N decimal (zero-padded), NOT 4H hex; (6) Service Code must be '998' for Scheme 0 (Visa dCVV); (7) PM has Version field; (8) dCVV in PM is at END of scheme fields, not before PAN. PM supports 8 schemes with sub-versions. Entry now scope-documented for Scheme '0' Version '0' (Visa dCVV). | Thales | PUGD0537-004 Core Host Commands V1, pp.306-315 — AUTHORITATIVE | hsm, card_validation, emv |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |
