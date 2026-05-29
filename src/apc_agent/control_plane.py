@@ -5,6 +5,8 @@ from botocore.exceptions import ClientError, ParamValidationError
 from mcp.server.fastmcp import FastMCP
 
 from .compliance import (
+    Severity,
+    check_algorithm,
     get_key_usage_info,
     list_key_usages,
 )
@@ -40,8 +42,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         tags: list[dict] | None = None,
     ) -> dict:
         """
-        Create a new APC key. Call explain_key_usage first to confirm the right
-        key usage code — APC keys are typed at creation and the type cannot change.
+        Call this when creating a new cryptographic key — BDK, ZPK, CVK, MAC key, KEK, etc.
+        Call explain_key_usage first to confirm the right key usage code — APC keys are
+        typed at creation and the type cannot change.
 
         AES keys must use CMAC for KCV (not ANSI_X9_24). Enforced here.
 
@@ -59,6 +62,14 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             return {
                 "error": f"Unknown key usage code: {key_usage}",
                 "valid_codes": [entry["code"] for entry in list_key_usages()],
+            }
+
+        algo_check = check_algorithm(key_algorithm)
+        if algo_check and algo_check.severity == Severity.HARD_STOP:
+            return {
+                "error": algo_check.message,
+                "modern_alternative": algo_check.modern_alternative,
+                "pci_requirement": algo_check.pci_requirement,
             }
 
         # AES keys must use CMAC for KCV — enforce per PCI PIN Annex C
@@ -92,6 +103,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_key(key_identifier: str) -> dict:
         """
+        Call this when you need the current state, algorithm, usage, or enabled status
+        of a key before using it in an operation.
+
         Retrieve metadata for a key by ARN or alias.
 
         Args:
@@ -106,6 +120,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         next_token: str | None = None,
     ) -> dict:
         """
+        Call this when auditing which keys exist, finding a key ARN, or checking
+        key state before an import or operation.
+
         List APC keys with optional state filter.
 
         Args:
@@ -123,6 +140,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def delete_key(key_identifier: str, delete_key_in_days: int = 7) -> dict:
         """
+        Call this when decommissioning a test key or retiring a key that is no longer
+        needed. Deletion is scheduled — the key enters DELETE_PENDING state first.
+
         Schedule a key for deletion.
 
         Args:
@@ -137,6 +157,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def restore_key(key_identifier: str) -> dict:
         """
+        Call this when a key was scheduled for deletion by mistake and needs to be
+        recovered before the waiting period expires.
+
         Cancel a pending key deletion.
 
         Args:
@@ -147,6 +170,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def start_key_usage(key_identifier: str) -> dict:
         """
+        Call this when enabling a key that was created with enabled=False or that was
+        previously disabled with stop_key_usage.
+
         Activate a key that was created in disabled state.
 
         Args:
@@ -157,6 +183,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def stop_key_usage(key_identifier: str) -> dict:
         """
+        Call this when temporarily disabling a key — for example during key rotation
+        before the old key is confirmed unused and can be deleted.
+
         Deactivate a key without deleting it.
 
         Args:
@@ -169,6 +198,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def create_alias(alias_name: str, key_arn: str | None = None) -> dict:
         """
+        Call this when establishing a stable name for a key so application code
+        does not need to change when keys are rotated.
+
         Create a friendly-name alias for a key.
 
         Args:
@@ -183,6 +215,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_alias(alias_name: str) -> dict:
         """
+        Call this when resolving an alias to its key ARN, or verifying which key
+        an alias currently points to.
+
         Retrieve alias details.
 
         Args:
@@ -193,6 +228,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def update_alias(alias_name: str, key_arn: str) -> dict:
         """
+        Call this when rotating a key — point the existing alias to the new key ARN
+        so application code referencing the alias picks up the rotation automatically.
+
         Point an alias to a different key (enables key rotation without code changes).
 
         Args:
@@ -204,6 +242,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def delete_alias(alias_name: str) -> dict:
         """
+        Call this when removing a friendly name that is no longer needed.
+        The underlying key is unaffected.
+
         Delete an alias (does not delete the underlying key).
 
         Args:
@@ -218,6 +259,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         next_token: str | None = None,
     ) -> dict:
         """
+        Call this when auditing all friendly names in the account, or finding aliases
+        associated with a specific key.
+
         List aliases, optionally filtered by key ARN.
 
         Args:
@@ -240,8 +284,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         wrapping_key_algorithm: str,
     ) -> dict:
         """
-        First step in any TR-34 or KeyCryptogram key import flow. Call this to obtain
-        APC's public wrapping key and import token before constructing the import payload.
+        Call this before import_key when using TR-34 or KeyCryptogram — you need APC's
+        public wrapping key and import token before constructing the import payload.
 
         AES-128 keys require RSA_3072 or higher wrapping key (key-strength rule enforced by APC).
 
@@ -261,8 +305,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         signing_key_algorithm: str,
     ) -> dict:
         """
-        Get APC's signing certificate needed to export a key to an external system.
-        Use this as the first step in TR-34 key export flows.
+        Call this before export_key when using TR-34 — you need APC's signing certificate
+        before constructing the export payload for an external system.
 
         Args:
             key_material_type: Tr31KeyBlock or Tr34KeyBlock
@@ -281,7 +325,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         tags: list[dict] | None = None,
     ) -> dict:
         """
-        Import key material into APC via TR-31 key block or TR-34.
+        Call this to bring an externally generated key into APC via TR-31 key block or TR-34.
         The key_material dict structure depends on the import method.
 
         For TR-31 (wrapping an existing key):
@@ -327,7 +371,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         export_attributes: dict | None = None,
     ) -> dict:
         """
-        Export a key from APC wrapped in a TR-31 key block or TR-34 structure.
+        Call this when distributing an APC-generated key to an external HSM or system,
+        wrapped in a TR-31 key block or TR-34 structure.
 
         Args:
             key_identifier: ARN or alias of the key to export
@@ -347,6 +392,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def tag_resource(resource_arn: str, tags: list[dict]) -> dict:
         """
+        Call this when adding classification, environment, or ownership metadata to a key.
+
         Add or update tags on an APC key.
 
         Args:
@@ -358,6 +405,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def untag_resource(resource_arn: str, tag_keys: list[str]) -> dict:
         """
+        Call this when removing stale or incorrect tags from a key.
+
         Remove tags from an APC key.
 
         Args:
@@ -373,6 +422,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         next_token: str | None = None,
     ) -> dict:
         """
+        Call this when auditing the tags on a key or verifying classification metadata.
+
         List all tags on an APC key.
 
         Args:
@@ -390,6 +441,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def put_resource_policy(resource_arn: str, policy: str) -> dict:
         """
+        Call this when granting cross-account access to a key or restricting which
+        principals may use it.
+
         Attach an IAM resource policy to a key.
 
         Args:
@@ -401,6 +455,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def get_resource_policy(resource_arn: str) -> dict:
         """
+        Call this when auditing who has access to a key or inspecting a cross-account policy.
+
         Retrieve the resource policy attached to a key.
 
         Args:
@@ -411,6 +467,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def delete_resource_policy(resource_arn: str) -> dict:
         """
+        Call this when revoking all cross-account or resource-based access grants on a key.
+
         Remove the resource policy from a key.
 
         Args:

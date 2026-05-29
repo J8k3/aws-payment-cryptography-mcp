@@ -29,10 +29,10 @@ class TestCheckAlgorithm:
         assert result is not None
         assert result.severity == Severity.HARD_STOP
 
-    def test_tdes_2key_is_hard_stop(self):
-        result = check_algorithm("TDES_2KEY")
-        assert result is not None
-        assert result.severity == Severity.HARD_STOP
+    def test_tdes_2key_is_permitted(self):
+        # TDES_2KEY (double-length, 112-bit) is the PCI PIN Annex C minimum — not prohibited.
+        # Fixed TDES PIN keys are handled by LEGACY_CONSTRUCTS["TDES_FIXED_KEY_PIN"].
+        assert check_algorithm("TDES_2KEY") is None
 
     def test_aes_128_is_permitted(self):
         assert check_algorithm("AES_128") is None
@@ -54,7 +54,7 @@ class TestCheckAlgorithm:
         assert result.modern_alternative is not None and len(result.modern_alternative) > 0
 
     def test_hard_stop_has_pci_requirement(self):
-        for algo in ("DES", "RSA_1024", "TDES_2KEY"):
+        for algo in ("DES", "RSA_1024"):
             result = check_algorithm(algo)
             assert result.pci_requirement is not None, f"{algo} missing pci_requirement"
 

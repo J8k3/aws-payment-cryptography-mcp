@@ -135,11 +135,12 @@ def contribute_kb_finding(
                 --body-file /tmp/kb-contribution.md
 
               # PowerShell
-              $env:BODY | gh issue create `
+              Set-Content $env:TEMP\\kb-contribution.md -Value $issue_body
+              gh issue create `
                 --repo {_REPO} `
                 --title "{title}" `
                 --label kb-contribution `
-                --body-file -
+                --body-file $env:TEMP\\kb-contribution.md
 
             The MCP server session will apply this contribution at next session start.
         """).strip(),

@@ -49,12 +49,12 @@ src/apc_agent/
 Tools are registered by calling `register_*_tools(mcp: FastMCP)` functions. Each function closes over a `client()` factory and decorates inner functions with `@mcp.tool()`. The `FastMCP` instance is constructed once in `server.py` with `instructions=SYSTEM_PROMPT`.
 
 **Compliance enforcement** runs in `compliance.py` before boto3 calls:
-- `PROHIBITED_ALGORITHMS` — hard stops (single DES, RSA-1024, 2-key TDES)
+- `PROHIBITED_ALGORITHMS` — hard stops (single DES, RSA < 2048); TDES_2KEY is the Annex C minimum and is NOT prohibited
 - `LEGACY_CONSTRUCTS` — warnings that trigger the Legacy Constraint Protocol (Format 0, CBC-MAC, TDES DUKPT, etc.)
 - `KEY_USAGE_REGISTRY` — maps TR-31 usage codes to allowed APC operations; mismatch = hard stop
 - `PIN_FORMAT_TRANSLATION_MATRIX` — encodes PCI PIN Req 3-3 legal translation pairs
 
-**HSM analysis (R8)** is source-code-only. `hsm_analysis.py` holds the command registry and regex patterns. `hsm_tools.py` exposes them as MCP tools. Current coverage: Futurex (authoritative), Thales International (reference quality), Atalla (not available). Do not extend R8 to live traffic interception.
+**HSM analysis (R8)** is source-code-only. `hsm_analysis.py` holds the command registry and regex patterns. `hsm_tools.py` exposes them as MCP tools. Current coverage: Futurex Excrypt (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales International/Core (mixed — core PIN/MAC/CVV commands authoritative via Futurex Integration Guide; key management and PIN verify commands reference quality via EFTlab), Thales Legacy (authoritative — payShield 10K Legacy Host Commands manual), Atalla/NCR (directory quality — command names and APC mappings only; no wire format; proxy not implemented). Do not extend R8 to live traffic interception.
 
 ## Session Start
 

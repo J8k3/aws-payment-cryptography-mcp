@@ -205,8 +205,8 @@ A team has run their application against the proxy in discovery mode. They paste
 {
   "commands_observed": 4,
   "mapped_to_apc": 4,
-  "handlers_already_exist": 3,
-  "handlers_needed": 1,
+  "handlers_already_exist": 4,
+  "handlers_needed": 0,
   "unknown_commands": 0,
   "parse_errors": 0,
   "commands": [
@@ -240,13 +240,13 @@ A team has run their application against the proxy in discovery mode. They paste
       "name": "EMV/Mastercard ARQC Verification",
       "category": "ARQC",
       "apc_operation": "verify_auth_request_cryptogram",
-      "apc_key_type": "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS_KEY",
+      "apc_key_type": "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
       "confidence": "high"
     },
     {
       "cmd": "GW",
       "vendor": "thales_payshield",
-      "handler_exists": false,
+      "handler_exists": true,
       "known": true,
       "name": "DUKPT MAC Generate / Verify (3DES & AES)",
       "category": "MAC",
@@ -256,8 +256,7 @@ A team has run their application against the proxy in discovery mode. They paste
     }
   ],
   "next_steps": [
-    "Handlers already implemented in the proxy: CA, G0, KQ. No action needed.",
-    "GW (DUKPT MAC Generate / Verify (3DES & AES)) → implement src/handlers/thales/gw.rs calling APC generate_mac with key type TR31_M3_ISO_9797_3_MAC_KEY."
+    "Handlers already implemented in the proxy: CA, G0, KQ, GW. No action needed."
   ],
   "migration_notes": [
     "NOTE — DUKPT Migration:\nIf the legacy codebase uses TDES DUKPT (CI command with 10-byte KSN): The BDK and IPEK are LMK-encrypted on the source HSM. They cannot be imported into APC directly..."
@@ -269,13 +268,13 @@ A team has run their application against the proxy in discovery mode. They paste
 
 **Agent response**
 
-Three of four commands already have proxy handlers — no action needed for `CA`, `G0`, `KQ`.
+All four commands already have proxy handlers — no additional implementation needed for this application.
 
-**One handler to build: `GW`**
+| Command | Handler | APC operation |
+|---------|---------|---------------|
+| `CA` — TPK→ZPK PIN translate | ✓ exists | `translate_pin_data` |
+| `G0` — DUKPT PIN translate (TDES) | ✓ exists | `translate_pin_data` |
+| `KQ` — ARQC/ARPC verification | ✓ exists | `verify_auth_request_cryptogram` |
+| `GW` — DUKPT MAC generate/verify | ✓ exists | `generate_mac` |
 
-- **What it does:** DUKPT MAC generate/verify (TDES and AES)
-- **APC operation:** `generate_mac`
-- **Key type:** `TR31_M3_ISO_9797_3_MAC_KEY`
-- **Where to put it:** `src/handlers/thales/gw.rs` — model it on the existing `m6.rs` handler
-
-Want me to write `gw.rs` now? I'll need the GW parameter layout from the Thales payShield Host Commands manual (payload length 96 bytes observed). If you have the manual section handy, paste it and I'll derive the field offsets directly.
+Next: disable discovery mode (`discover.enabled: false`) and test with the real application. The proxy will route all four commands to APC and return error 68 for anything unrecognized.

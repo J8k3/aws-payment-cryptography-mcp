@@ -19,7 +19,6 @@ import base64
 import os
 
 import pytest
-from mcp.server.fastmcp.exceptions import ToolError
 
 from apc_agent.server import mcp
 
@@ -349,27 +348,29 @@ class TestEmv:
         finally:
             await _delete_key(e4)
 
-    async def test_arqc_verify_wrong_cryptogram_raises(self):
+    async def test_arqc_verify_wrong_cryptogram_returns_error(self):
         """
-        Sends a known-wrong ARQC. FastMCP wraps the boto3 VerificationFailedException
-        in a ToolError — catching that proves the operation reached APC's cryptographic
-        comparison rather than failing on config or key type.
+        Sends a known-wrong ARQC. _call() catches the boto3 VerificationFailedException
+        (ClientError) and returns an error dict — confirming the operation reached APC's
+        cryptographic comparison rather than failing on config or key type.
         """
         e0 = await _create_key("TDES_2KEY", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS")
         try:
-            with pytest.raises(ToolError, match="VerificationFailedException"):
-                await _tool("verify_auth_request_cryptogram",
-                    key_identifier=e0,
-                    transaction_data="000000000000000000000000000000000000000000000001",
-                    auth_request_cryptogram="DEADBEEFDEADBEEF",
-                    major_key_derivation_mode="EMV_OPTION_A",
-                    session_key_derivation_attributes={
-                        "Visa": {
-                            "PrimaryAccountNumber": PAN,
-                            "PanSequenceNumber": "01",
-                        }
-                    },
-                )
+            result = await _tool("verify_auth_request_cryptogram",
+                key_identifier=e0,
+                transaction_data="000000000000000000000000000000000000000000000001",
+                auth_request_cryptogram="DEADBEEFDEADBEEF",
+                major_key_derivation_mode="EMV_OPTION_A",
+                session_key_derivation_attributes={
+                    "Visa": {
+                        "PrimaryAccountNumber": PAN,
+                        "PanSequenceNumber": "01",
+                    }
+                },
+            )
+            assert result.get("aws_error_code") == "VerificationFailedException", (
+                f"Expected VerificationFailedException, got: {result}"
+            )
             print("\n  PASS  ARQC verify — VerificationFailedException for wrong cryptogram")
         finally:
             await _delete_key(e0)

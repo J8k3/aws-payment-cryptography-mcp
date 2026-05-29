@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "aws-payment-cryptography-mcp",
   "display_name": "AWS Payment Cryptography",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "MCP server for AWS Payment Cryptography — key lifecycle, cryptographic operations, and HSM migration tools. Works with Claude Code, Codex CLI, and other MCP clients.",
   "long_description": "Provides direct access to the AWS Payment Cryptography (APC) control plane and data plane via the Model Context Protocol. Covers key hierarchy design, DUKPT, TR-31/TR-34, PIN block translation, MAC generation, CVV, and ARQC verification. PCI PIN v3.1 compliance enforcement is built into the tool layer — hard stops on illegal PIN format translations and invalid key usage, legacy construct warnings requiring explicit confirmation. Algorithm-level prohibitions (single DES, RSA &lt; 2048) are enforced by APC at the API level. Also includes HSM migration analysis tools for Thales payShield 10K and Futurex Excrypt Enterprise SSP v.2 codebases. Compatible with Claude Code, Codex CLI, and any MCP-capable client.",
   "author": {

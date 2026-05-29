@@ -59,6 +59,30 @@ class TestCreateKey:
         mock_boto3.client.assert_not_called()
         assert "error" in result
 
+    def test_single_des_blocked_before_boto3_call(self, tools):
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            result = tools["create_key"](
+                key_algorithm="DES",
+                key_usage="TR31_P0_PIN_ENCRYPTION_KEY",
+                key_class="SYMMETRIC_KEY",
+                exportable=False,
+            )
+        mock_boto3.client.assert_not_called()
+        assert "error" in result
+        assert "pci_requirement" in result
+
+    def test_rsa_1024_blocked_before_boto3_call(self, tools):
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            result = tools["create_key"](
+                key_algorithm="RSA_1024",
+                key_usage="TR31_D1_ASYMMETRIC_KEY_FOR_DATA_ENCRYPTION",
+                key_class="ASYMMETRIC_KEY_PAIR",
+                exportable=False,
+            )
+        mock_boto3.client.assert_not_called()
+        assert "error" in result
+        assert "pci_requirement" in result
+
     def test_create_key_passes_correct_params_to_boto3(self, tools):
         mock_client = MagicMock()
         mock_client.create_key.return_value = {

@@ -139,7 +139,7 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 **LMK key migration:** Keys stored as LMK-encrypted blobs in your application or database can't be imported into APC directly. They must be exported from the source HSM in TR-31 or TR-34 format first. The server surfaces this when it detects LMK references and guides the import process using `get_parameters_for_import` and `import_key`.
 
-**Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K (authoritative — Thales payShield 10K Legacy Host Commands manual), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
+**Coverage:** Futurex Excrypt Enterprise SSP v.2 / Standard API (authoritative — Futurex General Payment HSM Integration Guide 2024), Thales payShield 10K Legacy commands (authoritative — Thales payShield 10K Legacy Host Commands manual), Thales payShield 10K International/Core commands (mixed — core PIN/MAC/CVV/ARQC codes authoritative via Futurex Integration Guide; key management and PIN verify codes reference quality), Atalla/HPE/NCR (directory quality — command names and APC mappings only, no parameter detail; proxy support not implemented).
 
 ---
 

@@ -135,14 +135,10 @@ KEY_USAGE_REGISTRY = {
     },
 }
 
-# Algorithms that are hard-prohibited under PCI PIN v3.1 Annex C
+# Algorithms that are hard-prohibited under PCI PIN v3.1 Annex C.
+# Note: TDES_2KEY (double-length, 112-bit) is NOT prohibited — it is the minimum allowed per
+# Annex C. Fixed TDES keys for PIN encryption (Req 2-2) are handled in LEGACY_CONSTRUCTS.
 PROHIBITED_ALGORITHMS = {
-    "TDES_2KEY": ComplianceResult(
-        severity=Severity.HARD_STOP,
-        message="Single-length or two-key TDES provides less than 112 bits of security and is prohibited by PCI PIN v3.1 Annex C.",
-        modern_alternative="Use AES-128 or TDES_3KEY (triple-length, 168-bit) at minimum.",
-        pci_requirement="Annex C",
-    ),
     "DES": ComplianceResult(
         severity=Severity.HARD_STOP,
         message="Single DES (56-bit) is prohibited. Minimum is TDEA with double-length keys (112 bits) per PCI PIN v3.1 Annex C.",
