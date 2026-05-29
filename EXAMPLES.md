@@ -55,11 +55,11 @@ def verify_cvv(conn, cvk, pan, expiry, service_code):
       "command_code": "M6",
       "match_context": "cmd = \"M6\" + mak + data",
       "known": true,
-      "name": "Generate MAC (Extended)",
+      "name": "Generate MAC using MAK (supports continuation mode)",
       "category": "MAC",
       "apc_operation": "generate_mac",
-      "apc_key_type": "TR31_M6_ISO_9797_5_CMAC_KEY",
-      "notes": null,
+      "apc_key_type": "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M6_ISO_9797_5_CMAC_KEY",
+      "notes": "CBC-MAC — consider migrating to CMAC for new work.",
       "confidence": "high"
     },
     {
@@ -90,7 +90,7 @@ Three operations in scope:
 | Legacy command | APC operation | Key type (TR-31) |
 |---|---|---|
 | `CC` — ZPK-to-ZPK PIN translate | `translate_pin_data` | `TR31_P0_PIN_ENCRYPTION_KEY` |
-| `M6` — Generate MAC | `generate_mac` | `TR31_M6_ISO_9797_5_CMAC_KEY` |
+| `M6` — Generate MAC | `generate_mac` | `TR31_M1_ISO_9797_1_MAC_KEY` or `TR31_M6_ISO_9797_5_CMAC_KEY` |
 | `CY` — Verify CVV | `verify_card_validation_data` | `TR31_C0_CARD_VERIFICATION_KEY` |
 
 One flag: `CC` with static ZPK keys is a compliance risk. If these keys never rotate, AES DUKPT (`translate_pin_data` with a session key derived per-transaction from a BDK) is the preferred replacement.
@@ -226,10 +226,10 @@ A team has run their application against the proxy in discovery mode. They paste
       "vendor": "thales_payshield",
       "handler_exists": true,
       "known": true,
-      "name": "Translate PIN (DUKPT — TDES, Format 0/3/4)",
+      "name": "Translate PIN from BDK to ZPK Encryption (3DES DUKPT)",
       "category": "PIN",
       "apc_operation": "translate_pin_data",
-      "apc_key_type": "TR31_P0_PIN_ENCRYPTION_KEY",
+      "apc_key_type": "TR31_B0_BASE_DERIVATION_KEY",
       "confidence": "high"
     },
     {
@@ -248,10 +248,10 @@ A team has run their application against the proxy in discovery mode. They paste
       "vendor": "thales_payshield",
       "handler_exists": true,
       "known": true,
-      "name": "DUKPT MAC Generate / Verify (3DES & AES)",
+      "name": "Generate or Verify MAC (3DES DUKPT)",
       "category": "MAC",
       "apc_operation": "generate_mac",
-      "apc_key_type": "TR31_M3_ISO_9797_3_MAC_KEY",
+      "apc_key_type": "TR31_B0_BASE_DERIVATION_KEY",
       "confidence": "high"
     }
   ],

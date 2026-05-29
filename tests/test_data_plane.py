@@ -152,6 +152,92 @@ class TestTranslatePinData:
         assert "OutgoingDukptAttributes" not in call_kwargs
 
 
+# ── generate_pin_data / verify_pin_data ──────────────────────────────────────
+
+class TestPinDataComplianceGuards:
+    GEN_ATTRS = {"Ibm3624RandomPin": {"DecimalizationTable": "0123456789012345"}}
+    VER_ATTRS = {"Ibm3624PinOffset": {"DecimalizationTable": "0123456789012345", "PinValidationData": "1234567890123456", "PinOffset": "0000"}}
+
+    def test_generate_format0_triggers_legacy_warning_without_boto3(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            result = tools["generate_pin_data"](
+                generation_key_identifier="alias/pvk",
+                encryption_key_identifier="alias/pek",
+                generation_attributes=self.GEN_ATTRS,
+                pin_block_format="ISO_FORMAT_0",
+                primary_account_number="1234567890123456",
+            )
+        mock_boto3.client.assert_not_called()
+        assert "confirmation_required" in result
+
+    def test_generate_format3_triggers_legacy_warning_without_boto3(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            result = tools["generate_pin_data"](
+                generation_key_identifier="alias/pvk",
+                encryption_key_identifier="alias/pek",
+                generation_attributes=self.GEN_ATTRS,
+                pin_block_format="ISO_FORMAT_3",
+                primary_account_number="1234567890123456",
+            )
+        mock_boto3.client.assert_not_called()
+        assert "confirmation_required" in result
+
+    def test_verify_format0_triggers_legacy_warning_without_boto3(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            result = tools["verify_pin_data"](
+                verification_key_identifier="alias/pvk",
+                encrypted_pin_block="0123456789ABCDEF",
+                encryption_key_identifier="alias/pek",
+                verification_attributes=self.VER_ATTRS,
+                pin_block_format="ISO_FORMAT_0",
+                primary_account_number="1234567890123456",
+            )
+        mock_boto3.client.assert_not_called()
+        assert "confirmation_required" in result
+
+    def test_verify_format3_triggers_legacy_warning_without_boto3(self, tools):
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            result = tools["verify_pin_data"](
+                verification_key_identifier="alias/pvk",
+                encrypted_pin_block="0123456789ABCDEF",
+                encryption_key_identifier="alias/pek",
+                verification_attributes=self.VER_ATTRS,
+                pin_block_format="ISO_FORMAT_3",
+                primary_account_number="1234567890123456",
+            )
+        mock_boto3.client.assert_not_called()
+        assert "confirmation_required" in result
+
+    def test_generate_format4_reaches_boto3(self, tools):
+        mock_client = MagicMock()
+        mock_client.generate_pin_data.return_value = {"EncryptedPinBlock": "AABBCCDDEEFF0011"}
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["generate_pin_data"](
+                generation_key_identifier="alias/pvk",
+                encryption_key_identifier="alias/pek",
+                generation_attributes=self.GEN_ATTRS,
+                pin_block_format="ISO_FORMAT_4",
+                primary_account_number="1234567890123456",
+            )
+        mock_client.generate_pin_data.assert_called_once()
+
+    def test_verify_format4_reaches_boto3(self, tools):
+        mock_client = MagicMock()
+        mock_client.verify_pin_data.return_value = {"VerificationStatus": "SUCESS"}
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["verify_pin_data"](
+                verification_key_identifier="alias/pvk",
+                encrypted_pin_block="0123456789ABCDEF",
+                encryption_key_identifier="alias/pek",
+                verification_attributes=self.VER_ATTRS,
+                pin_block_format="ISO_FORMAT_4",
+                primary_account_number="1234567890123456",
+            )
+        mock_client.verify_pin_data.assert_called_once()
+
+
 # ── generate_mac ──────────────────────────────────────────────────────────────
 
 class TestGenerateMac:

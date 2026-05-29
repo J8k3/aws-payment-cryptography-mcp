@@ -545,9 +545,9 @@ domain:
   - pin_processing
   - cryptography
 attributes:
-  cipher: single_DES_ECB
+  cipher: tdes_ecb_2key
   inputs:
-    PVK: 16-byte or 24-byte DES key, selected by PVKI
+    PVK: 16-byte 2-key TDES key (TR31_V2), selected by PVKI; 3-key TDES also valid
     PVKI: PIN Verification Key Index, 1-6; embedded in PVV input and selects which key
     PAN: cardholder account number
     PIN: 4-12 digit PIN
@@ -4523,16 +4523,20 @@ constraints:
     (5F2A), transaction date (9A), transaction type (9C), unpredictable number (9F37),
     application interchange profile (82), application transaction counter (9F36),
     issuer application data / card verification results (9F10 sub-fields as applicable).
-  - For EMV MAC and ARPC, the preimage is the already-assembled bytes as hex; the
-    cryptogram operation itself is AES-CMAC(session_key, preimage_bytes)[0:8].
+  - For AES EMV keys (AES-based session key derivation): cryptogram = leftmost 8 bytes of AES-CMAC(session_key, preimage_bytes).
+  - For TDES EMV keys: cryptogram = ISO 9797-1 Algorithm 3 (Retail MAC) over preimage_bytes using the TDES session key.
   - APC VerifyAuthRequestCryptogram takes the transaction data (CDOL-R1 or full chip data TLV)
     and key ARN; it assembles the preimage internally per EMV Book 2 Annex A1.
   - When using a software tool (e.g., CyberChef EMV Verify ARQC), the preimage must be
     assembled externally before passing it to the operation; the tool does not parse TLV.
   - The session key is typically derived from the issuer master key (E0 type) using ATC-based
     EMV key derivation (Option A or Common Session Key derivation) applied before computing the ARQC.
-  - ARPC input = ARQC || ARC (Authorization Response Code, 2 bytes). Both are then passed to
-    AES-CMAC with the issuer session key to produce the ARPC.
+  - ARPC (Method 1) for both TDES and AES: X = ARC (2 bytes) || 0x0000000000000000 (6 zeros) → 8 bytes;
+    Y = ARQC XOR X. For TDES: ARPC = 3DES(SK_AC)[Y] (one-block ECB). For AES: ARPC = leftmost 8 bytes of
+    AES(SK_AC)[Y || 0x0000000000000000] (16-byte AES-ECB). Both methods XOR the ARC into the ARQC —
+    they do NOT use concatenation or CMAC. ARPC Method 2 (4 bytes): MAC(SK_AC)[ARQC || CSU ||
+    ProprietaryAuthData] truncated to 4 bytes — Retail MAC (ISO 9797-1 Alg 3) for 3DES; CMAC for AES.
+    The APC VerifyAuthRequestCryptogram operation handles both when AuthResponseAttributes are included.
 relationships:
   - type: related_to
     target_id: artifact.arqc
@@ -5211,8 +5215,8 @@ attributes:
     CVN04: {apc_attribute: EmvCommon, note: JCB CSK}
     CVN01: {apc_attribute: Visa, note: per-card derivation, shared attribute with Visa CVN10}
   arpc_methods:
-    Method_1: ARQC XOR 4-byte response code; simple XOR response
-    Method_2: MAC over 8-byte Card Status Update (CSU) + proprietary auth data; primary method in APC examples
+    Method_1: "ARQC XOR 2-byte Authorization Response Code (ARC), padded to 8 bytes; ARC passed as 4-hex-char string to APC"
+    Method_2: "MAC over 4-byte Card Status Update (CSU) + optional auth data; CSU passed as 8-hex-char string to APC; primary method in APC examples"
   apc_key_usages:
     arqc_generation: TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS
     integrity_mac: TR31_E2_EMV_MKEY_INTEGRITY
@@ -5303,7 +5307,7 @@ constraints:
   - AES P0 key + Format 0/1/3 → APC validation error
   - AES P0 key + Format 4 → correct
   - TDES P0 key + Format 0/1/3 → correct
-  - Format 4 uses double-pass AES ECB encryption with PAN as tweak
+  - Format 4 uses double-pass AES encryption: Block_A = AES_ECB(PIN_field XOR PAN_field), then Encrypted_PIN_Block = AES_ECB(Block_A XOR PAN_field). Each field is 16 bytes (128 bits). PIN_field includes 8 random bytes; PAN_field is derived from the 12 rightmost PAN digits (excl. check digit).
 relationships:
   - type: related_to
     target_id: format.pin-block-format-4
@@ -6141,9 +6145,10 @@ attributes:
     ISO 20022 (ATICA) supports AES natively via variable-length fields.
   format4_structure_summary: >
     Two 128-bit fields: PIN field (C=0100, N=PIN length, P=PIN digits, F=fill 0xA, R=64 random bits)
-    and PAN field (M=control for PAN 12-19 digits, A=PAN digits, zero-padded).
-    Encryption: AES(PIN field) XOR PAN field, then AES again. Requires AES (128-bit block cipher).
-    Both encrypt and decrypt must occur within an SCD/HSM.
+    and PAN field (constructed from 12 rightmost PAN digits excluding check digit, zero-padded).
+    Encryption is double-pass AES: Block_A = AES_ECB(PIN_field XOR PAN_field), then
+    Encrypted_PIN_Block = AES_ECB(Block_A XOR PAN_field). PAN field is XOR'd in as a tweak
+    in both passes. Requires AES (128-bit block cipher). Both encrypt and decrypt must occur within an SCD/HSM.
   format4_prevents_replay: "Random bits in lower 64 bits of PIN field make each block unique except by chance"
   format_translation_restrictions: >
     Format 0→4: Permitted. Format 1→4: Permitted. Format 2→4: NOT Permitted.
@@ -6241,7 +6246,7 @@ attributes:
     112_bits:  ["3-key TDEA (168-bit key)", "RSA-2048", "DH-2048", "EC-224 (P-224)"]
     128_bits:  ["AES-128", "RSA-3072", "DH-3072", "EC-256 (P-256)"]
     192_bits:  ["AES-192", "RSA-7680", "EC-384 (P-384)"]
-    256_bits:  ["AES-256", "RSA-15360", "EC-512 (P-512)"]
+    256_bits:  ["AES-256", "RSA-15360", "EC-521 (P-521)"]
   key_encipherment_rule: >
     The enciphering key must have bits-of-security >= the bits-of-security of the key
     it protects. Applies to all key transport and storage scenarios.
@@ -8485,8 +8490,8 @@ attributes:
     spec: ISO/IEC 9797-1
     padding: Mandatory '80' padding (method 2)
     iv: Zero IV
-    algorithm_1: Final block computed with single DES (H_B unchanged)
-    algorithm_3: Final block computed with 3DES
+    algorithm_1: All blocks including final use full TDES; MAC = last CBC block output (H_B unchanged, no additional processing)
+    algorithm_3: All intermediate CBC blocks use single DES (K1 = left 8 bytes); final MAC result processed with full 3DES (E-K1, D-K2, E-K1)
     output: Leftmost s bytes
   mac_AES:
     spec: CMAC per ISO/IEC 9797-1:2011 Algorithm 5
@@ -8523,7 +8528,7 @@ attributes:
     triple_DES:
       key_length: 128-bit double-length key (two independent 56-bit keys)
       standard: ISO/IEC 18033-3
-      single_DES_restriction: Approved ONLY as the final-block MAC algorithm (ISO 9797-1 Algorithm 3 last block); NOT for standalone encryption
+      single_DES_restriction: Used for all INTERMEDIATE CBC blocks in ISO 9797-1 Algorithm 3 (K1 = left 8 bytes of double-length key); NOT approved for standalone encryption
     AES:
       key_lengths: [128, 192, 256]
       approved_for: Session key derivation, ARQC/ARPC, secure messaging
@@ -8631,12 +8636,12 @@ attributes:
     - M0  # Generate DUKPT MAC
     - M2  # Verify and translate DUKPT MAC
     - M4  # Generate DUKPT response MAC
-  aes_dukpt_ksn_length: 24 bytes (48 hex digits); descriptor encoding follows same pattern but with larger sub-fields
+  aes_dukpt_ksn_length: 12 bytes (24 hex digits); descriptor encoding follows same pattern but with larger sub-fields
   storage: stored in the HSM command as a literal 3-char field immediately after the BDK identifier
 constraints:
   - The descriptor must be agreed between the BDK-injector (terminal manufacturer / key-injection facility) and the acquirer host before key injection
   - Misconfigured descriptor causes invalid key derivation silently — KSN parses, wrong key derived
-  - For AES DUKPT, the KSN is 24 bytes; payShield requires Key Block LMK (not Variant LMK) to protect the AES BDK
+  - For AES DUKPT, the KSN is 12 bytes (24 hex digits); payShield requires Key Block LMK (not Variant LMK) to protect the AES BDK
 relationships:
   - type: related_to
     target_id: concept.dukpt
@@ -9042,7 +9047,7 @@ domain:
 attributes:
   ksn_length:
     tdes_dukpt: 10 bytes (80 bits) — typically 3 bytes key_set_id + 5 bytes KSN counter; in Thales: 6+0+5 digit descriptor "605"
-    aes_dukpt: 24 bytes (192 bits) — 4 bytes key_set_id + 8 bytes device_id + 4 bytes transaction_counter per X9.24-3
+    aes_dukpt: 12 bytes (96 bits) — 8 bytes IKI (initial key identifier) + 4 bytes transaction counter per X9.24-3; passed to APC as a 24-character hex string
   bdk_algorithm:
     tdes_dukpt: TDES (triple-length 3DES, 168-bit nominal / 112-bit effective) — Variant or Key Block LMK
     aes_dukpt: AES-128, AES-192, or AES-256 — requires Key Block LMK (Variant LMK not supported on payShield)
@@ -9066,7 +9071,7 @@ attributes:
     bdk_key_type: TR31_B0_BASE_DERIVATION_KEY with algorithm AES_128, AES_192, or AES_256
     pin_translate: TranslatePinData with IncomingDukptAttributes (AES, KSN) + OutgoingAttributes
     pin_format: IsoFormat4 required for AES DUKPT in APC
-    ksn_format: 24-byte hex string passed as KSN in API call
+    ksn_format: 24-character hex string (12 bytes) passed as KSN in API call
 constraints:
   - AES DUKPT BDK requires Key Block LMK on payShield — cannot use Variant LMK; migration must account for this
   - All AES DUKPT PIN operations use ISO Format 4 — no exceptions; counterparty must support Format 4
@@ -9547,7 +9552,7 @@ attributes:
           Variant LMK: 32H (double-length, no scheme prefix) or 'U' + 32H (double-length with prefix).
           No triple-length ('T'+48H) — MK-SMI is always double-length 3DES.
           Key Block LMK: 'S' + nA; Key Usage 'E2', Algorithm 'T', Mode of Use 'N'.
-          APC key type: TR31_E2_EMV_MKEY_APP_SCRIPTS.
+          APC key type: TR31_E2_EMV_MKEY_INTEGRITY.
       - name: PAN/PAN Sequence No
         type: 8B
         details: >
@@ -9652,7 +9657,7 @@ attributes:
   apc_mapping:
     mode_0:
       operation: generate_mac
-      key_type: TR31_E2_EMV_MKEY_APP_SCRIPTS
+      key_type: TR31_E2_EMV_MKEY_INTEGRITY
       algorithm: Iso9797Algorithm3
       session_key_derivation_by_scheme: >
         KU '0' (Visa), '2' (Amex), '3'-'5' (JCB): EmvOptionA.
@@ -9669,7 +9674,7 @@ attributes:
       operation: generate_mac_emv_pin_change
       status: NOT_SUPPORTED_BY_PROXY
       reason: >
-        Requires two key ARNs (MK-SMI: TR31_E2_EMV_MKEY_APP_SCRIPTS plus
+        Requires two key ARNs (MK-SMI: TR31_E2_EMV_MKEY_INTEGRITY plus
         MK-SMC: TR31_E1_EMV_MKEY_CONFIDENTIALITY) and a pre-translated PIN block.
         Cannot be implemented by changing generate_mac parameters.
 
@@ -9681,7 +9686,7 @@ constraints:
   - "Schemes '0','1','2' in Mode 0: Plaintext Message Data is delimited by ';', no preceding 4H length field."
   - "Schemes '3','4','5','6': Plaintext Message Data Length (4H) precedes the data."
   - "Mode '0' is the only proxy-supported mode. Modes 1-4 return proxy error 15 — see AGENTS.md Key Constraints."
-  - "MK-SMI key type is TR31_E2_EMV_MKEY_APP_SCRIPTS — not E0 (ARQC) or E1 (confidentiality)."
+  - "MK-SMI key type is TR31_E2_EMV_MKEY_INTEGRITY — not E0 (ARQC) or E1 (confidentiality)."
   - "KY Mode '0': Scheme ID NOT present; IV-SMI (16B) IS present. KY Mode '5': Scheme ID present."
   - "KU Schemes '3','4','5' are only permitted with Mode Flags '0','1','2' (not '3' or '4')."
 
@@ -10172,7 +10177,7 @@ that publish annual revisions).
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
 | 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 | hsm, key_management, pin_processing, cryptography |
 | 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
-| 2026-05-25 | KU/KY (EMV issuer script MAC) wire format inferred from JU (PUGD0538-003 pp.124-126). PUGD0537-004 pp.475/480 not available as text. Wire family identical (BCD PAN+seq, binary ATC, 4H length, binary message data, ';' delimiter). Key difference from JS/JU: Key Type field (3H) present in KU/KY. Mode 0 → generate_mac (TR31_E2, Iso9797Algorithm3); modes 1-4 → generate_mac_emv_pin_change (unsupported by proxy). | Thales | PUGD0537-004 (inferred) / PUGD0538-003 pp.124-126 (authoritative reference) | hsm, emv, cryptography |
-| 2026-05-25 | LQ/LS (HMAC generate/verify) wire format inferred from M6/M8 (Retail MAC) pattern. PUGD0537-004 pp.405/407 not available as text. Wire layout: 1N SHA variant, var HMAC key (parse_legacy_key), 4H message byte count, nH message (ASCII hex). LS adds nH expected HMAC at end. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY; algorithm per SHA variant (Hmac/HmacSha256/HmacSha384/HmacSha512). | Thales | PUGD0537-004 (inferred) / M6/M8 pattern | hsm, cryptography |
+| 2026-05-25 (corrected 2026-05-26) | KU/KY (EMV issuer script MAC) wire format verified against PUGD0537-004 pp.475-484 (authoritative, local PDF). 8 errors in initial inferred entry corrected: no Key Type (3H) field — wire is Mode→SchemeID→MK-SMI directly; full scheme tables (7 KU / 10 KY); MK-SMI is 32H or 'U'+32H only (LMK 28-29 variant 2); Integrity Session Key Data is scheme-dependent; Schemes 0/1/2 Mode 0 use ';'-terminated message data (no 4H length); Schemes 3-6 use 4H length prefix; Response MAC is 8B binary; KY Mode 0 has no Scheme ID but has IV-SMI (16B). Mode 0 → generate_mac (TR31_E2_EMV_MKEY_INTEGRITY); modes 1-4 → generate_mac_emv_pin_change (proxy unsupported). | Thales | PUGD0537-004 Core Host Commands V1, pp.475-484 — AUTHORITATIVE | hsm, emv, cryptography |
+| 2026-05-25 (corrected 2026-05-26) | LQ/LS (HMAC generate/verify) wire format verified against PUGD0537-004 pp.405-408 (authoritative, local PDF). 7 errors in initial inferred entry corrected: Hash Identifier is 2N not 1N; three missing fields added (HMAC Length 4N, HMAC Key Format 2N, HMAC Key Length 4N); HMAC Key is nB binary under LMK pair 34-35 variant 1 with NO key scheme prefix; Delimiter ';' is Variant LMK only; Data Length is 5N decimal not 4H hex; Message Data is nB binary not ASCII hex; LS field order: HMAC before key fields. SHA-224 ('05') has no APC equivalent. Premium license required. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY. | Thales | PUGD0537-004 Core Host Commands V1, pp.405-408 — AUTHORITATIVE | hsm, cryptography |
 | 2026-05-25 | QY/PM (dCVV generate/verify) — prior inferred entry corrected against PUGD0537-004 pp.306-315 (AUTHORITATIVE, local PDF). Major corrections: (1) Master Key uses parse_legacy_key, NOT fixed 32H; (2) Scheme ID (1N) precedes the key; (3) Key Derivation Method (1A) follows the key; (4) PAN is variable-length nN with ';' delimiter, NOT fixed 16N; (5) ATC is 6N decimal (zero-padded), NOT 4H hex; (6) Service Code must be '998' for Scheme 0 (Visa dCVV); (7) PM has Version field; (8) dCVV in PM is at END of scheme fields, not before PAN. PM supports 8 schemes with sub-versions. Entry now scope-documented for Scheme '0' Version '0' (Visa dCVV). | Thales | PUGD0537-004 Core Host Commands V1, pp.306-315 — AUTHORITATIVE | hsm, card_validation, emv |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |

@@ -27,8 +27,8 @@ class ComplianceResult:
 KEY_USAGE_REGISTRY = {
     "TR31_B0_BASE_DERIVATION_KEY": {
         "name": "Base Derivation Key (BDK)",
-        "allowed_operations": ["encrypt_data", "decrypt_data", "translate_pin_data"],
-        "description": "DUKPT base key — never used directly for transactions",
+        "allowed_operations": ["encrypt_data", "decrypt_data", "translate_pin_data", "generate_mac", "verify_mac"],
+        "description": "DUKPT base key — derives per-transaction working keys for PIN, data, and MAC operations",
     },
     "TR31_C0_CARD_VERIFICATION_KEY": {
         "name": "Card Verification Key (CVK)",
@@ -85,8 +85,8 @@ KEY_USAGE_REGISTRY = {
     },
     "TR31_K3_ASYMMETRIC_KEY_FOR_KEY_AGREEMENT": {
         "name": "Asymmetric Key Agreement Key",
-        "allowed_operations": ["import_key", "export_key"],
-        "description": "ECDH key agreement",
+        "allowed_operations": ["import_key", "export_key", "translate_key_material"],
+        "description": "ECDH key agreement — used in DiffieHellman TR-31 key transport (TranslateKeyMaterial)",
     },
     "TR31_M0_ISO_16609_MAC_KEY": {
         "name": "MAC Key (AS2805 / ISO 16609)",

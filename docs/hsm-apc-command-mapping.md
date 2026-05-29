@@ -105,13 +105,15 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 | Verify CVC2 / CVV2 (card-not-present) | `verify_card_validation_data` | `TR31_C0` | RY | — | VCVC | 5E [d] |
 | Verify Amex CSC / CID | `verify_card_validation_data` | `TR31_C0` | — | — | VCSC | 35A [d], 35B [d] |
 | Verify CAVV / AAV (3D Secure) | `verify_card_validation_data` | `TR31_C0` | — | — | VAAV | — |
-| Generate dynamic CVV (dCVV) | `generate_card_validation_data` | `TR31_C0` | QY | — | — | — |
-| Verify dynamic CVV / CVC | `verify_card_validation_data` | `TR31_C0` | PM | — | — | 357 [d] |
+| Generate dynamic CVV (dCVV) | `generate_card_validation_data` | `TR31_E4` | QY | — | — | — |
+| Verify dynamic CVV / CVC | `verify_card_validation_data` | `TR31_E4` | PM | — | — | 357 [d] |
 | Calculate or verify CVC2/CVV2/CID | `generate_card_validation_data` or `verify_card_validation_data` | `TR31_C0` | RY | — | — | — |
-| Generate Mastercard CVC3 (contactless) | `generate_card_validation_data` | `TR31_C0` | NY | — | — | 359 [d] |
+| Generate Mastercard CVC3 (contactless) | `generate_card_validation_data` | `TR31_E4` | NY | — | — | 359 [d] |
 | Verify Discover dCVV | `verify_card_validation_data` | `TR31_C0` | — | — | — | 35F [d] |
 | Verify Visa Token (cloud-based) | `verify_card_validation_data` | `TR31_C0` | — | — | — | 365 [d] |
 | Verify Amex Expresspay | `verify_card_validation_data` | `TR31_C0` | — | — | — | 36A [d] |
+
+> **C0 vs E4 (dynamic CVV):** Static CVV operations (CW/CY, CVV1/CVV2/iCVV) use `TR31_C0_CARD_VERIFICATION_KEY` (TDES_2KEY only). Dynamic CVV commands (QY/PM for Visa dCVV, NY for Mastercard CVC3) use `TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS` — an EMV master key that requires session-key derivation (DeriveKey mode). Using C0 for QY/PM/NY will fail at the APC layer.
 
 ---
 
@@ -171,8 +173,10 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 
 | Operation | APC Call | Key Type | Thales International/Core | Thales Legacy | Futurex Excrypt | Atalla |
 |-----------|----------|----------|--------------------------|---------------|-----------------|--------|
-| Encrypt data (AES/3DES, various modes) | `encrypt_data` | `TR31_D0` | **M0** | HE [see note] | — | 55 [d], 97 [d], 390 [d] |
-| Decrypt data (AES/3DES, various modes) | `decrypt_data` | `TR31_D0` | **M2** | HG [see note] | — | 55 [d], 97 [d] |
+| Encrypt data (AES/3DES, various modes) | `encrypt_data` | `TR31_D0` | **M0** | — | — | 55 [d], 97 [d], 390 [d] |
+| Decrypt data (AES/3DES, various modes) | `decrypt_data` | `TR31_D0` | **M2** | — | — | 55 [d], 97 [d] |
+| Terminal authentication MAC generate | `generate_mac` | `TR31_M3` | — | HE [see note] | — | — |
+| Terminal authentication MAC verify | `verify_mac` | `TR31_M3` | — | HG [see note] | — | — |
 | Re-encrypt data (key-to-key translate) | `re_encrypt_data` | `TR31_D0` | **M4** | — | — | 55 [d] |
 | Encrypt cardholder data — DUKPT | `encrypt_data` | `TR31_B0` | M0 (BDK mode) | — | ECDK | 388 [d] |
 | Decrypt cardholder data — DUKPT | `decrypt_data` | `TR31_B0` | M2 (BDK mode) | — | DCDK | 388 [d] |
@@ -182,7 +186,7 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 | RSA signature generation | *(none — use AWS KMS)* | — | EW | — | — | — |
 | RSA signature verification | *(none — use AWS KMS)* | — | EY | — | — | — |
 
-> **HE / HG (Thales Legacy):** These use a TAK (MAC key, LMK pair 16-17), not a dedicated encryption key. If the intent is terminal command authentication, model as `generate_mac`. Superseded by M0/M2.
+> **HE / HG (Thales Legacy):** HE generates a MAC and HG verifies a MAC — both use a TAK (TR31_M3, LMK pair 16-17). Despite the "Encrypt/Decrypt" naming in the payShield manual, these are MAC operations and APC maps them to `generate_mac`/`verify_mac` with `TR31_M3_ISO_9797_3_MAC_KEY`. Using `encrypt_data` (D0 key) would be rejected by APC. Superseded by M0/M2 for data encryption; use M6/M8 for MAC.
 
 > **M0/M2/M4 modes:** ECB (00), CBC (01), CFB8/64 (02/03), OFB (05), CTR (06), FF1 FPE (11), Visa Standard Enc / Visa FPE (04/13, license required). For DUKPT keys, use the BDK key type codes (009/609/809/909). M4 restriction: only one of source or destination may be a BDK key.
 

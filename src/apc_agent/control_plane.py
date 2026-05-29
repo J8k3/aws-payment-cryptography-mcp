@@ -287,7 +287,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Call this before import_key when using TR-34 or KeyCryptogram — you need APC's
         public wrapping key and import token before constructing the import payload.
 
-        AES-128 keys require RSA_3072 or higher wrapping key (key-strength rule enforced by APC).
+        AES keys (128 or 256-bit) require RSA_3072 or higher wrapping key (key-strength rule enforced by APC).
 
         Args:
             key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
@@ -513,7 +513,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
 def _default_modes_of_use(key_usage: str) -> dict:
     """Return sensible default modes of use for a given key usage code."""
-    # TR-31 prohibits Encrypt+Decrypt as a combined mode — use NoRestrictions instead
+    # APC KeyModesOfUse uses NoRestrictions for keys that need both Encrypt and Decrypt
     no_restrictions_keys = {
         "TR31_P0_PIN_ENCRYPTION_KEY",
         "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",

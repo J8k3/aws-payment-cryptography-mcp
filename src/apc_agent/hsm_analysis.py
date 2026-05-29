@@ -565,18 +565,19 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Generate a Dynamic CVV", "CVV",
                "Generates a Dynamic Card Verification Value (dCVV) for a contactless or EMV "
                "transaction. Response code: QZ.",
-               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "generate_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
                "Source: PUGD0537-004 Rev A, p.306 — AUTHORITATIVE. "
-               "dCVV is time-limited or transaction-specific; requires a DCVV-enabled CVK. "
-               "In APC: generate_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
+               "QY uses EMV key derivation (Option A/B) — maps to TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS "
+               "in APC, not TR31_C0. E4 is DeriveKey-only; the APC call derives the session key "
+               "from the master key internally. See KB QY/PM wire format entry for full field detail."),
     HsmCommand("Thales/Futurex", "International", "PM",
                "Verify a Dynamic CVV/CVC", "CVV",
                "Verifies a Dynamic CVV or CVC value for contactless or EMV transactions. "
                "Response code: PN.",
-               "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "verify_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
                "Source: PUGD0537-004 Rev A, p.308 — AUTHORITATIVE. "
-               "Validates the dCVV against the expected value derived from the card's dynamic key. "
-               "In APC: verify_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
+               "PM uses EMV key derivation — maps to TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS, not TR31_C0. "
+               "See KB QY/PM wire format entry; multiple schemes (Visa, MC, Amex, Discover, JCB, Gemalto)."),
     HsmCommand("Thales/Futurex", "International", "RY",
                "Calculate/Verify Card Security Codes", "CVV",
                "Calculates or verifies card security codes (Mastercard CVC2, Visa CVV2, Amex CID). "
@@ -589,11 +590,11 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Generate IVCVC3 and Static CVC3", "CVV",
                "Generates an Initial Vector CVC3 (IVCVC3) and/or Static CVC3 for Mastercard "
                "contactless (PayPass/Tap & Go) transactions. Response code: NZ.",
-               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "generate_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
                "Source: PUGD0537-004 Rev A, p.493 — AUTHORITATIVE. "
                "CVC3 is Mastercard's contactless card verification value. "
-               "IVCVC3 is a one-time initialization vector; Static CVC3 is precomputed at issuance. "
-               "In APC: generate_card_validation_data with TR31_C0_CARD_VERIFICATION_KEY."),
+               "Uses EMV master key derivation — TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS (DeriveKey). "
+               "In APC: generate_card_validation_data with GenerationAttributes=DynamicCardVerificationCode."),
     # MAC
     HsmCommand("Thales/Futurex", "International", "M6",
                "Generate MAC using MAK (supports continuation mode)", "MAC",
@@ -624,7 +625,9 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Single-block MAC verification.", "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY"),
     HsmCommand("Thales/Futurex", "International", "GW",
                "Generate or Verify MAC (3DES DUKPT)", "MAC",
-               "DUKPT MAC generation and verification.", "generate_mac", "TR31_B0_BASE_DERIVATION_KEY"),
+               "DUKPT MAC generation and verification.", "generate_mac", "TR31_B0_BASE_DERIVATION_KEY",
+               "apc_operation shows the generate path; use verify_mac (same TR31_B0 key) for the verify path. "
+               "BDK required for both — DUKPT derives per-transaction MAC key from BDK + KSN."),
     HsmCommand("Thales/Futurex", "International", "C2",
                "Generate MAC (AS2805)", "MAC",
                "AS2805 MAC generation (Australian payment network standard).",
@@ -1346,16 +1349,18 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                "Encrypts a 64-bit (16H) data block using a TAK under LMK pair 16-17 variant 0. "
                "Response code: HF. Superseded by M0. Single 64-bit block only — not for "
                "general data encryption.",
-               "encrypt_data", "TR31_M3_ISO_9797_3_MAC_KEY",
-               "TAK is a MAC key (M-class), not an encryption key (D-class). "
-               "In APC: if the intent is PIN pad command authentication, model as generate_mac. "
-               "If general data encryption, use encrypt_data with TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY."),
+               "generate_mac", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "TAK is a MAC key (M-class), not an encryption key (D-class). APC does not allow "
+               "encrypt_data with an M3 key (key usage mismatch). Primary APC path: generate_mac "
+               "with TR31_M3 for terminal command authentication. If the intent is general data "
+               "encryption, use a TR31_D0 key with encrypt_data instead."),
     HsmCommand("Thales", "Legacy", "HG",
                "Decrypt Data Block", "ENCRYPT",
                "Decrypts a 64-bit (16H) data block using a TAK under LMK pair 16-17 variant 0. "
                "Response code: HH. Superseded by M2.",
-               "decrypt_data", "TR31_M3_ISO_9797_3_MAC_KEY",
-               "Mirror of HE. Same APC key-type considerations apply."),
+               "verify_mac", "TR31_M3_ISO_9797_3_MAC_KEY",
+               "Mirror of HE. APC does not allow decrypt_data with an M3 key. Primary APC path: "
+               "verify_mac with TR31_M3. For actual decryption, use TR31_D0 with decrypt_data."),
     # ── Legacy DUKPT PIN Verification ─────────────────────────────────────────
     HsmCommand("Thales", "Legacy", "CO",
                "Verify a PIN Using the Diebold Method (DUKPT)", "PIN",

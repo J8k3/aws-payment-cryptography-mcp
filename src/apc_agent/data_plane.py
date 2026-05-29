@@ -274,14 +274,18 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             pin_data_length: PIN length (4-12); omit to use scheme default
             encryption_wrapped_key: Optional TR-31 wrapped PEK (encryption_key_identifier becomes the KEK)
         """
-        if pin_block_format == "ISO_FORMAT_0":
-            result = check_legacy_construct("PIN_FORMAT_0")
-            if result:
-                return {
-                    "compliance_warning": result.message,
-                    "modern_alternative": result.modern_alternative,
-                    "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
-                }
+        for _format_key, _format_val in (
+            ("PIN_FORMAT_0", "ISO_FORMAT_0"),
+            ("PIN_FORMAT_3", "ISO_FORMAT_3"),
+        ):
+            if pin_block_format == _format_val:
+                result = check_legacy_construct(_format_key)
+                if result:
+                    return {
+                        "compliance_warning": result.message,
+                        "modern_alternative": result.modern_alternative,
+                        "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
+                    }
 
         params: dict = {
             "GenerationKeyIdentifier": generation_key_identifier,
@@ -336,14 +340,18 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             dukpt_attributes: Required when encryption_key_identifier is a BDK
             encryption_wrapped_key: Optional TR-31 wrapped PEK (encryption_key_identifier becomes the KEK)
         """
-        if pin_block_format == "ISO_FORMAT_0":
-            result = check_legacy_construct("PIN_FORMAT_0")
-            if result:
-                return {
-                    "compliance_warning": result.message,
-                    "modern_alternative": result.modern_alternative,
-                    "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
-                }
+        for _format_key, _format_val in (
+            ("PIN_FORMAT_0", "ISO_FORMAT_0"),
+            ("PIN_FORMAT_3", "ISO_FORMAT_3"),
+        ):
+            if pin_block_format == _format_val:
+                result = check_legacy_construct(_format_key)
+                if result:
+                    return {
+                        "compliance_warning": result.message,
+                        "modern_alternative": result.modern_alternative,
+                        "confirmation_required": format_legacy_constraint_prompt(result.modern_alternative),
+                    }
 
         params: dict = {
             "VerificationKeyIdentifier": verification_key_identifier,
@@ -461,7 +469,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             key_identifier: ARN or alias of MAC key (M0, M1, M3, M6, or M7)
             message_data: Hex-encoded message to authenticate
             generation_attributes: MAC algorithm parameters
-            mac_length: Output MAC length in bytes (default per algorithm)
+            mac_length: Output MAC length in nibbles/hex-digits (NOT bytes): 8=4-byte MAC, 16=8-byte MAC; omit for algorithm default
         """
         algo = generation_attributes.get("Algorithm", "")
         if "ALGORITHM1" in algo:
@@ -507,7 +515,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             message_data: Hex-encoded message that was authenticated
             mac: Hex-encoded MAC value to verify
             verification_attributes: MAC algorithm parameters (mirrors generate_mac)
-            mac_length: MAC length in bytes if non-default
+            mac_length: MAC length in nibbles/hex-digits (NOT bytes): 8=4-byte MAC, 16=8-byte MAC; must match the value used during generation
         """
         algo = verification_attributes.get("Algorithm", "")
         if "ALGORITHM1" in algo:
@@ -570,7 +578,7 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
             secure_messaging_confidentiality_key_identifier: ARN or alias of E1 key
             message_data: Hex-encoded script command data
             new_encrypted_pin_block: Hex-encoded new PIN block encrypted under PEK
-            pin_block_format: ISO_FORMAT_0 or ISO_FORMAT_4
+            pin_block_format: ISO_FORMAT_0, ISO_FORMAT_1, or ISO_FORMAT_3 (ISO_FORMAT_4 is not supported by this operation)
             derivation_method_attributes: EMV derivation method (Visa, Mastercard, etc.)
         """
         return _call(client().generate_mac_emv_pin_change,
@@ -615,9 +623,9 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
                           "ApplicationCryptogram": "<ARQC hex>"}}
 
         auth_response_attributes (to generate ARPC in same call):
-          {"GenerateArpc": {"ArpcMethod1": {"AuthResponseCode": "0010"}}}
+          {"ArpcMethod1": {"AuthResponseCode": "0010"}}
           or
-          {"GenerateArpc": {"ArpcMethod2": {"CardStatusUpdate": "00000000", "ProprietaryAuthenticationData": ""}}}
+          {"ArpcMethod2": {"CardStatusUpdate": "00000000", "ProprietaryAuthenticationData": ""}}
 
         ISO 8583 field 55 contains the EMV data including ARQC and ATC (tag 0x9F36).
 

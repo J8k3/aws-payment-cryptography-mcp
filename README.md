@@ -133,7 +133,7 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 1. Connect the MCP server to your AI client and open the relevant source files.
 2. Ask it to analyze them. Example: *"What HSM operations does this code use and what are the APC equivalents?"*
-3. The AI calls `hsm_analyze_code`, which scans for Futurex Excrypt bracket-delimited commands (`[TPIN;...]`) and Thales two-char command codes (`CA`, `G0`, `M6`, etc.) in the source, then looks each one up in the command registry.
+3. The AI calls `hsm_analyze_code`, which scans for Futurex Excrypt bracket-delimited commands (`[AOTPIN;...]` / `[TPIN;...]`) and Thales two-char command codes (`CA`, `G0`, `M6`, etc.) in the source, then looks each one up in the command registry.
 4. For each command detected: the APC operation to call, the required key type (TR-31 usage code), a confidence level, and migration notes.
 5. The AI writes the refactored code using the APC SDK and validates it against the compliance rules.
 
