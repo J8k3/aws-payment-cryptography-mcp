@@ -2428,7 +2428,7 @@ domain:
   - cryptography
 relationships:
   - type: wraps
-    target_id: key_block.tr31
+    target_id: key-block.tr31
 status: active
 ```
 
@@ -5493,7 +5493,7 @@ examples:
   - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' now exposes a padding method selector (default Method 2)"
 relationships:
   - type: related_to
-    target_id: algorithm.iso9797-algorithm3
+    target_id: algorithm.mac-iso9797
   - type: related_to
     target_id: rule.apc-generate-mac-length-nibbles
 status: active
@@ -5860,7 +5860,7 @@ references:
   - "PCI Information Supplement: PIN Security Req 18-3 Key Blocks, June 2019 (Q4, Q7, Q13)"
 relationships:
   - type: related_to
-    target_id: algorithm.tr31
+    target_id: key-block.tr31
   - type: related_to
     target_id: concept.pci-pin-bdk-segmentation
 status: active
@@ -6159,7 +6159,7 @@ relationships:
   - type: related_to
     target_id: algorithm.dukpt
   - type: related_to
-    target_id: rule.apc-iso-format4-required
+    target_id: rule.apc-format4-aes-pin-requirement
 status: active
 ```
 
@@ -6262,7 +6262,7 @@ relationships:
   - type: related_to
     target_id: concept.pci-pin-kcv-method-rule
   - type: related_to
-    target_id: algorithm.tr31
+    target_id: key-block.tr31
 status: active
 ```
 
@@ -7257,7 +7257,7 @@ relationships:
   - type: related_to
     target_id: concept.pci-mpoc-backend-hsm-requirement
   - type: related_to
-    target_id: concept.apc-key-management-overview
+    target_id: concept.apc-key-lifecycle
 status: active
 ```
 
@@ -7320,7 +7320,7 @@ relationships:
   - type: related_to
     target_id: concept.pci-mpoc-architecture
   - type: related_to
-    target_id: concept.apc-key-management-overview
+    target_id: concept.apc-key-lifecycle
 status: active
 ```
 
@@ -7411,7 +7411,7 @@ references:
   - "PCI MPoC Standard v1.1, Req 1A-3.4 (page 58)"
 relationships:
   - type: related_to
-    target_id: concept.pci-pin-key-usage-restriction
+    target_id: concept.pci-pin-key-block-requirements
   - type: related_to
     target_id: concept.pci-p2pe-key-variant-prohibition
 status: active
@@ -7464,7 +7464,7 @@ relationships:
   - type: related_to
     target_id: concept.pci-mpoc-key-session-definition
   - type: related_to
-    target_id: concept.dukpt-aes
+    target_id: concept.aes-dukpt-migration
   - type: related_to
     target_id: concept.pci-p2pe-hybrid-ddk-controls
 status: active
@@ -7529,7 +7529,7 @@ references:
   - "PCI MPoC Standard v1.1, Req 1A-3.2 (page 57)"
 relationships:
   - type: related_to
-    target_id: concept.pci-pin-algorithm-requirements
+    target_id: concept.pci-pin-tdes-sunset-and-format4-mandate
   - type: related_to
     target_id: concept.pci-p2pe-account-data-algorithms
 status: active
@@ -7669,7 +7669,7 @@ relationships:
   - type: related_to
     target_id: concept.pci-mpoc-dukpt-forward-secrecy
   - type: related_to
-    target_id: concept.dukpt-aes
+    target_id: concept.aes-dukpt-migration
 status: active
 ```
 
@@ -7816,7 +7816,7 @@ references:
   - "PCI CPoC Standard v1.0, Section 1.3 Acceptable Cryptography (pages 32-36)"
 relationships:
   - type: related_to
-    target_id: concept.pci-pin-algorithm-requirements
+    target_id: concept.pci-pin-tdes-sunset-and-format4-mandate
   - type: related_to
     target_id: concept.pci-p2pe-account-data-algorithms
   - type: related_to
@@ -8627,9 +8627,9 @@ constraints:
   - For AES DUKPT, the KSN is 12 bytes (24 hex digits); payShield requires Key Block LMK (not Variant LMK) to protect the AES BDK
 relationships:
   - type: related_to
-    target_id: concept.dukpt
+    target_id: algorithm.dukpt
   - type: related_to
-    target_id: concept.ksn
+    target_id: artifact.ksn
   - type: related_to
     target_id: concept.thales-bdk-types
 status: active
@@ -8924,7 +8924,7 @@ constraints:
   - AES DUKPT BDK must be in an AES Key Block (KB code requires AES Key Block LMK); Variant LMK cannot protect AES BDKs on payShield
 relationships:
   - type: related_to
-    target_id: concept.dukpt
+    target_id: algorithm.dukpt
   - type: related_to
     target_id: concept.thales-key-type-mapping
   - type: related_to
@@ -9004,7 +9004,7 @@ relationships:
   - type: related_to
     target_id: concept.thales-bdk-types
   - type: related_to
-    target_id: concept.dukpt
+    target_id: algorithm.dukpt
 status: active
 ```
 
@@ -9062,7 +9062,7 @@ constraints:
   - IPEK terminology is TDES-specific; never use "IPEK" for AES DUKPT (it confuses the derivation scheme); use "IK"
 relationships:
   - type: related_to
-    target_id: concept.dukpt
+    target_id: algorithm.dukpt
   - type: related_to
     target_id: concept.thales-bdk-types
   - type: related_to
@@ -9679,7 +9679,7 @@ relationships:
   - type: related_to
     target_id: operation.emv-issuer-script
   - type: related_to
-    target_id: concept.emv-secure-messaging
+    target_id: operation.emv-secure-messaging
   - type: related_to
     target_id: concept.thales-key-type-mapping
 status: active
