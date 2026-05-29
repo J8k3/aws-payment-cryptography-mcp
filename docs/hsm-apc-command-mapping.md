@@ -134,7 +134,7 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 | Generate MAC — AS2805 | `generate_mac` | `TR31_M0` | C2 | — | — | — |
 | Verify MAC — AS2805 | `verify_mac` | `TR31_M0` | C4 | — | — | — |
 | Generate MAC — EMV | `generate_mac` | `TR31_M6` | — | — | EMVM | 352 [d] |
-| Generate HMAC (SHA-1/256/384/512) | `generate_mac` | `TR31_M7` | LQ | — | HMAC | 39B [d] |
+| Generate HMAC (SHA-1/224/256/384/512) | `generate_mac` | `TR31_M7` | LQ | — | HMAC | 39B [d] |
 | Verify HMAC | `verify_mac` | `TR31_M7` | LS | — | — | 39C [d] |
 | Generate MAC + encrypt data | `generate_mac` + `encrypt_data` | `TR31_M6` + `TR31_D0` | — | — | — | 59 [d] |
 | Generate CMAC — TDES | `generate_mac` | `TR31_M6` | — | — | — | 305 [d] |

@@ -3270,24 +3270,6 @@ relationships:
 status: active
 ```
 
-### Master/Session Key Management
-
-```yaml
-id: algorithm.master-session
-entity_type: algorithm
-canonical_name: Master/Session Key Management
-aliases:
-  - Master/Session
-summary: Older key-management approach in which each device is initialized with a unique master key and transaction data is protected with session keys derived under that device context.
-domain:
-  - key_management
-  - cryptography
-relationships:
-  - type: related_to
-    target_id: algorithm.dukpt
-status: active
-```
-
 ### Symmetric and Message Authentication Algorithms
 
 ```yaml
@@ -3387,7 +3369,7 @@ attributes:
     HMAC:
       tr31_key_usage: M7
       apc_enum_direct: HMAC_SHA256  # or HMAC_SHA224, HMAC_SHA384, HMAC_SHA512; HMAC (bare) also accepted
-      security_note: Approved when used with SHA-256 or higher. Not commonly used for ISO 8583 MAC but valid for host-to-host integrity in non-scheme contexts.
+      security_note: "APC supports HMAC (bare/SHA-1), HMAC_SHA224, HMAC_SHA256, HMAC_SHA384, HMAC_SHA512. SHA-256 or higher recommended for new deployments. Not commonly used for ISO 8583 MAC but valid for host-to-host integrity in non-scheme contexts."
     AS2805_MAC:
       tr31_key_usage: M0
       apc_enum_direct: AS2805_4_1
@@ -4082,7 +4064,6 @@ attributes:
     chaining into Verify ops.
   not_covered:
     - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
-    - TR-31 key block decryption (parsing only — issue #13 in the fork repo)
     - Issuer card personalization, IMK/CMK derivation (out of scope)
 relationships:
   - type: related_to
@@ -4556,17 +4537,17 @@ id: rule.iso9797-payment-interpretation
 entity_type: constraint_rule
 canonical_name: ISO 9797-1 MAC Payment Industry Interpretation
 summary: >
-  The payment industry uses the labels "Algorithm 1" and "Algorithm 3" differently from
-  the pure ISO 9797-1 definitions. Understanding the difference prevents key or padding
-  mismatches during implementation.
+  ISO 9797-1 Algorithms 1 and 3 are used in the payment industry with the same definitions
+  as the ISO standard. Algorithm 1 uses the full block cipher for every block; Algorithm 3
+  (Retail MAC) uses single DES for the CBC chain then applies an outer TDES transform.
+  Understanding the difference prevents key or padding mismatches.
 domain:
   - cryptography
 constraints:
-  - "Pure ISO 9797-1 Algorithm 1: straightforward CBC-MAC using a single algorithm (DES, TDES, or AES) for all blocks."
-  - "Payment industry Algorithm 1 (as used in EMV and acquirer MAC contexts): DES CBC-MAC using the left half of the TDES key for all blocks except the last, then a TDES output transform (E-K1, D-K2, E-K3) on the final block only."
-  - "Payment industry Algorithm 3 (Retail MAC, ANSI X9.19): DES CBC-MAC with K1 (left 8 bytes) for all blocks, then decrypt with K2 (right 8 bytes), then re-encrypt with K3 (= K1 for 2-key, or third 8-byte segment for 3-key)."
-  - "The difference between Algorithm 1 and Algorithm 3 in the payment context is the final output transform: TDES-wrap (Alg 1) vs. decrypt-then-encrypt (Alg 3)."
-  - "ISO 9797-1 Padding Method 2 (80-then-zeros) is standard for EMV MAC. Padding Method 1 (zero-padding) is used in some acquirer host MAC contexts."
+  - "ISO 9797-1 Algorithm 1 (APC: ISO9797_ALGORITHM1, M1 key): Full block cipher (TDES when key is TDES, AES when AES) applied to ALL blocks including the final block. MAC = last CBC output with no additional transform."
+  - "ISO 9797-1 Algorithm 3 (Retail MAC, APC: ISO9797_ALGORITHM3, M3 key, ANSI X9.19): Single DES with K1 (left 8 bytes) applied to ALL blocks (1 through N) in CBC mode, then an outer TDES transform (D-K2, E-K1) applied to the final DES output. Result: E-K1(D-K2(E-K1(h_{N-1} XOR m_N))). K3=K1 for 2-key TDES; K3 is the third 8-byte segment for 3-key."
+  - "The difference: Algorithm 1 uses the full cipher (TDES) for every block. Algorithm 3 uses single DES for every block in the chain, then applies the outer 3-step TDES transform to the last DES output."
+  - "ISO 9797-1 Padding Method 2 (80-then-zeros) is standard for EMV MAC. Padding Method 1 (zero-padding) is used in some acquirer host MAC contexts (APC uses Method 1 for ISO9797_ALGORITHM3 — see rule.apc-iso9797-algorithm3-method1)."
   - "APC MAC operation enums: ISO9797_ALGORITHM1 (M1 key), ISO9797_ALGORITHM3 (M3 key), CMAC (M6 key)."
 relationships:
   - type: related_to
@@ -5099,7 +5080,7 @@ attributes:
     algorithms: [AES_128, AES_192, AES_256]
     note: AES-CMAC MAC key
   M7_HMAC_KEY:
-    algorithms: [HMAC_SHA256, HMAC_SHA384, HMAC_SHA512]
+    algorithms: [HMAC_SHA224, HMAC_SHA256, HMAC_SHA384, HMAC_SHA512]
     note: Used for Mastercard SPA2 AAV via GenerateMac
   K0_KEY_ENCRYPTION_KEY:
     algorithms: [TDES_2KEY, TDES_3KEY, AES_128, AES_192, AES_256]
@@ -6030,7 +6011,7 @@ attributes:
   key_strength_rule: "encipherment key must be >= strength of protected key for network transport"
 constraints:
   - Never transport AES keys under TDES over a network — treat as cleartext breach
-  - APC TR-31 import uses RSA-2048 or RSA-3072 to wrap the key block — compliant for AES-128 and AES-256
+  - APC KEY_CRYPTOGRAM import uses RSA-OAEP. APC enforces strict equivalence: RSA-2048 (112-bit) wraps TDES only (2KEY or 3KEY); RSA-3072 or RSA-4096 (128-bit) wraps TDES or AES-128. AES-192/256 requires ECDH (K3 key). PCI PIN FAQ exception permits RSA-2048 for AES-128 remote key distribution, but APC enforces strict 112-bit equivalence — do not expect RSA-2048 to wrap AES-128 in APC. RSA-2048 is NOT compliant for AES-256 — use ECDH.
 references:
   - "PCI PTS PIN Technical FAQs v3 June 2021, Q1, Q3, Q4, Q20"
 relationships:
@@ -6258,18 +6239,20 @@ attributes:
       RSA-2048 (112-bit security) equals 3-key TDEA strength — it CAN protect AES-128 only
       if both are considered equivalent (per older interpretations). Strict Annex C reading:
       RSA-2048 = 112 bits < AES-128 = 128 bits, so RSA-3072 is required for AES-128.
-      APC TR-31 import supports RSA-3072 which covers both AES-128 and AES-256 wrapping.
+      RSA-3072 (128-bit security) is sufficient for AES-128 but NOT AES-256. APC RSA wrap
+      supports TDES and AES-128 only; AES-192/256 requires ECDH (K3 key).
     rsa_2048_cannot_protect_aes_256: >
-      RSA-2048 (112-bit security) cannot wrap AES-256 (256-bit security). Use RSA-3072+ or
-      ECDH (P-256+) for AES-256 key transport.
+      RSA-2048 (112-bit security) cannot wrap AES-256 (256-bit security). Per PCI PIN
+      Annex C, AES-256 requires 256-bit equivalent strength (RSA-15360 or EC-521). APC
+      does not support RSA wrap for AES-192/256 — use ECDH (K3 key, EC-521) instead.
     two_key_tdea_prohibited: >
       2-key TDEA provides only 80-bit security — below the minimum for any key encipherment
       since it fails to protect even 3-key TDEA (112-bit). Prohibited as encipherment key.
 constraints:
-  - Always use RSA-3072 or EC-256+ for wrapping AES keys in TR-31 or TR-34 flows
+  - For AES-128 wrapping: RSA-3072 or EC-256 meet the 128-bit security threshold; for AES-256 wrapping: use EC-521 or RSA-15360 per PCI PIN Annex C — APC uses ECDH (K3 key) for AES-256 (RSA wrap limited to TDES and AES-128)
   - TDEA KBPK (TR-31 key-block protection key) must be 3-key TDEA to protect 3-key TDEA payloads
   - TDEA KBPK cannot be used to protect AES key payloads — use AES-128+ KBPK for AES keys
-  - APC import flow uses RSA-3072 OAEP by default — sufficient for all AES key sizes
+  - APC import flow uses RSA-3072 OAEP for TDES and AES-128; for AES-256, use ECDH (K3 key) — RSA-3072 is 128-bit security and does not cover AES-256 (256-bit) per Annex C
 references:
   - "PCI PIN Security Requirements and Testing Procedures v3.1 Annex C"
   - "PCI PIN Security Requirements and Testing Procedures v3.1 §10-1"
@@ -6842,7 +6825,7 @@ attributes:
     "112 bits": "Triple-TDEA / RSA-2048 / ECC-224 / FFC-2048+224"
     "128 bits": "AES-128 / RSA-3072 / ECC-256 / FFC-3072+256"
     "192 bits": "AES-192 / RSA-7680 / ECC-384 / FFC-7680+384"
-    "256 bits": "AES-256 / RSA-15360 / ECC-512 / FFC-15360+512"
+    "256 bits": "AES-256 / RSA-15360 / ECC-521 / FFC-15360+512"
   exceptions:
     two_key_tdea: >
       Footnote 5: PTS POI v3.x+ devices may use 2-key TDEA (double-length BDK) ONLY when
@@ -7508,7 +7491,7 @@ summary: >
     exception (which was AES-128 only). KEK minimum = 128 bits of security.
   Equivalence table (Table 8): 112 bits = RSA-2048/ECC-224/FFC-2048-224;
     128 bits = RSA-3072/ECC-256/FFC-3072-256/AES-128; 192 bits = RSA-7680/ECC-384/AES-192;
-    256 bits = RSA-15360/ECC-512/AES-256
+    256 bits = RSA-15360/ECC-521/AES-256
 domain:
   - compliance
   - cryptography
@@ -7536,7 +7519,7 @@ attributes:
     112_bits: ["RSA-2048", "ECC-224", "FFC-2048/224"]
     128_bits: ["RSA-3072", "ECC-256", "FFC-3072/256", "AES-128"]
     192_bits: ["RSA-7680", "ECC-384", "AES-192"]
-    256_bits: ["RSA-15360", "ECC-512", "AES-256"]
+    256_bits: ["RSA-15360", "ECC-521", "AES-256"]
 constraints:
   - SHA-1 is NOT permitted for any security purpose
   - AES KCV must use CMAC method, not legacy ECB-zero method
@@ -7772,7 +7755,7 @@ summary: >
     112 bits = RSA-2048 / ECC-224 / FFC-2048/224
     128 bits = RSA-3072 / ECC-256 / FFC-3072/256 / AES-128
     192 bits = RSA-7680 / ECC-384 / AES-192
-    256 bits = RSA-15360 / ECC-512 / AES-256
+    256 bits = RSA-15360 / ECC-521 / AES-256
   
   KCV (from Appendix C p.147): TDEA = ECB encrypt all-zero block, leftmost 24 bits
   (note: standard text has a typographical inconsistency — it says "24 bits" alongside
@@ -7815,7 +7798,7 @@ attributes:
     112_bits: ["RSA-2048", "ECC-224", "FFC-2048/224"]
     128_bits: ["RSA-3072", "ECC-256", "FFC-3072/256", "AES-128"]
     192_bits: ["RSA-7680", "ECC-384", "AES-192"]
-    256_bits: ["RSA-15360", "ECC-512", "AES-256"]
+    256_bits: ["RSA-15360", "ECC-521", "AES-256"]
   cross_standard_note: >
     Equivalence table is identical to PCI PIN Annex C and PCI P2PE Annex C and MPoC
     Appendix C. All four standards agree on equivalent key sizes. The only divergence
@@ -9056,7 +9039,7 @@ attributes:
     aes_dukpt: IK (Initial Key) — AES key; terminology changed in X9.24-3; "IPEK" is not used for AES DUKPT
   pin_block_format:
     tdes_dukpt: ISO Format 0 (most common) or Format 3 — XOR-based, PAN-dependent
-    aes_dukpt: ISO Format 4 only — AES-CBC encryption, includes PAN in ciphertext, not XOR-based; payShield format code "48"
+    aes_dukpt: ISO Format 4 only — double-pass AES-ECB encryption (Block_A = AES_ECB(PIN_field XOR PAN_field), Encrypted_PIN_Block = AES_ECB(Block_A XOR PAN_field)); includes PAN in ciphertext; payShield format code "48"
     constraint: AES DUKPT mandates Format 4; Format 0/3 are not permitted with AES DUKPT
   key_derivation:
     tdes_dukpt: IPEK derivation from BDK + 10-byte KSN; future key register shift via left/right half operations
@@ -9743,7 +9726,7 @@ attributes:
         details: >
           2 ASCII decimal chars. Selects HMAC hash algorithm:
           '01' = HMAC-SHA-1   (output L=20 bytes; 10 ≤ t ≤ 20)
-          '05' = HMAC-SHA-224 (no APC equivalent — proxy must return migration error)
+          '05' = HMAC-SHA-224 → APC MacAlgorithm::HmacSha224 (L=28; 14 ≤ t ≤ 28)
           '06' = HMAC-SHA-256 → APC MacAlgorithm::HmacSha256 (L=32; 16 ≤ t ≤ 32)
           '07' = HMAC-SHA-384 → APC MacAlgorithm::HmacSha384 (L=48; 24 ≤ t ≤ 48)
           '08' = HMAC-SHA-512 → APC MacAlgorithm::HmacSha512 (L=64; 32 ≤ t ≤ 64)
@@ -9875,12 +9858,17 @@ attributes:
       key_type: TR31_M7_HMAC_KEY
       algorithm_by_hash_identifier:
         "'01'": "MacAlgorithm::Hmac (HMAC-SHA-1) — weak; flag for migration to SHA-256 or SHA-512"
-        "'05'": "NO APC EQUIVALENT — SHA-224 not supported; return proxy migration error"
+        "'05'": "MacAlgorithm::HmacSha224 (L=28; 14 ≤ t ≤ 28)"
         "'06'": "MacAlgorithm::HmacSha256"
         "'07'": "MacAlgorithm::HmacSha384"
         "'08'": "MacAlgorithm::HmacSha512"
       message_data: "Message Data field (nB binary from wire), hex-encoded before passing to APC."
-      mac_length: "HMAC Length field (4N) → APC MacLength; use full hash output if APC does not support truncation."
+      mac_length: >
+        Wire HMAC Length (4N) is bytes; APC MacLength is nibbles (per rule.apc-generate-mac-length-nibbles).
+        If APC supports HMAC truncation: mac_length = wire_hmac_length_bytes × 2.
+        If APC does not support truncation: pass full hash output in nibbles
+        (SHA-224=56, SHA-256=64, SHA-384=96, SHA-512=128), then truncate APC response
+        to wire_hmac_length bytes before returning.
     verify:
       operation: verify_mac
       key_type: TR31_M7_HMAC_KEY
@@ -9894,8 +9882,9 @@ constraints:
   - "Data Length is 5N decimal (not 4H hex). '00128' = 128 bytes."
   - "Message Data is nB binary — hex-encode only after reading from wire for APC."
   - "In LS, HMAC to verify appears AFTER Hash Identifier + HMAC Length, BEFORE key fields."
-  - "SHA-224 ('05') has no APC equivalent — proxy must return an error for this Hash Identifier."
+  - "SHA-224 ('05') maps to MacAlgorithm::HmacSha224 in APC (L=28 bytes; valid t range 14-28 bytes)."
   - "HMAC Length (4N) governs actual output byte count; it appears in both command and LR response."
+  - "APC MacLength is nibbles, not bytes (rule.apc-generate-mac-length-nibbles). Wire HMAC Length (bytes) × 2 = APC MacLength. SHA-256 full output 32 bytes → mac_length=64."
   - "Premium license required. Error '67' = Command not licensed."
   - "HMAC-SHA-1 is cryptographically weak; recommend migration to SHA-256 or SHA-512."
 
@@ -10178,6 +10167,6 @@ that publish annual revisions).
 | 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 | hsm, key_management, pin_processing, cryptography |
 | 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
 | 2026-05-25 (corrected 2026-05-26) | KU/KY (EMV issuer script MAC) wire format verified against PUGD0537-004 pp.475-484 (authoritative, local PDF). 8 errors in initial inferred entry corrected: no Key Type (3H) field — wire is Mode→SchemeID→MK-SMI directly; full scheme tables (7 KU / 10 KY); MK-SMI is 32H or 'U'+32H only (LMK 28-29 variant 2); Integrity Session Key Data is scheme-dependent; Schemes 0/1/2 Mode 0 use ';'-terminated message data (no 4H length); Schemes 3-6 use 4H length prefix; Response MAC is 8B binary; KY Mode 0 has no Scheme ID but has IV-SMI (16B). Mode 0 → generate_mac (TR31_E2_EMV_MKEY_INTEGRITY); modes 1-4 → generate_mac_emv_pin_change (proxy unsupported). | Thales | PUGD0537-004 Core Host Commands V1, pp.475-484 — AUTHORITATIVE | hsm, emv, cryptography |
-| 2026-05-25 (corrected 2026-05-26) | LQ/LS (HMAC generate/verify) wire format verified against PUGD0537-004 pp.405-408 (authoritative, local PDF). 7 errors in initial inferred entry corrected: Hash Identifier is 2N not 1N; three missing fields added (HMAC Length 4N, HMAC Key Format 2N, HMAC Key Length 4N); HMAC Key is nB binary under LMK pair 34-35 variant 1 with NO key scheme prefix; Delimiter ';' is Variant LMK only; Data Length is 5N decimal not 4H hex; Message Data is nB binary not ASCII hex; LS field order: HMAC before key fields. SHA-224 ('05') has no APC equivalent. Premium license required. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY. | Thales | PUGD0537-004 Core Host Commands V1, pp.405-408 — AUTHORITATIVE | hsm, cryptography |
+| 2026-05-25 (corrected 2026-05-26) | LQ/LS (HMAC generate/verify) wire format verified against PUGD0537-004 pp.405-408 (authoritative, local PDF). 7 errors in initial inferred entry corrected: Hash Identifier is 2N not 1N; three missing fields added (HMAC Length 4N, HMAC Key Format 2N, HMAC Key Length 4N); HMAC Key is nB binary under LMK pair 34-35 variant 1 with NO key scheme prefix; Delimiter ';' is Variant LMK only; Data Length is 5N decimal not 4H hex; Message Data is nB binary not ASCII hex; LS field order: HMAC before key fields. SHA-224 ('05') maps to MacAlgorithm::HmacSha224 in APC (corrected 2026-05-29 — initial entry incorrectly stated no APC equivalent). Premium license required. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY. | Thales | PUGD0537-004 Core Host Commands V1, pp.405-408 — AUTHORITATIVE | hsm, cryptography |
 | 2026-05-25 | QY/PM (dCVV generate/verify) — prior inferred entry corrected against PUGD0537-004 pp.306-315 (AUTHORITATIVE, local PDF). Major corrections: (1) Master Key uses parse_legacy_key, NOT fixed 32H; (2) Scheme ID (1N) precedes the key; (3) Key Derivation Method (1A) follows the key; (4) PAN is variable-length nN with ';' delimiter, NOT fixed 16N; (5) ATC is 6N decimal (zero-padded), NOT 4H hex; (6) Service Code must be '998' for Scheme 0 (Visa dCVV); (7) PM has Version field; (8) dCVV in PM is at END of scheme fields, not before PAN. PM supports 8 schemes with sub-versions. Entry now scope-documented for Scheme '0' Version '0' (Visa dCVV). | Thales | PUGD0537-004 Core Host Commands V1, pp.306-315 — AUTHORITATIVE | hsm, card_validation, emv |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |

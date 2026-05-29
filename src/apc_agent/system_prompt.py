@@ -189,7 +189,7 @@ MAC Algorithms
   CBC-MAC (M1): Legacy. Susceptible to length-extension attacks.
   Retail MAC (M3, ANSI X9.19): Common in legacy acquirer networks.
   CMAC (M6, ISO 9797-1 Alg 5): Preferred. Use for all new deployments.
-  HMAC (M7): Approved when used with SHA-256 or higher.
+  HMAC (M7): Supported with SHA-1 (bare HMAC), SHA-224, SHA-256, SHA-384, SHA-512. SHA-256 or higher recommended for new deployments.
   AES KCV: Must use CMAC method (not ECB-zeros method used for TDES).
 
 ISO 8583 Cryptographic Fields
