@@ -197,6 +197,46 @@ class TestCheckKeyOperationCompatibility:
         )
         assert result is None
 
+    # Regression tests for EMV E2 (integrity key) mode split —
+    # Mode 0 (generate_mac/verify_mac) must be allowed; was blocked before fix.
+    def test_e2_integrity_key_generate_mac_is_ok(self):
+        result = check_key_operation_compatibility(
+            "TR31_E2_EMV_MKEY_INTEGRITY", "generate_mac"
+        )
+        assert result is None, "E2 must allow generate_mac for KU/KY Mode 0 (integrity-only)"
+
+    def test_e2_integrity_key_verify_mac_is_ok(self):
+        result = check_key_operation_compatibility(
+            "TR31_E2_EMV_MKEY_INTEGRITY", "verify_mac"
+        )
+        assert result is None, "E2 must allow verify_mac for KU/KY Mode 0 (integrity-only)"
+
+    def test_e2_integrity_key_generate_mac_emv_pin_change_is_ok(self):
+        result = check_key_operation_compatibility(
+            "TR31_E2_EMV_MKEY_INTEGRITY", "generate_mac_emv_pin_change"
+        )
+        assert result is None, "E2 must allow generate_mac_emv_pin_change for Modes 1-4"
+
+    def test_e2_integrity_key_encrypt_data_is_hard_stop(self):
+        result = check_key_operation_compatibility(
+            "TR31_E2_EMV_MKEY_INTEGRITY", "encrypt_data"
+        )
+        assert result is not None
+        assert result.severity == Severity.HARD_STOP
+
+    def test_e0_app_cryptogram_key_verify_arqc_is_ok(self):
+        result = check_key_operation_compatibility(
+            "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS", "verify_auth_request_cryptogram"
+        )
+        assert result is None
+
+    def test_e0_app_cryptogram_key_generate_mac_is_hard_stop(self):
+        result = check_key_operation_compatibility(
+            "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS", "generate_mac"
+        )
+        assert result is not None
+        assert result.severity == Severity.HARD_STOP
+
     def test_mismatch_error_message_names_allowed_operations(self):
         result = check_key_operation_compatibility(
             "TR31_C0_CARD_VERIFICATION_KEY", "encrypt_data"

@@ -145,3 +145,27 @@ class TestCommandRegistry:
         results = [c for c in ALL_COMMANDS if c.command_code == "TPIN" and c.api == "Excrypt"]
         assert len(results) > 0
         assert all(c.confidence == "high" for c in results)
+
+    # Regression: KU and KY primary APC operation must be generate_mac (Mode 0),
+    # not generate_mac_emv_pin_change (which is Modes 1-4 only).
+    def test_ku_primary_apc_operation_is_generate_mac(self):
+        results = [c for c in ALL_COMMANDS if c.command_code == "KU"]
+        assert results, "KU command missing from registry"
+        assert results[0].apc_operation == "generate_mac", (
+            "KU Mode 0 (integrity-only) must map to generate_mac, not generate_mac_emv_pin_change"
+        )
+
+    def test_ky_primary_apc_operation_is_generate_mac(self):
+        results = [c for c in ALL_COMMANDS if c.command_code == "KY"]
+        assert results, "KY command missing from registry"
+        assert results[0].apc_operation == "generate_mac", (
+            "KY Mode 0 (integrity-only) must map to generate_mac, not generate_mac_emv_pin_change"
+        )
+
+    def test_ku_key_type_is_e2_integrity(self):
+        results = [c for c in ALL_COMMANDS if c.command_code == "KU"]
+        assert results[0].apc_key_type == "TR31_E2_EMV_MKEY_INTEGRITY"
+
+    def test_ky_key_type_is_e2_integrity(self):
+        results = [c for c in ALL_COMMANDS if c.command_code == "KY"]
+        assert results[0].apc_key_type == "TR31_E2_EMV_MKEY_INTEGRITY"
