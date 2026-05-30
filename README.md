@@ -161,6 +161,12 @@ Deviating from this path — TDES, Format 0 PIN blocks, TDES DUKPT, CBC-MAC — 
 
 5. Disable discovery mode (`discover.enabled: false`) and test with the real application. The proxy now routes the handled commands to APC and returns error 68 for anything unrecognized.
 
+**Common APC constraints when implementing handlers** — surfaced during live integration testing of apc-hsm-proxy against real APC:
+
+- **DUKPT key variant:** `DukptKeyVariant::Bidirectional` is valid for AES DUKPT (X9.24-3) only. 3DES DUKPT (X9.24-1 / `TDES_2KEY`) requires `Request` or `Response` — passing `Bidirectional` returns `ValidationException: Invalid DukptKeyVariant provided for key algorithm`. Use `Request` for terminal-originated MACs.
+- **AES-CMAC truncated verify:** `verify_mac` for AES-CMAC requires the full 16-byte (32H) MAC. payShield M8 sends a truncated MAC (e.g., 4 bytes). Passing truncated output causes `ValidationException`. Workaround: call `generate_mac` and compare the leading `mac_size` bytes in the handler.
+- **IBM 3624 PIN offset padding:** `verify_pin_data` for IBM 3624 requires a digits-only `PinOffset` (`^[0-9]+$`). payShield pads the offset to 12 hex characters with `F` (e.g., `9237FFFFFFFF`). Strip trailing `F` characters in the handler before calling APC.
+
 The discovery log is the handoff between the two tools. Because it deduplicates — writing once per command code, not once per transaction — it stays small and works directly as source context in an AI coding session.
 
 ---
