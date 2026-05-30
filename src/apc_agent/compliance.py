@@ -57,8 +57,8 @@ KEY_USAGE_REGISTRY = {
     },
     "TR31_E2_EMV_MKEY_INTEGRITY": {
         "name": "EMV Secure Messaging Integrity Key",
-        "allowed_operations": ["generate_mac_emv_pin_change"],
-        "description": "EMV script integrity (MAC)",
+        "allowed_operations": ["generate_mac", "verify_mac", "generate_mac_emv_pin_change"],
+        "description": "EMV script integrity (MAC). Mode 0 (integrity only) → generate_mac; Modes 1-4 (confidentiality/PIN change) → generate_mac_emv_pin_change.",
     },
     "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS": {
         "name": "EMV Dynamic Number Key",

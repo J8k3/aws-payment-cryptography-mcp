@@ -684,21 +684,20 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Computes a MAC over the script command using the SMI (Secure Messaging Integrity) "
                "issuer master key, and optionally encrypts sensitive data with the SMC key. "
                "Response code: KV.",
-               "generate_mac_emv_pin_change", "TR31_E2_EMV_MKEY_INTEGRITY",
+               "generate_mac", "TR31_E2_EMV_MKEY_INTEGRITY",
                "Source: PUGD0537-004 Rev A, p.475 — AUTHORITATIVE. "
-               "Covers issuer script MAC generation for all EMV 3.1.1 secure messaging commands "
-               "(e.g. PUT DATA, EXTERNAL AUTHENTICATE, PIN UNBLOCK). "
-               "In APC: generate_mac_emv_pin_change for PIN-change scripts (MAC+cipher combined); "
-               "generate_mac with TR31_E2_EMV_MKEY_INTEGRITY for MAC-only scripts. "
-               "Key: SMI master key (TR31_E2). Optional SMC key (TR31_E1) for confidentiality."),
+               "Mode 0 (integrity/MAC only): generate_mac with TR31_E2_EMV_MKEY_INTEGRITY. "
+               "Modes 1-4 (confidentiality + optional PIN change): generate_mac_emv_pin_change "
+               "with TR31_E2 (integrity) + TR31_E1 (confidentiality). "
+               "Proxy currently supports Mode 0 only."),
     HsmCommand("Thales/Futurex", "International", "KY",
                "Generate Secure Message (EMV 4.x)", "ARQC",
                "Generates an EMV 4.x issuer secure message. Extends KU to support the EMV 4.x "
                "secure messaging format (longer MAC, updated derivation). Response code: KZ.",
-               "generate_mac_emv_pin_change", "TR31_E2_EMV_MKEY_INTEGRITY",
+               "generate_mac", "TR31_E2_EMV_MKEY_INTEGRITY",
                "Source: PUGD0537-004 Rev A, p.480 — AUTHORITATIVE. "
-               "Same conceptual operation as KU but for EMV 4.x (EMV 2004+) card profiles. "
-               "In APC: same mapping as KU — generate_mac_emv_pin_change or generate_mac with TR31_E2."),
+               "Same mode split as KU: Mode 0 → generate_mac; Modes 1-4 → generate_mac_emv_pin_change. "
+               "KY uses EMV2000 or EMV Common session key derivation vs KU's EMV 3.1.1 derivation."),
     HsmCommand("Thales/Futurex", "International", "K2",
                "Mastercard CAP (Chip Authentication Program) Verification", "ARQC",
                "Verifies a Mastercard CAP one-time password or transaction authentication code. "
@@ -912,8 +911,10 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Generates an HMAC over a data block using an HMAC secret key. Response code: LR.",
                "generate_mac", "TR31_M7_HMAC_KEY",
                "Source: PUGD0537-004 Rev A, p.405 — AUTHORITATIVE. "
-               "Supports HMAC-SHA-1 (20 B), HMAC-SHA-256 (32 B), HMAC-SHA-384 (48 B), "
-               "HMAC-SHA-512 (64 B). Output length determined by algorithm, not truncated. "
+               "Supports HMAC-SHA-1 (Hash ID 01, 20 B), HMAC-SHA-224 (05, 28 B), "
+               "HMAC-SHA-256 (06, 32 B), HMAC-SHA-384 (07, 48 B), HMAC-SHA-512 (08, 64 B). "
+               "Output length is configurable via the HMAC Length field (L/2 ≤ t ≤ L). "
+               "APC MacLength is nibbles (not bytes): wire HMAC Length (bytes) × 2 = APC MacLength. "
                "In APC: generate_mac with TR31_M7_HMAC_KEY."),
     HsmCommand("Thales/Futurex", "International", "LS",
                "Verify an HMAC on a Block of Data", "MAC",

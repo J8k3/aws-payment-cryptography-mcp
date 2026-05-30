@@ -157,13 +157,16 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 | Verify ARQC / generate ARPC (UnionPay) | `verify_auth_request_cryptogram` | `TR31_E0` | — | JS | — | — |
 | Mastercard CAP / UCAF verification | `verify_auth_request_cryptogram` | `TR31_E0` | K2 | — | — | — |
 | DAC + Dynamic Number verification (EMV 3.1.1) | `verify_auth_request_cryptogram` | `TR31_E0` | KS | — | — | — |
-| Issuer secure message MAC (EMV 3.1.1) | `generate_mac_emv_pin_change` | `TR31_E2` | KU | — | — | — |
-| Issuer secure message MAC (EMV 4.x) | `generate_mac_emv_pin_change` | `TR31_E2` | KY | — | — | — |
+| Issuer script MAC only — Mode 0 (EMV 3.1.1) | `generate_mac` | `TR31_E2` | KU | — | — | — |
+| Issuer script MAC only — Mode 0 (EMV 4.x) | `generate_mac` | `TR31_E2` | KY | — | — | — |
+| Issuer script MAC + confidentiality / PIN change — Modes 1-4 | `generate_mac_emv_pin_change` | `TR31_E2` + `TR31_E1` | KU, KY | — | — | — |
 | Decrypt EMV 4.x chip counters | `decrypt_data` | `TR31_E1` | K0 | — | — | — |
 
 > **KQ wire format:** All multibyte fields (PAN+Seq, ATC, UN, Transaction Data, ARQC) are raw binary (not hex-encoded ASCII). Proxy implementations using hex ASCII require format adaptation.
 
 > **KW:** Requires the Premium package license on the payShield device. Supports Visa CVN14/18/22, MC M/Chip, Amex, Discover, JCB, UnionPay, and cloud-based (token) SKD variants.
+
+> **KU/KY Mode 0 vs Modes 1-4:** Mode 0 (integrity only — script MAC) maps to `generate_mac` with `TR31_E2_EMV_MKEY_INTEGRITY`. Modes 1-4 (add confidentiality and/or PIN change) require `generate_mac_emv_pin_change` with both MK-SMI (`TR31_E2`) and MK-SMC (`TR31_E1`) and a pre-translated PIN block. The proxy currently supports Mode 0 only.
 
 ---
 
