@@ -287,12 +287,22 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Call this before import_key when using TR-34 or KeyCryptogram — you need APC's
         public wrapping key and import token before constructing the import payload.
 
-        AES keys (128 or 256-bit) require RSA_3072 or higher wrapping key (key-strength rule enforced by APC).
+        Key-strength rules enforced by APC (wrapping key strength ≥ working key strength):
+          AES-128 (128-bit): RSA_3072 (~128-bit) or RSA_4096 (~140-bit) — both acceptable.
+          AES-256 (256-bit): RSA of any size is too weak (~140-bit max for RSA_4096).
+                             Use ECC_NIST_P521 (~261-bit) — the only KEY_CRYPTOGRAM path for AES-256.
+          TDES (112-bit):    RSA_2048 (~112-bit) or higher.
+
+        For AES-256 keys (E0, E1, E2, E4, E6, D0 at 256-bit, M6 at 256-bit):
+          wrapping_key_algorithm must be ECC_NIST_P521.
+          Attempting RSA_2048/RSA_3072/RSA_4096 with an AES-256 key will fail.
+          Alternative: use create_key (APC generates the key material — no import needed,
+          but the key value is not externally known, so cross-system test vectors are not possible).
 
         Args:
             key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
                                RootCertificatePublicKey, or TrustedCertificatePublicKey
-            wrapping_key_algorithm: RSA_2048, RSA_3072, or RSA_4096
+            wrapping_key_algorithm: RSA_2048, RSA_3072, RSA_4096, or ECC_NIST_P521 (required for AES-256)
         """
         return _call(client().get_parameters_for_import,
             KeyMaterialType=key_material_type,

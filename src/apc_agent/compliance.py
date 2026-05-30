@@ -48,22 +48,35 @@ KEY_USAGE_REGISTRY = {
     "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS": {
         "name": "EMV Application Cryptogram Master Key",
         "allowed_operations": ["verify_auth_request_cryptogram"],
-        "description": "Used for ARQC/ARPC verification. EMV PIN change scripts use E2 (integrity) and E1 (confidentiality), not E0.",
+        "description": (
+            "Used for ARQC/ARPC verification. EMV PIN change scripts use E2 (integrity) and E1 (confidentiality), not E0. "
+            "Import note: E0 is typically AES-256 — RSA wrapping of any size is too weak (RSA-4096 ≈ 140-bit vs 256-bit required). "
+            "Use get_parameters_for_import with wrapping_key_algorithm=ECC_NIST_P521, or use create_key if external key material is not needed."
+        ),
     },
     "TR31_E1_EMV_MKEY_CONFIDENTIALITY": {
         "name": "EMV Secure Messaging Confidentiality Key",
         "allowed_operations": ["encrypt_data", "decrypt_data", "generate_mac_emv_pin_change"],
-        "description": "EMV script confidentiality",
+        "description": (
+            "EMV script confidentiality. "
+            "Import note: if AES-256, RSA wrapping fails — use ECC_NIST_P521 with get_parameters_for_import or create_key."
+        ),
     },
     "TR31_E2_EMV_MKEY_INTEGRITY": {
         "name": "EMV Secure Messaging Integrity Key",
         "allowed_operations": ["generate_mac", "verify_mac", "generate_mac_emv_pin_change"],
-        "description": "EMV script integrity (MAC). Mode 0 (integrity only) → generate_mac; Modes 1-4 (confidentiality/PIN change) → generate_mac_emv_pin_change.",
+        "description": (
+            "EMV script integrity (MAC). Mode 0 (integrity only) → generate_mac; Modes 1-4 (confidentiality/PIN change) → generate_mac_emv_pin_change. "
+            "Import note: if AES-256, RSA wrapping fails — use ECC_NIST_P521 with get_parameters_for_import or create_key."
+        ),
     },
     "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS": {
         "name": "EMV Dynamic Number Key",
         "allowed_operations": ["generate_card_validation_data", "verify_card_validation_data"],
-        "description": "Used for dynamic card verification values",
+        "description": (
+            "Used for dynamic card verification values (dCVV/iCVV). "
+            "Import note: if AES-256, RSA wrapping fails — use ECC_NIST_P521 with get_parameters_for_import or create_key."
+        ),
     },
     "TR31_E6_EMV_MKEY_OTHER": {
         "name": "EMV Other Master Key",
@@ -71,7 +84,10 @@ KEY_USAGE_REGISTRY = {
             "encrypt_data", "decrypt_data",
             "generate_card_validation_data", "verify_card_validation_data",
         ],
-        "description": "General-purpose EMV master key",
+        "description": (
+            "General-purpose EMV master key. "
+            "Import note: if AES-256, RSA wrapping fails — use ECC_NIST_P521 with get_parameters_for_import or create_key."
+        ),
     },
     "TR31_K0_KEY_ENCRYPTION_KEY": {
         "name": "Key Encryption Key (KEK)",

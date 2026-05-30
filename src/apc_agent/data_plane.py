@@ -461,9 +461,19 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
           ISO 9797-1 Alg 1 (CBC-MAC): {"Algorithm": "ISO9797_ALGORITHM1"}
           ISO 9797-1 Alg 3 (Retail):  {"Algorithm": "ISO9797_ALGORITHM3"}
           HMAC-SHA256:                 {"Algorithm": "HMAC_SHA256"}
-          DUKPT CMAC:                  {"DukptCmac": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "AES_128"}}
-          DUKPT Alg 1:                 {"DukptIso9797Algorithm1": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "TDES_2KEY"}}
-          DUKPT Alg 3:                 {"DukptIso9797Algorithm3": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "TDES_2KEY"}}
+          DUKPT CMAC (AES):           {"DukptCmac": {"KeySerialNumber": "...", "DukptKeyVariant": "BIDIRECTIONAL", "DukptDerivationType": "AES_128"}}
+          DUKPT Alg 1 (3DES):         {"DukptIso9797Algorithm1": {"KeySerialNumber": "...", "DukptKeyVariant": "REQUEST", "DukptDerivationType": "TDES_2KEY"}}
+          DUKPT Alg 3 (3DES):         {"DukptIso9797Algorithm3": {"KeySerialNumber": "...", "DukptKeyVariant": "REQUEST", "DukptDerivationType": "TDES_2KEY"}}
+
+        DUKPT key variant rules:
+          BIDIRECTIONAL is only valid for AES DUKPT (DukptDerivationType: AES_128/AES_192/AES_256).
+          For 3DES DUKPT (TDES_2KEY/TDES_3KEY) use REQUEST (terminal→host) or RESPONSE (host→terminal).
+          Passing BIDIRECTIONAL with a TDES derivation type returns ValidationException.
+
+        CMAC mac_length note: generate_mac with CMAC always returns the full 16-byte (32H) MAC regardless
+        of the mac_length parameter — APC returns the full value and the caller truncates. If you need
+        verify_mac to accept a truncated CMAC (e.g. 4-byte / 8H from a payShield M8 flow), see verify_mac
+        docstring for the workaround.
 
         Args:
             key_identifier: ARN or alias of MAC key (M0, M1, M3, M6, or M7)
@@ -510,10 +520,20 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
         Call this to verify a MAC on a received payment message or issuer script.
         Mirrors generate_mac — use the same algorithm and key.
 
+        CMAC truncation warning: verify_mac with CMAC requires the FULL MAC value (16 bytes / 32H
+        for AES-128). Passing a truncated CMAC — e.g. 4 bytes / 8H produced by payShield M6 with
+        mac_size=0 — returns ValidationException with no descriptive error message.
+        ISO 9797-1 Alg 1/3 produce 4-byte MACs natively and are not affected.
+
+        Workaround for truncated CMAC verify (e.g. bridging a payShield M8 flow):
+          1. Call generate_mac with the same key and message.
+          2. Compare the leading mac_length bytes of the returned 32H MAC against the received value.
+          This costs one extra APC call per verify.
+
         Args:
             key_identifier: ARN or alias of MAC key
             message_data: Hex-encoded message that was authenticated
-            mac: Hex-encoded MAC value to verify
+            mac: Hex-encoded MAC value to verify (CMAC: must be full 32H, not truncated)
             verification_attributes: MAC algorithm parameters (mirrors generate_mac)
             mac_length: MAC length in nibbles/hex-digits (NOT bytes): 8=4-byte MAC, 16=8-byte MAC; must match the value used during generation
         """
