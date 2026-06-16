@@ -5324,6 +5324,63 @@ relationships:
 status: active
 ```
 
+### APC: Private Keys Are Never Exportable
+
+```yaml
+id: rule.apc-private-keys-non-exportable
+entity_type: constraint_rule
+canonical_name: APC Asymmetric Private Keys Cannot Leave the Service
+summary: >
+  APC generates and retains asymmetric (RSA/ECC) private keys in custody and never
+  returns private key material in any form, clear or wrapped. APC also does not accept
+  an externally generated private key for import. Only public keys, certificates, and
+  symmetric key blocks cross the service boundary. This is an architectural property,
+  not a configurable policy, and it directly shapes what a physical-HSM migration can
+  and cannot reproduce.
+domain:
+  - key_management
+  - migration
+constraints:
+  - No API returns an APC-held private key (no clear value, no KEK-wrapped form, no TR-34 export of a private key)
+  - GetParametersForImport / GetParametersForExport expose only the public wrapping key and its certificate
+  - Externally generated private keys cannot be imported; RSA/ECC key pairs are generated inside APC
+  - A migration step that moves a private key off the source HSM has no APC equivalent and must be re-architected
+  - Thales mapping (see hsm_analysis registry) - EI generate pair maps to the public side only via create_key / GetParametersForImport; EK load private key, L6 import private key have no APC analog; EM translate private key, L8 export private key have no APC analog by design
+relationships:
+  - type: related_to
+    target_id: concept.apc-key-lifecycle
+  - type: related_to
+    target_id: rule.apc-key-attributes-immutable
+status: active
+```
+
+### APC: ARQC Verification Input and Derivation Requirements
+
+```yaml
+id: rule.apc-arqc-verify-inputs
+entity_type: constraint_rule
+canonical_name: APC verify_auth_request_cryptogram Input and Derivation Requirements
+summary: >
+  Verified end-to-end against live APC (2026-06-16, through an HSM-translation proxy
+  with a real Mastercard ARQC). VerifyAuthRequestCryptogram has four non-obvious
+  requirements; violating any of them rejects or silently mismatches (error 01) a
+  cryptographically valid ARQC. These directly shape how a Thales KQ/KW (or Futurex
+  EMVA) command must be translated.
+domain:
+  - cryptography
+  - emv
+  - migration
+constraints:
+  - TransactionData is NOT padded by APC. The caller must apply EMV (ISO 9797-1 method 2) padding - append 0x80, then 0x00 to the next 8-byte boundary (always at least one byte). Unpadded or non-8-byte-aligned data is rejected with ValidationException ("TransactionData should be of length multiple of 16" hex chars) or silently mismatches.
+  - EMV Option B (EMV_OPTION_B major key derivation) requires a PAN longer than 16 digits; a PAN of 16 digits or fewer must use EMV_OPTION_A. APC raises ValidationException ("PAN length is invalid for EMV major key derivation mode EMV_OPTION_B") otherwise.
+  - SessionKeyDerivationMode must match the card's actual session-key method (EMV_COMMON_SESSION_KEY, EMV2000, MASTERCARD_SESSION_KEY, AMEX, or VISA). A wrong method derives a different key and fails verification with error 01, indistinguishable from a genuinely bad cryptogram. MASTERCARD_SESSION_KEY additionally requires the UnpredictableNumber field.
+  - There is NO static / no-session-key mode. EMV schemes that compute the cryptogram directly from the ICC master key with no session-key step (e.g. Visa VIS / CVN10) cannot be verified by APC - every session-key mode rejects them. Such schemes have no faithful APC equivalent and should be surfaced as unsupported.
+relationships:
+  - type: related_to
+    target_id: rule.apc-key-attributes-immutable
+status: active
+```
+
 ### APC: Key Attributes Are Immutable After Creation
 
 ```yaml

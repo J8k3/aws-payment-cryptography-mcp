@@ -170,7 +170,12 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
     HsmCommand("Futurex", "Excrypt", "EMVA", "Verify ARQC and Optionally Generate ARPC", "ARQC",
                "Validates EMV Authorization Request Cryptogram and generates ARPC. "
                "Core acquiring EMV validation operation.",
-               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS"),
+               "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
+               "Subject to the APC verify_auth_request_cryptogram input requirements "
+               "(KB rule.apc-arqc-verify-inputs, validated live): TransactionData must be EMV "
+               "(ISO 9797-1 method 2) padded; EMV_OPTION_B needs PAN > 16 digits; the "
+               "SessionKeyDerivationMode must match the card's method (MASTERCARD_SESSION_KEY needs "
+               "the UnpredictableNumber); there is no static / no-session-key mode."),
     HsmCommand("Futurex", "Excrypt", "EMVP", "EMV PIN Change", "PIN",
                "EMV offline PIN change operation.",
                "generate_mac_emv_pin_change",
@@ -259,6 +264,114 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "Futurex HSMs pad shorter key blocks to at least 3DES length automatically. "
                "After migration, only key blocks should be stored — disable cryptograms in Key Block Policy. "
                "Source: Futurex TR-31 Key Block Implementation Whitepaper (2024)."),
+    # ── Remote Key Loading / ECDH / RSA key-exchange family ───────────────────
+    # confidence="directory": these command codes are OBSERVED in Futurex key-migration
+    # and remote-key-loading flows, but their precise wire semantics and APC mappings are
+    # NOT yet corroborated against the Futurex General Payment HSM Integration Guide.
+    # apc_operation is left None until verified; the proposed APC correspondence is
+    # recorded in notes as a hypothesis only. Do not promote to high/medium without
+    # guide confirmation. This family is key transport/establishment (migration-time),
+    # NOT transaction-time translation — none are proxy handler candidates.
+    HsmCommand("Futurex", "Excrypt", "GECC", "Generate ECC Key Pair", "KEY_MGMT",
+               "Generates an elliptic-curve key pair on the HSM, used as the party key for an "
+               "ECDH key-establishment exchange.",
+               None, None,
+               "Proposed APC correspondence: create_key with an ECC key (usage "
+               "TR31_K3_ASYMMETRIC_KEY_FOR_KEY_AGREEMENT) acting as the ECDH party key. "
+               "Observed in ECDH key-migration flows; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "SDDH", "ECDH Shared-Secret Derivation", "KEY_MGMT",
+               "Derives a shared secret from a local EC private key and a counterparty EC public "
+               "key (Diffie-Hellman), producing a key-encryption key for transport.",
+               None, None,
+               "Proposed APC correspondence: ECDH derivation is internal to APC import_key/"
+               "export_key DiffieHellman key-block material; APC exposes no standalone derive call. "
+               "Observed in ECDH key-migration flows; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "GCKD", "Derive Key From Shared Secret", "KEY_MGMT",
+               "Converts an ECDH-derived shared secret into a usable symmetric working key under "
+               "the HSM master key.",
+               None, None,
+               "Proposed APC correspondence: covered implicitly within APC's ECDH import_key flow. "
+               "Observed alongside SDDH; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "GRSA", "Generate RSA Key Pair", "KEY_MGMT",
+               "Generates an RSA key pair on the HSM, used to receive a key wrapped under the HSM's "
+               "RSA public key during RSA-based remote key loading.",
+               None, None,
+               "Proposed APC correspondence: get_parameters_for_import returns the APC-side RSA "
+               "wrapping public key/certificate that plays the equivalent role. "
+               "Observed in RSA key-transport flows; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "GPRW", "Get Public RSA Wrapping Key", "KEY_MGMT",
+               "Returns the HSM's RSA public key/certificate to a counterparty so they can wrap a "
+               "key for import.",
+               None, None,
+               "Proposed APC correspondence: get_parameters_for_import (import token plus wrapping "
+               "key certificate). Observed in RSA and CloudHSM import flows; verify against the guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "RSAR", "Import Key Under RSA", "KEY_MGMT",
+               "Imports a symmetric key that was wrapped under the HSM's RSA public key.",
+               None, None,
+               "Proposed APC correspondence: import_key with RSA key-wrap (RSA_OAEP) material. "
+               "Observed in RSA key-transport flows; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "AVPC", "Add/Trust Public Certificate", "KEY_MGMT",
+               "Loads and trusts an external public-key certificate (counterparty CA or leaf) so "
+               "keys signed or wrapped under it can be validated during key exchange.",
+               None, None,
+               "Proposed APC correspondence: import_key of a RootCertificatePublicKey / trusted "
+               "certificate to establish the import trust chain. Observed in ECDH/RSA trust setup; "
+               "verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "RVPC", "Receive/Verify Public Certificate", "KEY_MGMT",
+               "Receives and validates a counterparty public certificate against a trusted chain "
+               "during a key-exchange handshake.",
+               None, None,
+               "Proposed APC correspondence: certificate-chain validation handled within APC "
+               "import_key. Observed paired with AVPC; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "TWKS", "Translate Working Key (Symmetric KEK Import)", "KEY_MGMT",
+               "Imports a working key — or a batch of keys — that has been encrypted under a single "
+               "symmetric key-encryption key (KEK) into the HSM, re-wrapping it under the HSM master "
+               "key. Common batch key-import path in payment deployments.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: Futurex General Payment HSM Integration Guide — keys encrypted under a single "
+               "KEK are batch-imported via TWKS. APC analog: import_key under a symmetric KEK "
+               "(TR-31 key block).",
+               confidence="medium"),
+    HsmCommand("Futurex", "Excrypt", "TWKA", "Translate Working Key (Asymmetric KEK)", "KEY_MGMT",
+               "Asymmetric-KEK counterpart of TWKS: moves a working key under an RSA/asymmetric "
+               "key-encryption key. Direction (import vs export) not confirmed in the provided guide.",
+               None, None,
+               "Proposed APC correspondence: import_key or export_key under an asymmetric/RSA wrapping "
+               "key. Only the symmetric variant (TWKS) is confirmed by the Futurex Integration Guide; "
+               "verify TWKA against the full Excrypt command reference.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "TRTD", "TR-34 Key Import (Translate In)", "KEY_MGMT",
+               "Imports a key delivered as a TR-34 two-party key block, translating it onto the HSM "
+               "master key.",
+               None, None,
+               "Proposed APC correspondence: get_parameters_for_import + import_key with a TR-34 "
+               "key block (same family as PEDK). Observed in TR-34 RKL flows; verify against the guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "TRTP", "TR-34 Payload Produce/Translate", "KEY_MGMT",
+               "Produces or translates a TR-34 key-block payload as part of a two-party remote "
+               "key-loading exchange.",
+               None, None,
+               "Proposed APC correspondence: export_key / get_parameters_for_export TR-34 leg. "
+               "Observed alongside TRTD; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    HsmCommand("Futurex", "Excrypt", "TROP", "TR-34 Key Export (Translate Out)", "KEY_MGMT",
+               "Exports a key as a TR-34 key block for delivery to a counterparty HSM.",
+               None, None,
+               "Proposed APC correspondence: export_key with a TR-34 key block. "
+               "Observed in TR-34 RKL flows; verify against the Futurex Integration Guide.",
+               confidence="directory"),
+    # Observed-but-unresolved RKL handshake sub-commands (ASGC, ASSR, ASYR, ASYD, RSGC,
+    # RCCN, GPRU): seen inside RSA/ECDH certificate-association handshakes but with no
+    # reliable standalone function mapping. Intentionally NOT given invented semantics —
+    # noted here so a future Futurex Integration Guide cross-check can resolve and add them.
 ]
 
 # ── Futurex/Thales International Commands ────────────────────────────────────
@@ -672,8 +785,16 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Mode 2/4 appends: CSU 4 B + PAD length 1 B + PAD n B (ARPC Method 2). "
                "Response KR: error 2A + ARPC 8 B (if mode ≠ 0). "
                "For Visa CVN14/18/22, MC M/Chip, Amex, Discover, JCB, UnionPay, or cloud SKD use KW. "
-               "WARNING: proxy kq_arqc.rs uses hex-encoded ASCII (non-standard) — not wire-compatible "
-               "with a real payShield without format adaptation. See payshield-core-commands-ref.md."),
+               "VALIDATED 2026-06-16 end-to-end against live APC through the proxy (binary wire format, "
+               "real Mastercard ARQC -> error 00): the Scheme ID selects the session-key derivation "
+               "method, and ALL KQ schemes use EMV Option A major (ICC master key) derivation. "
+               "'0' Visa VIS = static / no session key -> NO APC equivalent (APC always derives a "
+               "session key; every mode rejected a static CVN10 cryptogram) -> return unsupported (68); "
+               "'1' Mastercard M/Chip = SessionKeyDerivation Mastercard (REQUIRES the Unpredictable "
+               "Number); '2' Amex AEIPS = SessionKeyDerivation Amex. The session method materially "
+               "changes the derived key — a wrong method yields verification error 01. APC does NOT "
+               "EMV-pad TransactionData: the caller must supply ISO 9797-1 method-2 padded, 8-byte "
+               "aligned data, or APC rejects (ValidationException) or mismatches."),
     HsmCommand("Thales/Futurex", "International", "KW",
                "Verify ARQC / Generate ARPC (EMV & Cloud-Based SKD)", "ARQC",
                "EMV cryptogram verification and ARPC generation with extended derivation method support. "
@@ -686,9 +807,16 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "field (scheme-specific code identifying the CVN/SKD variant) after Scheme ID. "
                "FOLLOW-UP: for the Option B scheme IDs, KW/KU/K2/K0 carry the PAN/PSN as a variable-length "
                "field ('n B') governed by a preceding PAN Length field rather than the fixed 8 B above. "
-               "APC verify_auth_request_cryptogram supports the major EMV derivation methods natively; "
-               "map the Derivation Method byte to the appropriate MajorKeyDerivationMode "
-               "and SessionKeyDerivationMode in EmvCommon/VisaAmex/Mastercard attributes."),
+               "VALIDATED 2026-06-16 against live APC: the Scheme ID (not the Derivation Method byte) "
+               "selects BOTH the major mode and the session method — '0'=Option A + EMV2000, "
+               "'1'=Option B + EMV2000, '2'=Option A + EMV Common, '3'=Option B + EMV Common, "
+               "'5'=Mastercard cloud (Option A + EMV Common). EMV Option C ('9'), JCB ('A'/'B'), "
+               "UnionPay ('C'), and the Visa/Amex cloud-LUK and Discover variants have no APC "
+               "SessionKeyDerivation equivalent -> return unsupported (68). Map to APC "
+               "SessionKeyDerivationMode: EMV2000, EMV_COMMON_SESSION_KEY, MASTERCARD_SESSION_KEY "
+               "(needs UnpredictableNumber), AMEX, or VISA. APC enforces PAN length > 16 digits for "
+               "Option B (Option A for <= 16) and does NOT EMV-pad TransactionData (caller pads, "
+               "ISO 9797-1 method 2)."),
     HsmCommand("Thales/Futurex", "International", "KU",
                "Generate Secure Message (EMV 3.1.1)", "ARQC",
                "Generates an EMV 3.1.1 issuer secure message for delivery to the chip card. "
@@ -717,7 +845,10 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Source: PUGD0537-004 Rev A, p.485 — AUTHORITATIVE. "
                "Mastercard CAP (also known as MasterCard Secure Code / UCAF): "
                "card-generates a 6–8 digit OTP from the AC key and transaction parameters. "
-               "In APC: verify_auth_request_cryptogram with TR31_E0 master key."),
+               "In APC: verify_auth_request_cryptogram with TR31_E0 master key. "
+               "Subject to the verify_auth_request_cryptogram input requirements "
+               "(KB rule.apc-arqc-verify-inputs): EMV method-2 padded TransactionData, "
+               "Option B PAN > 16, SessionKeyDerivationMode must match the card, no static mode."),
     HsmCommand("Thales/Futurex", "International", "KS",
                "Data Authentication Code and Dynamic Number Verification (EMV 3.1.1)", "ARQC",
                "Verifies an EMV 3.1.1 Data Authentication Code (DAC) and Dynamic Number "
@@ -726,7 +857,10 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
                "Source: PUGD0537-004 Rev A, p.488 — AUTHORITATIVE. "
                "Used for EMV 3.1.1 contactless/chip card SDA and DDA verification. "
-               "In APC: verify_auth_request_cryptogram with TR31_E0 master key."),
+               "In APC: verify_auth_request_cryptogram with TR31_E0 master key. "
+               "Subject to the verify_auth_request_cryptogram input requirements "
+               "(KB rule.apc-arqc-verify-inputs): EMV method-2 padded TransactionData, "
+               "Option B PAN > 16, SessionKeyDerivationMode must match the card, no static mode."),
     HsmCommand("Thales/Futurex", "International", "K0",
                "Decrypt Encrypted Counters (EMV 4.x)", "ARQC",
                "Decrypts the encrypted counters in an EMV 4.x chip card response using the "
@@ -758,6 +892,121 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "export_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
                "EFTlab source — reference quality. Maps to APC export_key via TR-31.",
                confidence="medium"),
+    HsmCommand("Thales/Futurex", "International", "EI",
+               "Generate a Public/Private Key Pair", "KEY_MGMT",
+               "Generates an RSA public/private key pair on the HSM. The public key is returned; the "
+               "private key is returned encrypted under the LMK. Used to establish an RSA key for "
+               "key transport or remote key loading. Response code: EJ.",
+               "get_parameters_for_import", None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.165). APC analog: "
+               "get_parameters_for_import yields an APC-held RSA wrapping key pair/certificate for "
+               "the import leg; APC never returns a private key in the clear or under an external LMK.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "EO",
+               "Import a Public Key", "KEY_MGMT",
+               "Imports an external RSA public key, protecting it with a MAC under the LMK or as a key "
+               "block (Key Usage '02', Algorithm 'R'). Typically used to trust a certification "
+               "authority public key. Formerly named 'Generate a MAC on an RSA Public Key'. "
+               "Response code: EP.",
+               "import_key", None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.171). APC analog: import_key of a "
+               "trusted / root certificate public key to seat the import trust chain.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "ES",
+               "Validate a Certificate and Import the Public Key", "KEY_MGMT",
+               "Validates an X.509 certificate against a trusted chain and imports the public key it "
+               "contains. Response code: ET.",
+               "import_key", None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.175). APC analog: import_key with "
+               "certificate-chain validation (RootCertificatePublicKey / trusted certificate).",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "EK",
+               "Load a Private Key", "KEY_MGMT",
+               "Loads an RSA private key into the HSM, re-encrypting it under the LMK. Response code: EL.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.168). No direct APC analog — APC "
+               "generates and retains private keys in custody and does not load externally supplied "
+               "clear or LMK-wrapped private keys.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "EM",
+               "Translate a Private Key", "KEY_MGMT",
+               "Re-encrypts an RSA private key from one protection key to another (e.g. LMK rollover). "
+               "Response code: EN.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.169). No direct APC analog — private "
+               "key custody is internal to APC.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "EQ",
+               "Validate a Public Key", "KEY_MGMT",
+               "Validates the integrity of an RSA public key (MAC or key-block check). Response code: ER.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.174). APC analog: public-key and "
+               "certificate validation is performed implicitly within import_key.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "EU",
+               "Translate a Public Key", "KEY_MGMT",
+               "Re-formats or re-protects an RSA public key between representations. Response code: EV.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.178). No direct APC analog.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "GI",
+               "Import Key or Data Under an RSA Public Key", "KEY_MGMT",
+               "Imports a symmetric key (or data block) that has been wrapped under an RSA public key. "
+               "Core asymmetric key-transport import path; counterpart to GK (export under RSA). "
+               "Response code: GJ.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: PUGD0537-004 Core Host Commands V1 (p.180). APC analog: import_key with an "
+               "RSA key-wrap (RSA_OAEP) wrapping spec.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "H4",
+               "Generate a KEKs for Node-to-Node Interchange Using RSA", "KEY_MGMT",
+               "Sender side of an RSA-protected key-encryption-key exchange between interchange nodes. "
+               "Response code: H5.",
+               "export_key", "TR31_K0_KEY_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Core Host Commands V1 (p.154). APC analog: export_key of a KEK "
+               "under an RSA wrapping key (get_parameters_for_export provides the wrapping spec).",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "H6",
+               "Receive a KEKr for Node-to-Node Interchange Using RSA", "KEY_MGMT",
+               "Receiver side of an RSA-protected key-encryption-key exchange between interchange nodes. "
+               "Response code: H7.",
+               "import_key", "TR31_K0_KEY_ENCRYPTION_KEY",
+               "Source: PUGD0537-004 Core Host Commands V1 (p.156). APC analog: get_parameters_for_import "
+               "then import_key of a KEK wrapped under RSA.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "L6",
+               "Import an RSA Private Key", "KEY_MGMT",
+               "Imports an externally generated RSA private key, protected under a ZMK/KEK, and "
+               "re-encrypts it under the LMK. Response code: L7.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.85). No direct APC analog — APC does "
+               "not accept externally generated private keys; RSA/ECC private keys are generated "
+               "inside APC and never leave it.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "L8",
+               "Export an RSA Private Key", "KEY_MGMT",
+               "Exports an RSA private key wrapped under a ZMK/KEK for transfer to another HSM. "
+               "Response code: L9.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.89). No APC analog by design — APC "
+               "never exports private key material in any form (clear or wrapped). A migration that "
+               "depends on moving a private key off the source HSM cannot be reproduced on APC.",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "KK",
+               "Import a Certification Authority Self-Signed Certificate", "KEY_MGMT",
+               "Imports and trusts a CA self-signed (root) certificate, establishing a trust anchor "
+               "for later certificate and key validation. Response code: KL.",
+               "import_key", None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.509). APC analog: import_key of a "
+               "RootCertificatePublicKey to seat the import trust chain (counterpart to Futurex AVPC).",
+               confidence="high"),
+    HsmCommand("Thales/Futurex", "International", "JO",
+               "Validate a CA Self-Signed Certificate", "KEY_MGMT",
+               "Validates a CA self-signed certificate before it is trusted. Response code: JP.",
+               None, None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.116). APC analog: certificate "
+               "validation is performed implicitly within import_key.",
+               confidence="high"),
     HsmCommand("Thales/Futurex", "International", "IA",
                "Generate a ZPK", "KEY_MGMT",
                "Generates a Zone PIN Key. Response code: IB.",
