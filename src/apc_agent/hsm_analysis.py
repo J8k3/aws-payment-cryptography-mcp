@@ -509,7 +509,11 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "key_serial_number + dukpt_derivation_type (DukptDerivationType::Tdes2Key). "
                "PVK ARN goes in verification_key_identifier. PIN block goes in encrypted_pin_block at "
                "the outer call level. Note: Ibm3624PinOffset is for generate_pin_data, not verify. "
-               "CO (Diebold) and CQ (Encrypted PIN) have no APC equivalent — return error 68."),
+               "CO (Diebold) and CQ (Encrypted PIN) have no APC equivalent — return error 68. "
+               "CAVEAT: CK/CL is a legacy (pre-payShield-10K) command code and does NOT appear in the "
+               "PUGD0537-004 Core Host Commands. On payShield 10K the IBM-offset DUKPT verify is GO; "
+               "unlike this legacy layout, GO carries a leading Mode (1N) and an explicit PIN Block "
+               "Format Code (2N). Prefer GO for 10K deployments."),
     HsmCommand("Thales/Futurex", "International", "CM",
                "Verify PIN using Visa PVV Method (DUKPT)", "PIN",
                "Visa PVV PIN verification with original single-length DUKPT. "
@@ -523,7 +527,10 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "BDK ARN goes in encryption_key_identifier on the outer verify_pin_data call. "
                "DukptAttributes only holds key_serial_number + dukpt_derivation_type. "
                "PVK ARN goes in verification_key_identifier. PIN block goes in encrypted_pin_block "
-               "at the outer call level. Note: VisaPinVerificationValue is for generate_pin_data, not verify."),
+               "at the outer call level. Note: VisaPinVerificationValue is for generate_pin_data, not verify. "
+               "CAVEAT: CM/CN is a legacy (pre-payShield-10K) command code and does NOT appear in the "
+               "PUGD0537-004 Core Host Commands. On payShield 10K the PVV DUKPT verify is GQ, which adds a "
+               "leading Mode (1N) and an explicit PIN Block Format Code (2N). Prefer GQ for 10K deployments."),
     HsmCommand("Thales/Futurex", "International", "DE",
                "Generate an IBM PIN Offset (of an LMK-encrypted PIN)", "PIN",
                "Generates an IBM 3624 PIN offset from a customer-selected PIN already encrypted "
@@ -647,37 +654,53 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     HsmCommand("Thales/Futurex", "International", "GO",
                "Verify a PIN Using the IBM Offset Method (3DES & AES DUKPT)", "PIN",
                "Verifies a DUKPT-encrypted PIN using the IBM 3624 offset method. Supports both "
-               "3DES (X9.24-1) and AES (X9.24-3) DUKPT. Response code: GP.",
+               "3DES (X9.24-1) and AES (X9.24-3) DUKPT. The request opens with a Mode digit (1N): "
+               "'0'/'2' = PIN verify only, '1' = PIN verify AND MAC verify (with extra MAC Mode/Method "
+               "fields). After the BDK, PVK, KSN descriptor (3H) and KSN (12-20H for 3DES, 24H for AES) "
+               "comes the PIN block (16H for a DES BDK, 32H for an AES BDK), then a PIN Block Format "
+               "Code (2N), Check Length (2N), PAN (12N), decimalization table, PIN validation data and "
+               "the IBM offset. Response code: GP.",
                "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
                "Source: PUGD0537-004 Rev A, p.349 — AUTHORITATIVE. "
                "BDK (LMK pair 28-29) + KSN derive the working key. "
-               "In APC: verify_pin_data with IncomingDukptAttributes (BDK ARN + KSN + dukpt_derivation_type). "
-               "For AES DUKPT: dukpt_derivation_type=AES_128 and 12-byte KSN."),
+               "In APC: verify_pin_data with IncomingDukptAttributes (BDK ARN + KSN + dukpt_derivation_type) "
+               "and PinVerificationAttributes::Ibm3624Pin. For AES DUKPT use dukpt_derivation_type=AES_128, "
+               "a 24H KSN and a 32H PIN block. The 2N PIN Block Format Code maps 01->IsoFormat0, "
+               "05->IsoFormat1, 47->IsoFormat3; '04' (Plus) has no APC equivalent. Mode '1' (PIN+MAC "
+               "verify) is not supported — APC verify_pin_data cannot verify a MAC in the same call."),
     HsmCommand("Thales/Futurex", "International", "GQ",
                "Verify a PIN Using the ABA PVV Method (3DES & AES DUKPT)", "PIN",
                "Verifies a DUKPT-encrypted PIN using the ABA PVV (Visa PIN Verification Value) "
-               "method. Supports both 3DES and AES DUKPT. Response code: GR.",
+               "method. Supports both 3DES and AES DUKPT. Same Mode (1N) prefix and PIN Block Format "
+               "Code (2N) as GO; after the PIN block + format code come the PAN (12N), PVKI (1N) and "
+               "PVV (4N). Response code: GR.",
                "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
                "Source: PUGD0537-004 Rev A, p.352 — AUTHORITATIVE. "
                "In APC: verify_pin_data with IncomingDukptAttributes + "
                "PinVerificationAttributes::VisaPin(VisaPinVerification). "
-               "PVK ARN in verification_key_identifier; BDK ARN in encryption_key_identifier."),
+               "PVK ARN in verification_key_identifier; BDK ARN in encryption_key_identifier. "
+               "PIN Block Format Code mapping and the Mode '1' restriction are identical to GO."),
     HsmCommand("Thales/Futurex", "International", "GS",
                "Verify a PIN Using the Diebold Method (3DES & AES DUKPT)", "PIN",
                "Verifies a DUKPT-encrypted PIN using the Diebold method. "
                "Supports both 3DES and AES DUKPT. Response code: GT.",
-               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.355 — AUTHORITATIVE. "
-               "In APC: verify_pin_data with IncomingDukptAttributes."),
+               "Like GA/CE, the Diebold method indexes a conversion table held in HSM user storage, which "
+               "AWS Payment Cryptography has no equivalent for. APC's PinVerificationAttributes is limited "
+               "to IBM 3624 and Visa PVV, so GS cannot be translated and a wire-compatible proxy returns "
+               "payShield 68."),
     HsmCommand("Thales/Futurex", "International", "GU",
                "Verify a PIN Using the Encrypted PIN Method (3DES & AES DUKPT)", "PIN",
-               "Verifies a DUKPT-encrypted PIN by decrypting and comparing against a stored "
-               "reference PIN (Encrypted PIN comparison method). Supports 3DES and AES DUKPT. "
-               "Response code: GV.",
-               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
+               "Verifies a DUKPT-encrypted PIN by decrypting it and comparing against a stored "
+               "LMK-encrypted reference PIN (Encrypted PIN comparison method). Supports 3DES and AES "
+               "DUKPT. Response code: GV.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.358 — AUTHORITATIVE. "
-               "In APC: verify_pin_data with IncomingDukptAttributes. "
-               "TDES prohibited for new deployments since Jan 2023 — migrate to AES DUKPT."),
+               "GU is a decrypt-and-compare against an LMK-encrypted reference PIN. APC has no LMK and "
+               "verify_pin_data only supports algorithmic verification (IBM 3624 offset / Visa PVV), not "
+               "comparison to a stored encrypted PIN, so GU cannot be translated; a wire-compatible proxy "
+               "returns payShield 68."),
     # PIN Translation — additional
     HsmCommand("Thales/Futurex", "International", "BQ",
                "Translate PIN Algorithm (PIN Block Format Conversion)", "PIN",
