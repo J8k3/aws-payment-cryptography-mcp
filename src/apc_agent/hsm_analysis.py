@@ -711,9 +711,15 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "reordering)."),
     HsmCommand("Thales/Futurex", "International", "CY",
                "Verify Visa Card Verification Value (CVV)", "CVV",
-               "Verifies CVV/CVV2 for acquirer/processor card validation.",
+               "Verifies CVV/CVV2/iCVV for acquirer/processor card validation.",
                "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
-               "Thales response code: CZ. Parameters: CVK, PAN, expiry date, service code, CVV to verify."),
+               "Thales response code: CZ. Wire (PUGD0537-004 p.303): CVK (32H | 'U'+32H | 'S'+keyblock) "
+               "+ CVV (3N) + Primary Account Number (nN, max 19) + ';' DELIMITER + Expiration date (4N) "
+               "+ Service code (3N). Like CW the PAN is VARIABLE-LENGTH and ';'-terminated, and there is "
+               "no mode byte — the product is selected by service code (000=CVV2, 999=iCVV, actual=CVV1). "
+               "In APC: verify_card_validation_data with CardVerificationValue1 (CardExpiryDate + "
+               "ServiceCode). Validated live: CardVerificationValue1 with ServiceCode='000' yields the "
+               "same value as CardVerificationValue2."),
     HsmCommand("Thales/Futurex", "International", "QY",
                "Generate a Dynamic CVV", "CVV",
                "Generates a Dynamic Card Verification Value (dCVV) for a contactless or EMV "
@@ -732,22 +738,37 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "PM uses EMV key derivation — maps to TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS, not TR31_C0. "
                "See KB QY/PM wire format entry; multiple schemes (Visa, MC, Amex, Discover, JCB, Gemalto)."),
     HsmCommand("Thales/Futurex", "International", "RY",
-               "Calculate/Verify Card Security Codes", "CVV",
-               "Calculates or verifies card security codes (Mastercard CVC2, Visa CVV2, Amex CID). "
-               "Response code: RZ.",
-               "verify_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
-               "Source: PUGD0537-004 Rev A, p.315-316 — AUTHORITATIVE. "
-               "Dual-function: generate or verify depending on parameters. "
-               "In APC: generate_card_validation_data or verify_card_validation_data with TR31_C0."),
+               "Calculate/Verify American Express Card Security Codes", "CVV",
+               "Calculates (Mode '3') or verifies (Mode '4') American Express Card Security Codes. A "
+               "Flag selects the algorithm: '0' Classic CSC v1.0, '2' Enhanced CSC v2.0, '3' AEVV "
+               "(3-D Secure). The request carries CSCK, a 19N full account (left-justified, zero-filled), "
+               "expiry/unpredictable number, and (for Flag 2/3) a service code; verify additionally "
+               "carries 5-digit, 4-digit and 3-digit CSCs. Response code: RZ.",
+               "NOT_SUPPORTED", "N/A",
+               "Source: PUGD0537-004 Rev A, p.252, 316 — AUTHORITATIVE. "
+               "RY is the Amex CSC command, not the Visa CVV2 / Mastercard CVC2 algorithm. Classic and "
+               "Enhanced CSC correspond to APC AmexCardSecurityCodeVersion1/2, but RY's response "
+               "validates up to three CSC lengths (5/4/3-digit) at once and supports the AEVV variant, "
+               "neither of which APC's single-value generate/verify_card_validation_data can reproduce. "
+               "A wire-compatible proxy therefore returns payShield 68. Migration: use "
+               "generate/verify_card_validation_data with AmexCardSecurityCodeVersion1/2 per individual "
+               "CSC, and handle AEVV outside APC."),
     HsmCommand("Thales/Futurex", "International", "NY",
                "Generate IVCVC3 and Static CVC3", "CVV",
-               "Generates an Initial Vector CVC3 (IVCVC3) and/or Static CVC3 for Mastercard "
-               "contactless (PayPass/Tap & Go) transactions. Response code: NZ.",
-               "generate_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
+               "Generates an Initial Vector CVC3 (IVCVC3) and a Static CVC3 (or PINIVCVC3/PINCVC3) for "
+               "Mastercard PayPass contactless transactions. The request carries a Scheme ID, the "
+               "MK-CVC3 issuer master key, an Option A/B derivation selector, derivation data "
+               "(PAN + sequence), delimited static track data, an unpredictable number and the ATC. "
+               "NZ returns BOTH the IVCVC3 (5N) and the Static CVC3 (5N). Response code: NZ.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.493 — AUTHORITATIVE. "
-               "CVC3 is Mastercard's contactless card verification value. "
-               "Uses EMV master key derivation — TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS (DeriveKey). "
-               "In APC: generate_card_validation_data with GenerationAttributes=DynamicCardVerificationCode."),
+               "CVC3 itself corresponds to APC DynamicCardVerificationCode (unpredictable number, PAN "
+               "sequence, ATC, track data), but NY's NZ response returns two values — the IVCVC3 and the "
+               "CVC3 — while APC's generate_card_validation_data emits a single validation value and "
+               "exposes no intermediate IVCVC3. The PINIVCVC3/PINCVC3 scheme (Scheme ID '2') and the "
+               "explicit Option A/B selector also have no APC equivalent. A wire-compatible proxy "
+               "therefore returns payShield 68; an APC redesign computes the CVC3 directly via "
+               "DynamicCardVerificationCode."),
     # MAC
     HsmCommand("Thales/Futurex", "International", "M6",
                "Generate MAC using MAK (supports continuation mode)", "MAC",
