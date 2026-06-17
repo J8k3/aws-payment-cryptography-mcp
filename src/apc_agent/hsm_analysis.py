@@ -745,21 +745,33 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "same value as CardVerificationValue2."),
     HsmCommand("Thales/Futurex", "International", "QY",
                "Generate a Dynamic CVV", "CVV",
-               "Generates a Dynamic Card Verification Value (dCVV) for a contactless or EMV "
-               "transaction. Response code: QZ.",
-               "generate_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
+               "Generates a Dynamic Card Verification Value. The request opens with a Scheme ID (1N: "
+               "'0' Visa dCVV, '1' Visa AV, '5' Visa dCVV2 time-based), an issuer Master Key (MK-AC, "
+               "E0) and a Key Derivation Method (1A: EMV Option A/B), then a variable PAN terminated "
+               "by ';' and scheme-specific fields (for Visa dCVV: expiry 4N, service code 3N = '998', "
+               "ATC 6N). It does NOT use the static C0 CVK. Response code: QZ.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.306 — AUTHORITATIVE. "
-               "QY uses EMV key derivation (Option A/B) — maps to TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS "
-               "in APC, not TR31_C0. E4 is DeriveKey-only; the APC call derives the session key "
-               "from the master key internally. See KB QY/PM wire format entry for full field detail."),
+               "QY derives a card-unique key from an EMV master key. Visa dCVV (Scheme '0') is the one "
+               "scheme that plausibly maps to generate_card_validation_data with "
+               "DynamicCardVerificationValue (TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS), but APC requires a PAN "
+               "sequence number the Visa-dCVV wire format does not carry, and the ATC encoding and EMV "
+               "card-key derivation must be validated against live APC first. Visa AV and dCVV2 "
+               "time-based have no APC equivalent. Until a Scheme-'0' mapping is validated end-to-end, a "
+               "wire-compatible proxy returns payShield 68 rather than emit a wrong dCVV."),
     HsmCommand("Thales/Futurex", "International", "PM",
                "Verify a Dynamic CVV/CVC", "CVV",
-               "Verifies a Dynamic CVV or CVC value for contactless or EMV transactions. "
-               "Response code: PN.",
-               "verify_card_validation_data", "TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS",
+               "Verifies a dynamic CVV/CVC. The request carries a Scheme ID (1N: '0' Visa, '1' "
+               "Mastercard, '2' Amex, '3' Discover, '4' Oberthur, '5' Visa dCVV2, '6' JCB, '7' Gemalto), "
+               "a Version (1N), an MK-DCVV master key (MK-AC or MK-CVC3 depending on scheme/version) and "
+               "scheme-specific fields. Response code: PN.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.308 — AUTHORITATIVE. "
-               "PM uses EMV key derivation — maps to TR31_E4_EMV_MKEY_DYNAMIC_NUMBERS, not TR31_C0. "
-               "See KB QY/PM wire format entry; multiple schemes (Visa, MC, Amex, Discover, JCB, Gemalto)."),
+               "PM is a multi-scheme EMV dynamic-CVV verifier. Only Visa DCVV (Scheme '0', Version '0') "
+               "is a candidate for verify_card_validation_data + DynamicCardVerificationValue, subject to "
+               "the same PAN-sequence / ATC / derivation validation as QY. The Mastercard CVC3, Amex "
+               "ExpressPay, Discover, Oberthur, JCB and Gemalto schemes have no APC equivalent. A "
+               "wire-compatible proxy returns payShield 68."),
     HsmCommand("Thales/Futurex", "International", "RY",
                "Calculate/Verify American Express Card Security Codes", "CVV",
                "Calculates (Mode '3') or verifies (Mode '4') American Express Card Security Codes. A "
