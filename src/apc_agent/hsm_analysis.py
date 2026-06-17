@@ -399,31 +399,51 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
 INTERNATIONAL_COMMANDS: list[HsmCommand] = [
     # PIN Translation — most common acquirer operations
     HsmCommand("Thales/Futurex", "International", "CA",
-               "Translate PIN Block from TPK to PEK Encryption", "PIN",
-               "Translates a PIN block from Terminal PIN Key (TPK) to Zone PIN Key (ZPK/PEK). "
-               "ATM terminal to acquirer host — the most common inter-zone PIN routing command.",
+               "Translate a PIN from TPK to ZPK/BDK Encryption", "PIN",
+               "Translates a PIN block from a Terminal PIN Key (TPK) to a Zone PIN Key (ZPK), or to a "
+               "BDK when a Destination Key Flag ('*'/'~') is present. Wire (p.285): Source TPK "
+               "(16H|'U'+32H|'T'+48H|'S'+keyblock), optional dest key flag, destination key, optional "
+               "destination KSN (BDK dest), Maximum PIN Length (2N), source PIN block (16H DES / 32H "
+               "AES), source + destination PIN Block Format Codes (2N each), PAN.",
                "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
-               "Inbound key is a TPK (TR31_P0), outbound is ZPK (TR31_P0). "
-               "Watch for Format 0 (TDES) — recommend Format 4 migration."),
+               "Inbound key is a TPK (TR31_P0), outbound is ZPK (TR31_P0) — or a BDK for a DUKPT "
+               "destination. The PIN block format codes are the standard Thales 2N values: 01=ISO "
+               "Format 0, 04=Plus (no APC equivalent), 05=ISO Format 1, 47=ISO Format 3, 48=ISO Format "
+               "4. In APC: translate_pin_data with the matching TranslationIsoFormats. Watch for Format "
+               "0 (TDES) — recommend Format 4 migration."),
     HsmCommand("Thales/Futurex", "International", "CC",
-               "Translate PIN Block from PEK to PEK Encryption", "PIN",
-               "Translates a PIN block from one Zone PIN Key to another. "
-               "Host-to-host PIN routing between network participants.",
+               "Translate a PIN from one ZPK to Another", "PIN",
+               "Translates a PIN block from one Zone PIN Key to another. Host-to-host PIN routing "
+               "between network participants. Wire (p.282): Source ZPK, Destination ZPK (each "
+               "16H|'U'+32H|'T'+48H|'S'+keyblock), Maximum PIN Length (2N), source PIN block (16H DES / "
+               "32H AES), source + destination PIN Block Format Codes (2N each), PAN (12N).",
                "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
-               "Both inbound and outbound are ZPK/PEK (TR31_P0). "
-               "Fixed TDES keys for this operation disallowed since Jan 2023 (PCI PIN Req 2-2)."),
+               "Both inbound and outbound are ZPK/PEK (TR31_P0). The 2N format codes are 01=ISO 0, "
+               "05=ISO 1, 47=ISO 3, 48=ISO 4 (NOT a 00/01/03/04 scheme). In APC: translate_pin_data "
+               "with TranslationIsoFormats. Fixed TDES keys for this operation disallowed since Jan "
+               "2023 (PCI PIN Req 2-2)."),
     HsmCommand("Thales/Futurex", "International", "CI",
                "Translate PIN Block from BDK to PEK Encryption (DUKPT)", "PIN",
                "Translates a DUKPT-encrypted PIN block to a ZPK. "
                "Terminal DUKPT to acquirer host — modern DUKPT ingest.",
                "translate_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
                "Inbound is BDK (TR31_B0) with KSN. Outbound is ZPK (TR31_P0). "
-               "Prefer AES DUKPT (AES BDK) over TDES DUKPT for new deployments."),
+               "CAVEAT: 'CI' does NOT appear in the PUGD0537-004 Core Host Commands as a translate "
+               "command code; the payShield 10K BDK-to-BDK/ZPK DUKPT translate is G0. Treat CI as a "
+               "legacy/vendor code and prefer G0 for 10K deployments."),
     HsmCommand("Thales/Futurex", "International", "G0",
-               "Translate PIN from BDK to ZPK Encryption (3DES DUKPT)", "PIN",
-               "3DES DUKPT PIN translation — Futurex-specific variant of CI.",
+               "Translate a PIN from BDK to BDK or ZPK Encryption (3DES & AES DUKPT)", "PIN",
+               "The payShield 10K DUKPT PIN translate. The request carries an optional Source Key Flag "
+               "('~' = BDK-2), the source BDK, an optional Destination Key Flag ('*'/'~'/'!' for "
+               "BDK-1/2/4), the destination key (ZPK or BDK), a Source KSN descriptor (3H) + KSN "
+               "(12-20H for 3DES, 24H for AES), an optional Destination KSN (when the destination is a "
+               "BDK), the source PIN block (16H/32H) and the source/destination format codes. "
+               "Response code: G1.",
                "translate_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
-               "TDES DUKPT — legacy. Migrate to AES DUKPT when possible."),
+               "Source: PUGD0537-004 Rev A, p.345 — AUTHORITATIVE. "
+               "In APC: translate_pin_data with IncomingDukptAttributes (and OutgoingDukptAttributes when "
+               "the destination is a BDK). Inbound is a BDK (TR31_B0) with KSN; outbound is ZPK "
+               "(TR31_P0) or another BDK. Supports both 3DES and AES DUKPT; migrate TDES to AES."),
     HsmCommand("Thales/Futurex", "International", "JC",
                "Translate PIN from TPK to LMK Encryption", "PIN",
                "Translates from terminal key to Local Master Key encryption. "
@@ -703,13 +723,19 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "returns payShield 68."),
     # PIN Translation — additional
     HsmCommand("Thales/Futurex", "International", "BQ",
-               "Translate PIN Algorithm (PIN Block Format Conversion)", "PIN",
-               "Translates a PIN block from one PIN block format to another without decrypting "
-               "the PIN to clear text. Response code: BR.",
-               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Translate PIN Algorithm (Visa to Racal)", "PIN",
+               "Re-encrypts an LMK-encrypted PIN from the Visa PIN algorithm to the Racal PIN "
+               "algorithm. The request carries an account number (12N) and the PIN encrypted under the "
+               "LMK using the Visa algorithm; the response returns the PIN encrypted under the LMK "
+               "using the Racal algorithm. It is NOT a PIN block format conversion and involves no "
+               "ZPK/TPK. Response code: BR.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.294 — AUTHORITATIVE. "
-               "Used to convert between ISO Format 0, Format 1, Format 3, Format 4, etc. "
-               "In APC: translate_pin_data with explicit source and target format specifiers."),
+               "BQ operates entirely on LMK-encrypted PINs and depends on the proprietary Racal PIN "
+               "algorithm. AWS Payment Cryptography has no LMK and no Racal algorithm, so there is no "
+               "translate_pin_data (or any) mapping; a wire-compatible proxy returns payShield 68. "
+               "For ISO PIN block format conversion between live keys, use CC/CA/G0 with "
+               "translate_pin_data instead."),
     HsmCommand("Thales/Futurex", "International", "AQ",
                "Translate an RSA-encrypted PIN to a ZPK or TPK-encrypted PIN", "PIN",
                "Translates a PIN block encrypted under an RSA public key into a symmetric "
