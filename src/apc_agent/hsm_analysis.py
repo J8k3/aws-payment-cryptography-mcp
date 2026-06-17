@@ -86,6 +86,18 @@ Wire format (Thales payShield 10K):
     X = double-length TDES ANSI (X9.24 format)
     Y = triple-length TDES ANSI
 
+  PIN block format codes (2-digit, in PIN translate/verify/change commands) -> APC mapping
+  (source: PUGD0537-004 "Only these Thales PIN Block formats are supported"):
+    '01' = ISO 9564-1 & ANSI X9.8 Format 0  -> APC IsoFormat0
+    '05' = ISO 9564-1 Format 1              -> APC IsoFormat1
+    '47' = ISO 9564-1 & ANSI X9.8 Format 3  -> APC IsoFormat3
+    '48' = ISO 9564-1 Format 4 (AES)        -> APC IsoFormat4
+    '02' Docutel / '03' Diebold&IBM / '04' PLUS / '34' EMV-1996 (ISO Format 2)
+        -> NOT supported by APC TranslatePinData/VerifyPinData/GeneratePinData.
+    A proxy MUST read this wire field and map it; APC does NOT default it. Forcing
+    IsoFormat0 silently mis-decodes any non-Format-0 PIN block (e.g. AES DUKPT,
+    which uses Format 4).
+
 Key insight: Futurex's International command set uses the same command codes as Thales payShield
 (CA, CC, CI, CW, CY, M6, M8, MA, etc.). Code that appears to target "Thales International" commands
 may actually be running against a Futurex HSM in International compatibility mode.
@@ -668,7 +680,14 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Generate Visa Card Verification Value (CVV)", "CVV",
                "Generates CVV/CVV2 for Visa cards. Also used for iCVV with service code 999.",
                "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
-               "Thales response code: CX. Parameters: CVK (under LMK), PAN, expiry date, service code."),
+               "Thales response code: CX. Wire (PUGD0537-004 p.250): CVK A/B (32H | 'U'+32H | "
+               "'S'+keyblock) + Primary Account Number (nN, max 19 digits) + ';' DELIMITER + "
+               "Expiration date (4N) + Service code (3N). The PAN is VARIABLE-LENGTH and "
+               "';'-terminated, NOT fixed-width — a fixed-16 parse mis-reads Amex (15) and 19-digit "
+               "PANs (and the trailing ';'). In APC: generate_card_validation_data with "
+               "PrimaryAccountNumber + CardVerificationValue1 (CardExpiryDate + ServiceCode); "
+               "iCVV uses service code 999. APC CardExpiryDate is 4 digits used as-is (no MMYY/YYMM "
+               "reordering)."),
     HsmCommand("Thales/Futurex", "International", "CY",
                "Verify Visa Card Verification Value (CVV)", "CVV",
                "Verifies CVV/CVV2 for acquirer/processor card validation.",
