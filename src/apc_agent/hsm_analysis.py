@@ -540,12 +540,19 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY."),
     HsmCommand("Thales/Futurex", "International", "GA",
                "Derive a PIN Using the Diebold Method", "PIN",
-               "Derives a PIN for an account using the Diebold derivation algorithm. "
+               "Derives a PIN for an account using the Diebold derivation algorithm. The wire request "
+               "carries an index flag, a 3-digit table pointer into a Diebold conversion table held in "
+               "HSM user storage, an algorithm number, an offset, the account, and PIN validation data. "
                "Response code: GB. Used in card issuance to compute the initial system-assigned PIN.",
-               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.213 — AUTHORITATIVE. "
-               "Diebold PIN derivation variant; same APC mapping as EE (IBM 3624). "
-               "In APC: generate_pin_data with TR31_V1_IBM3624_PIN_VERIFICATION_KEY."),
+               "The Diebold method is NOT a variant of IBM 3624. It derives the PIN by indexing a "
+               "Diebold conversion (randomizing) table that the operator loads into the HSM's user "
+               "storage; the result depends on that table's contents, not on a DES-encrypt-and-decimalize "
+               "of the PAN. AWS Payment Cryptography has no equivalent user-storage table mechanism, so "
+               "there is no generate_pin_data parameter set that reproduces a Diebold PIN. Treat GA as "
+               "unsupported on APC; migration requires re-issuing affected PINs under a supported scheme "
+               "(IBM 3624 or Visa PVV)."),
     HsmCommand("Thales/Futurex", "International", "BK",
                "Generate an IBM PIN Offset (of a Customer-Selected PIN)", "PIN",
                "Generates an IBM 3624 PIN offset where the customer enters their desired PIN "
@@ -556,10 +563,16 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "entry devices and must never be logged. In APC: generate_pin_data."),
     HsmCommand("Thales/Futurex", "International", "CE",
                "Generate a Diebold PIN Offset", "PIN",
-               "Generates a Diebold PIN offset for a given account. Response code: CF.",
-               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Generates a Diebold PIN offset for a given account. The wire request carries an index "
+               "flag, a 3-digit table pointer into a Diebold conversion table in HSM user storage, an "
+               "algorithm number, the LMK-encrypted reference PIN, the account, and PIN validation data. "
+               "Response code: CF.",
+               "NOT_SUPPORTED", "N/A",
                "Source: PUGD0537-004 Rev A, p.224 — AUTHORITATIVE. "
-               "Diebold offset variant. In APC: generate_pin_data."),
+               "Like GA, this offset is computed against a Diebold conversion table loaded into the HSM's "
+               "user storage, not by IBM 3624 derivation. AWS Payment Cryptography has no user-storage "
+               "table facility, so the Diebold offset cannot be reproduced via generate_pin_data. Treat CE "
+               "as unsupported on APC; migrate affected accounts to IBM 3624 offset or Visa PVV."),
     HsmCommand("Thales/Futurex", "International", "DG",
                "Generate an ABA PVV (of an LMK-encrypted PIN)", "PIN",
                "Generates an ABA PVV (Visa PIN Verification Value) from a customer-selected PIN "
