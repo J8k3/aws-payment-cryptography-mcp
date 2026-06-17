@@ -950,7 +950,14 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Mode 0 (integrity/MAC only): generate_mac with TR31_E2_EMV_MKEY_INTEGRITY. "
                "Modes 1-4 (confidentiality + optional PIN change): generate_mac_emv_pin_change "
                "with TR31_E2 (integrity) + TR31_E1 (confidentiality). "
-               "Proxy currently supports Mode 0 only."),
+               "WIRE/DERIVATION CAVEAT: after Mode Flag (1N) and Scheme ID (1N) the MK-SMI key follows "
+               "DIRECTLY with no 3H key-type prefix; the next field is an 8B Integrity Session Key Data "
+               "value (the 2-byte ATC right-justified and zero-padded to 8 bytes for schemes 0/1/2/5; "
+               "2B for schemes 3/4), not a bare 2B ATC. KU supplies the issuer MASTER key plus this "
+               "derivation data and derives the integrity session key internally per scheme; APC "
+               "generate_mac does not derive an EMV session key, so a faithful mapping must supply the "
+               "pre-derived session key (or use EMV MAC support) and validate against live APC. The "
+               "proxy gates KU pending that validation."),
     HsmCommand("Thales/Futurex", "International", "KY",
                "Generate Secure Message (EMV 4.x)", "ARQC",
                "Generates an EMV 4.x issuer secure message. Extends KU to support the EMV 4.x "
@@ -1297,7 +1304,12 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "HMAC-SHA-256 (06, 32 B), HMAC-SHA-384 (07, 48 B), HMAC-SHA-512 (08, 64 B). "
                "Output length is configurable via the HMAC Length field (L/2 ≤ t ≤ L). "
                "APC MacLength is nibbles (not bytes): wire HMAC Length (bytes) × 2 = APC MacLength. "
-               "In APC: generate_mac with TR31_M7_HMAC_KEY."),
+               "In APC: generate_mac with TR31_M7_HMAC_KEY. "
+               "WIRE/VALIDATION CAVEAT: the 2N Hash Identifier is 01/05/06/07/08 (NOT a 1N '1'-'4' "
+               "selector); the HMAC key is preceded by a 2N format and a 4N byte-length and carries NO "
+               "key-scheme prefix; and the message is raw bytes (Data Length 5N + Message Data nB), not "
+               "hex. A proxy must hex-encode the message for APC and confirm SHA-224 support and the "
+               "byte-length truncation before relying on this mapping."),
     HsmCommand("Thales/Futurex", "International", "LS",
                "Verify an HMAC on a Block of Data", "MAC",
                "Verifies an HMAC over a data block. Response code: LT. Error 01 = HMAC mismatch.",
