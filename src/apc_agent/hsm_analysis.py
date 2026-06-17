@@ -839,12 +839,15 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Source: PUGD0537-004 Rev A, p.363 — AUTHORITATIVE. "
                "Wire: Mode Flag 1N + Input Format Flag 1N + MAC Size 1N + MAC Algorithm 1N "
                "+ Padding Method 1N + Key Type 3H (003=TAK/008=ZAK variant, FFF=KB-LMK) "
-               "+ Key (16H/U+32H/T+48H or S+nA) + [Message Length 4H] + Message. "
+               "+ Key (16H/U+32H/T+48H or S+nA) + [IV 16H/32H for continuation blocks] "
+               "+ Message Length 4H + Message. "
+               "MAC Size: '0' = 8 hex digits (4 bytes), '1' = 16 hex digits (8 bytes, full "
+               "double-length MAC). MAC Algorithm: '1' ISO9797 Alg1 (X9.9), '3' ISO9797 Alg3 (X9.19), "
+               "'5' CBC-MAC (AES), '6' CMAC (AES). "
                "Response M7: Error 2A + MAC (8H or 16H). "
-               "Use MY for Key Block LMK keys. CBC-MAC — consider migrating to CMAC for new work. "
-               "WARNING: proxy mac.rs uses simplified format (mode 1N + key 32H fixed + msg_len 4H) "
-               "without the Input Format, MAC Size, Algorithm, Padding, or Key Type fields — "
-               "not wire-compatible with a real payShield M6."),
+               "Use MY for Key Block LMK keys. The proxy handles single-block (Mode '0'), hex-input "
+               "messages; continuation modes need an inter-block IV that APC's single-call generate_mac "
+               "cannot carry. Consider migrating CBC-MAC to CMAC for new work."),
     HsmCommand("Thales/Futurex", "International", "M8",
                "Verify MAC using MAK (supports continuation mode)", "MAC",
                "Verifies a MAC using a Message Authentication Key. Response code: M9. "
@@ -864,12 +867,26 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "apc_operation shows the generate path; use verify_mac (same TR31_B0 key) for the verify path. "
                "BDK required for both — DUKPT derives per-transaction MAC key from BDK + KSN."),
     HsmCommand("Thales/Futurex", "International", "C2",
-               "Generate MAC (AS2805)", "MAC",
-               "AS2805 MAC generation (Australian payment network standard).",
-               "generate_mac", "TR31_M0_ISO_16609_MAC_KEY"),
+               "Generate a MAC for a Large Message (X9.9/X9.19/AS2805)", "MAC",
+               "Generates a MAC over a large message using a TAK or ZAK. Supports ANSI X9.9, X9.19 and "
+               "AS2805.4.1. Wire (p.583): Message Block Number (1N: '0' only block, '1'-'3' "
+               "continuation), Key Type (1N: '0' TAK, '1' ZAK, '2' TAKs, '3' ZAKs), MAC generation "
+               "Mode (1N: '0' X9.9, '1' X9.19, '2'/'3' AS2805), Message Type (1N: '0' binary, '1' hex), "
+               "Key (16H | 'U'+32H | 'T'+48H), optional IV (blocks 2/3), Message Length (4H), Message. "
+               "Response code: C3.",
+               "generate_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M3_ISO_9797_3_MAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.583 — AUTHORITATIVE. "
+               "NOT AS2805-only: the MAC algorithm is selected by the MAC generation Mode field "
+               "('0' X9.9 -> ISO9797 Algorithm 1, '1' X9.19 -> ISO9797 Algorithm 3, '2'/'3' AS2805). "
+               "In APC: generate_mac with the matching ISO 9797 algorithm. Single-block messages map "
+               "directly; multi-block continuation needs an inter-block IV that APC cannot carry."),
     HsmCommand("Thales/Futurex", "International", "C4",
-               "Verify MAC (AS2805)", "MAC",
-               "AS2805 MAC verification.", "verify_mac", "TR31_M0_ISO_16609_MAC_KEY"),
+               "Verify a MAC for a Large Message (X9.9/X9.19/AS2805)", "MAC",
+               "Verifies a large-message MAC; same layout as C2 with the MAC appended. Supports X9.9, "
+               "X9.19 and AS2805, selected by the MAC generation Mode field (not AS2805-only).",
+               "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M3_ISO_9797_3_MAC_KEY",
+               "Source: PUGD0537-004 Rev A, p.583 — AUTHORITATIVE. "
+               "In APC: verify_mac with the ISO 9797 algorithm selected by the MAC generation Mode."),
     HsmCommand("Thales/Futurex", "International", "MY",
                "Verify and Translate MAC", "MAC",
                "Verifies a MAC under one key and generates a new MAC under a different key in a "
