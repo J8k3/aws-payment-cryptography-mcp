@@ -439,14 +439,22 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Translates from LMK to ZPK.", "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY"),
     HsmCommand("Thales/Futurex", "International", "JA",
                "Generate Random PIN", "PIN",
-               "Generates a random PIN of specified length for a given PAN. "
-               "Returns the PIN encrypted under LMK. Response code: JB.",
-               "generate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
-               "Wire params (thales-bogr): PAN (12N), PIN length (2N). "
-               "In APC: generate_pin_data returns a PIN block encrypted under the specified PEK; "
-               "APC has no LMK concept — the output key is the APC PEK ARN. "
-               "EFTlab + thales-bogr sources — reference quality.",
-               confidence="medium"),
+               "Generates a random PIN of 4-12 digits for a given PAN. The wire request carries only "
+               "the account number (12N) and an optional PIN length (2N), with an optional excluded-PIN "
+               "table; it carries no keys. JB returns the PIN encrypted under the LMK as a proprietary "
+               "LMK PIN block in which the PIN is cryptographically bound to the account number. "
+               "Response code: JB.",
+               "generate_pin_data", "TR31_V1_IBM3624_PIN_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.215 — AUTHORITATIVE. "
+               "The random-PIN algorithm maps to generate_pin_data with Ibm3624RandomPin (analogous to "
+               "EE for natural PINs): supply the IBM 3624 PVK as the generation key, a PEK/ZPK as the "
+               "encryption key, and the decimalization table / validation data via the request. APC "
+               "returns the PIN as a ZPK-encrypted block plus a verification value. "
+               "LIMITATION — like EE/BA, the native JA output is an LMK-encrypted PIN block, which APC "
+               "has no LMK to produce; a wire-compatible proxy therefore cannot reproduce JB and returns "
+               "payShield 68. Migration redesign should consume the ZPK-encrypted block and verification "
+               "value from generate_pin_data directly instead of an LMK-encrypted PIN.",
+               confidence="high"),
     HsmCommand("Thales/Futurex", "International", "BA",
                "Encrypt Clear PIN to LMK-Encrypted PIN Block", "PIN",
                "Accepts a clear PIN and account number, returns a PIN block encrypted under LMK. "
