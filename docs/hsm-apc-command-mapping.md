@@ -12,6 +12,8 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 
 **Vendors:** Thales payShield 10K (International/Core and Legacy command sets), Futurex Excrypt Enterprise SSP v.2, Atalla/NCR
 
+**Cross-checked against the AWS official migration doc** (`aws-samples/samples-for-payment-cryptography-service`, `migration_guidance/payshield-command-mapping.md`) on 2026-06-25 — treated as high confidence for payShield→APC mappings (AWS hardware-validates before publishing). AWS-doc errata found during the cross-check were reported upstream (aws-samples PR #67).
+
 ---
 
 ## PIN Translation
@@ -243,6 +245,23 @@ Each row is a logical payment operation anchored to the APC API. The vendor colu
 > **B0 / GKBL:** The PCI PIN 18-3 migration path. Converts variant-encrypted (LMK) keys to TR-31 key blocks. B0 is the payShield command; GKBL is the Futurex equivalent.
 
 > **KA / BU:** APC automatically includes the KCV in all `create_key` and `import_key` responses — no separate API call is needed. AES keys must use CMAC-based KCV per PCI PIN Annex C (never ECB-zeros).
+
+---
+
+## AS2805 Node Initialization (Australian Standard 2805)
+
+*Node-to-node KEK validation and zone-key setup for AS2805 deployments. Pairs with the AS2805 transaction commands (Thales RTKS `RI`/`RK`/`RO`… set).*
+
+| Operation | APC Call | Thales | Futurex | Note |
+|-----------|----------|--------|---------|------|
+| Generate KEK validation request | `generate_as2805_kek_validation` | E0 | — | `As2805KekValidationType=KekValidationRequest`. APC API confirmed. |
+| Generate KEK validation response | `generate_as2805_kek_validation` | E2 | — | `As2805KekValidationType=KekValidationResponse`. |
+| Generate & export AS2805 zone keys | `create_key` + `export_key` | OI | — | AS2805-specific. |
+| Import AS2805 zone keys | `import_key` | OK | — | AS2805-specific. |
+| Encrypt data (AS2805) | `encrypt_data` | PU | — | AS2805 variant of M0. |
+| Decrypt data (AS2805) | `decrypt_data` | PW | — | AS2805 variant of M2. |
+
+> **Source / confidence:** Added from the AWS official migration doc (2026-06 reconciliation). The APC mappings are confirmed against the Data Plane API reference; the payShield E0/E2/OI/OK/PU/PW **wire-field layouts are not yet transcribed from PUGD0541** — verify before relying on field offsets. APC also exposes `As2805PekDerivationAttributes` and `TranslationPinDataAs2805Format0` for the AS2805 PIN path.
 
 ---
 

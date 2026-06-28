@@ -17,6 +17,15 @@ Sources and confidence levels:
                              Some of these codes were adopted by the Futurex Standard API for
                              Atalla backward-compatibility, but are not seen in Excrypt deployments.
                              Proxy support: not implemented — wire format undocumented.
+  AWS official migration doc: HIGH CONFIDENCE for payShield→APC mappings — AWS maintains a
+                             real payShield and tests mappings before publishing. Source:
+                             aws-samples/samples-for-payment-cryptography-service
+                             migration_guidance/payshield-command-mapping.md. Reconciled against
+                             this registry on 2026-06-25 (per-command rationale is in the
+                             commit history). Used to corroborate mappings and add the AS2805 KEK-validation
+                             family (E0/E2) and other gaps. Treated as wrong only where the doc is
+                             internally contradictory (e.g. GQ titled "Verify PIN" but mapped to
+                             TranslatePinData) — those are reported upstream, not adopted.
 
 Wire format (Futurex Excrypt):
   TCP socket with mTLS; commands wrapped in [ ] delimiters, AO prefix prepended to the
@@ -805,15 +814,16 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "(3-D Secure). The request carries CSCK, a 19N full account (left-justified, zero-filled), "
                "expiry/unpredictable number, and (for Flag 2/3) a service code; verify additionally "
                "carries 5-digit, 4-digit and 3-digit CSCs. Response code: RZ.",
-               "NOT_SUPPORTED", "N/A",
-               "Source: PUGD0537-004 Rev A, p.252, 316 — AUTHORITATIVE. "
-               "RY is the Amex CSC command, not the Visa CVV2 / Mastercard CVC2 algorithm. Classic and "
-               "Enhanced CSC correspond to APC AmexCardSecurityCodeVersion1/2, but RY's response "
-               "validates up to three CSC lengths (5/4/3-digit) at once and supports the AEVV variant, "
-               "neither of which APC's single-value generate/verify_card_validation_data can reproduce. "
-               "A wire-compatible proxy therefore returns payShield 68. Migration: use "
-               "generate/verify_card_validation_data with AmexCardSecurityCodeVersion1/2 per individual "
-               "CSC, and handle AEVV outside APC."),
+               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Source: PUGD0537-004 Rev A, p.252, 316; AWS migration doc (RY -> "
+               "GenerateCardValidationData) corroborates. PARTIAL SUPPORT (softened 2026-06 from a "
+               "blanket NOT_SUPPORTED): the base case maps — Classic CSC v1.0 and Enhanced CSC v2.0 "
+               "correspond to APC AmexCardSecurityCodeVersion1/2 on generate_card_validation_data "
+               "(Mode '3') and verify_card_validation_data (Mode '4'). NOT reproducible as a single "
+               "call: RY's RZ response validates up to three CSC lengths (5/4/3-digit) at once, and the "
+               "AEVV (3-D Secure) variant has no APC equivalent. A wire-faithful proxy still returns "
+               "payShield 68 for the whole command; a migration redesign issues one "
+               "generate/verify_card_validation_data call per CSC and handles AEVV outside APC."),
     HsmCommand("Thales/Futurex", "International", "NY",
                "Generate IVCVC3 and Static CVC3", "CVV",
                "Generates an Initial Vector CVC3 (IVCVC3) and a Static CVC3 (or PINIVCVC3/PINCVC3) for "
@@ -1043,10 +1053,14 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Generates an RSA public/private key pair on the HSM. The public key is returned; the "
                "private key is returned encrypted under the LMK. Used to establish an RSA key for "
                "key transport or remote key loading. Response code: EJ.",
-               "get_parameters_for_import", None,
-               "Source: PUGD0537-004 Core Host Commands V1 (p.165). APC analog: "
-               "get_parameters_for_import yields an APC-held RSA wrapping key pair/certificate for "
-               "the import leg; APC never returns a private key in the clear or under an external LMK.",
+               "create_key", None,
+               "Source: PUGD0537-004 Core Host Commands V1 (p.165); AWS migration doc corroborates. "
+               "PRIMARY APC analog: create_key with an ASYMMETRIC_KEY_PAIR (RSA) — APC generates the "
+               "RSA pair on its own HSM and retains the private key (never returned in the clear or "
+               "under an external LMK). SUB-CASE: when EI is used purely to seat an RSA wrapping key "
+               "for a subsequent import, get_parameters_for_import provides the APC-held wrapping "
+               "key/certificate. Re-mapped from get_parameters_for_import to create_key during the "
+               "2026-06 AWS-doc reconciliation (the doc maps EI -> CreateKey ASYMMETRIC_KEY_PAIR).",
                confidence="high"),
     HsmCommand("Thales/Futurex", "International", "EO",
                "Import a Public Key", "KEY_MGMT",
@@ -1585,6 +1599,101 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "APC equivalent: export_key with WrappingKeySpec RSA_OAEP_SHA_256 or similar. "
                "Prefer TR-34 (get_parameters_for_export → export_key with TR-34 token) for "
                "standards-compliant authenticated BDK distribution."),
+    # ── Reconciled from the AWS official migration doc (2026-06) ───────────────
+    # Source: aws-samples/.../migration_guidance/payshield-command-mapping.md — HIGH CONFIDENCE
+    # (AWS hardware-validates before publishing). apc_operation is corroborated against the
+    # APC Data Plane API reference where applicable. payShield wire-field layouts are NOT yet
+    # transcribed from PUGD for these, so confidence is capped at "medium" pending a manual
+    # cite — the mapping is trusted; the field-level detail is the open item.
+    HsmCommand("Thales", "International", "E0",
+               "Generate AS2805 KEK Validation Request", "KEY_MGMT",
+               "Generates a KEK validation request for AS2805 node-to-node initialization "
+               "between payment processing nodes (Australian Standard 2805). Pairs with E2.",
+               "generate_as2805_kek_validation", None,
+               "Source: AWS migration doc (E0 -> GenerateAs2805KekValidation); APC API confirmed "
+               "(GenerateAs2805KekValidation, As2805KekValidationType=KekValidationRequest). "
+               "Fills a gap: the registry already carries the AS2805 RTKS transaction commands "
+               "(RI/RK/RO...) but lacked the KEK-validation setup. payShield wire fields not yet "
+               "transcribed from PUGD0541 — verify before relying on field offsets.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "E2",
+               "Generate AS2805 KEK Validation Response", "KEY_MGMT",
+               "Generates a KEK validation response for AS2805 node-to-node initialization. "
+               "Responder side of the E0 exchange.",
+               "generate_as2805_kek_validation", None,
+               "Source: AWS migration doc (E2 -> GenerateAs2805KekValidation); APC API confirmed "
+               "(As2805KekValidationType=KekValidationResponse). payShield wire fields not yet "
+               "transcribed from PUGD0541 — verify before relying on field offsets.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "PU",
+               "Encrypt Data (AS2805)", "ENCRYPT",
+               "Encrypts a data block under the AS2805 zone-key hierarchy.",
+               "encrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
+               "Source: AWS migration doc (PU -> EncryptData). AS2805 variant of M0. "
+               "payShield wire fields not yet transcribed from PUGD0541.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "PW",
+               "Decrypt Data (AS2805)", "ENCRYPT",
+               "Decrypts a data block under the AS2805 zone-key hierarchy.",
+               "decrypt_data", "TR31_D0_SYMMETRIC_DATA_ENCRYPTION_KEY",
+               "Source: AWS migration doc (PW -> DecryptData). AS2805 variant of M2. "
+               "payShield wire fields not yet transcribed from PUGD0541.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "OK",
+               "Import AS2805 Zone Keys", "KEY_MGMT",
+               "Imports AS2805 zone keys into HSM protection.",
+               "import_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: AWS migration doc (OK -> ImportKey). AS2805-specific. "
+               "payShield wire fields not yet transcribed from PUGD0541.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "OI",
+               "Generate and Export AS2805 Zone Keys", "KEY_MGMT",
+               "Generates AS2805 zone keys and exports them for distribution to a partner node.",
+               "export_key", "TR31_K1_KEY_BLOCK_PROTECTION_KEY",
+               "Source: AWS migration doc (OI -> generation/export). AS2805-specific; APC analog is "
+               "create_key followed by export_key. payShield wire fields not yet transcribed.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "IG",
+               "Execute ECDH (Discrete Key-Agreement Sub-flow)", "KEY_MGMT",
+               "Performs an ECDH key-agreement step as part of a larger key-establishment flow. "
+               "Not a standalone transaction-time operation.",
+               None, None,
+               "Source: AWS migration doc — the doc's 'subflows' point: ECDH is folded into "
+               "import_key / export_key / translate_pin_data (DiffieHellman key material) rather "
+               "than a discrete APC call. Mirrors the Futurex ECDH family (GECC/SDDH/GCKD). "
+               "No standalone APC operation.",
+               confidence="directory"),
+    HsmCommand("Thales", "Legacy", "FI",
+               "Create a ZEK or ZAK", "KEY_MGMT",
+               "Generates a Zone Encryption Key (ZEK) or Zone Authentication Key (ZAK). "
+               "Superseded by A0.",
+               "create_key", None,
+               "Source: AWS migration doc (FI -> CreateKey). In APC: create_key with "
+               "TR31_D0 (ZEK / data) or TR31_M3/M6 (ZAK / MAC) usage as appropriate.",
+               confidence="medium"),
+    HsmCommand("Thales", "Legacy", "FM",
+               "Export a ZAK or ZEK", "KEY_MGMT",
+               "Exports a ZAK or ZEK under a ZMK for delivery to a network partner. "
+               "Superseded by A8.",
+               "export_key", None,
+               "Source: AWS migration doc (FM -> ExportKey). In APC: export_key with a TR-31 "
+               "block under the ZMK/KEK; usage TR31_D0 (ZEK) or TR31_M3/M6 (ZAK).",
+               confidence="medium"),
+    HsmCommand("Thales", "Legacy", "FY",
+               "Generate an ECC Key Pair", "KEY_MGMT",
+               "Generates an elliptic-curve key pair on the HSM.",
+               "create_key", None,
+               "Source: AWS migration doc (FY -> CreateKey). In APC: create_key with an ECC "
+               "ASYMMETRIC_KEY_PAIR; APC retains the private key.",
+               confidence="medium"),
+    HsmCommand("Thales", "International", "BG",
+               "Rewrap PIN Block", "PIN",
+               "Re-encrypts a PIN block under a different PIN-encryption key.",
+               "translate_pin_data", "TR31_P0_PIN_ENCRYPTION_KEY",
+               "Source: AWS migration doc (BG -> TranslatePin). Functionally a PIN translate "
+               "(PEK -> PEK); maps to translate_pin_data. payShield wire fields not yet "
+               "transcribed — confirm against CA/CC/G0 before relying on offsets.",
+               confidence="medium"),
 ]
 
 # ── Thales payShield 10K Legacy Commands ─────────────────────────────────────
@@ -1781,20 +1890,24 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                "Takes BDK + Diebold table index (stored in user storage) + KSN (3H descriptor + "
                "12-20H KSN) + PIN block (16H) + account number (12N) + PIN validation data (16H) "
                "+ offset (4N). Superseded by GS (3DES DUKPT Diebold verify).",
-               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
-               "Original single-length DUKPT (derives 56-bit working key from 112-bit BDK). "
-               "In APC: verify_pin_data with IncomingDukptAttributes. "
-               "Diebold method requires IncomingDukptAttributes.DukptKeyDerivationType=TDES_2KEY. "
-               "Migrate to AES DUKPT — TDES prohibited for new deployments since Jan 2023."),
+               "NOT_SUPPORTED", "N/A",
+               "CORRECTED 2026-06 (was verify_pin_data): CO is the Diebold method, and APC's "
+               "PinVerificationAttributes supports only IBM 3624 offset and Visa PVV — not Diebold, "
+               "which indexes a conversion table held in HSM user storage that APC has no equivalent "
+               "for. Same basis as the GS NOT_SUPPORTED ruling (CO is GS's single-length-DUKPT "
+               "predecessor). DUKPT derivation is not the obstacle; the Diebold algorithm is. "
+               "Migration: re-issue affected PINs under IBM 3624 or Visa PVV."),
     HsmCommand("Thales", "Legacy", "CQ",
                "Verify a PIN Using the Encrypted PIN Method (DUKPT)", "PIN",
                "Verifies a PIN using the Encrypted PIN comparison method with DUKPT key derivation. "
                "Response code: CR. Takes BDK + KSN + encrypted PIN block from terminal + "
                "account number (12N) + reference PIN encrypted under LMK. Superseded by GU.",
-               "verify_pin_data", "TR31_B0_BASE_DERIVATION_KEY",
-               "Decrypts terminal PIN block using DUKPT-derived key, then compares against "
-               "host-stored PIN (encrypted under LMK). In APC: verify_pin_data; the reference "
-               "PIN is stored as APC's PinVerificationKeyArn data — never log either PIN value."),
+               "NOT_SUPPORTED", "N/A",
+               "CORRECTED 2026-06 (was verify_pin_data): CQ is the Encrypted-PIN comparison method — "
+               "decrypt the terminal PIN block and compare it to a stored LMK-encrypted reference PIN. "
+               "APC has no LMK and verify_pin_data does only algorithmic verification (IBM 3624 offset "
+               "/ Visa PVV), not comparison against a stored encrypted PIN. Same basis as the GU "
+               "NOT_SUPPORTED ruling (CQ is GU's single-length-DUKPT predecessor)."),
     # ── Legacy MAC ────────────────────────────────────────────────────────────
     HsmCommand("Thales", "Legacy", "ME",
                "Verify and Translate a MAC", "MAC",
@@ -2202,6 +2315,7 @@ INTERNATIONAL_AND_THALES_PATTERNS = [
     r'["\'](CA|CB|CC|CD|CI|CJ|CW|CX|CY|CZ|DA|DC|EA|EC|M0|M2|M4|M6|M7|M8|M9|MA|MC|ME|MK|MM|MO|MQ|MS|MU|MW|MY|MZ|A0|A6|A8|IA|BU|KQ|KR|KS|KW|KX|KU|KV|KY|KZ|K0|K2|K3|GW)',
     r'["\'](DE|EE|GA|BK|CE|DG|FW|DU|CU|BC|BE|CG|EG|GO|GQ|GS|GU|BQ|AQ|CK|CM|JA|BA|NG|JC|JE|JG|FK|KG|NC|QH)',  # PIN/Key INTERNATIONAL (Core additions)
     r'["\'](QY|PM|RY|NY|A4|B0|B8|BY|HY|K8|KI|L0|LQ|LS|LU|LW|EW|EY|GM|NO|N0|CS)',  # CVV/HMAC/RSA/Mgmt INTERNATIONAL (Core)
+    r'["\'](E0|E2|PU|PW|OI|OK|IG|FI|FM|FY|BG)',  # AS2805 KEK/zone + key/ECDH (AWS-doc reconciled, 2026-06)
     r'["\'](HC|HD|HA|HB|HE|HF|HG|HH|BI|BJ|AS|AT|FG|FH|GG|GH|GY|GZ)',  # Thales Legacy key gen
     r'["\'](AA|AB|AE|AF|AG|AH|AC|AD|AU|AV|AW|AX|FA|FB|FC|FD|FE|FF|GC|GD|GE|GF|GY|GZ|KC|KD|KA|KB)',  # Thales Legacy translate
     r'["\'](MG|MH|MI|MJ|DW|DX|DY|DZ|CO|CP|CQ|CR|JS|JT)',  # Thales Legacy additional
