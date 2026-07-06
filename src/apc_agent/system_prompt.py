@@ -56,9 +56,10 @@ credentials and a configured APC environment:
 
   Data plane  — translate_pin_data, generate_pin_data, verify_pin_data,
                 generate_mac, verify_mac, generate_mac_emv_pin_change,
-                verify_auth_request_cryptogram, generate_card_validation_data,
-                verify_card_validation_data, encrypt_data, decrypt_data,
-                re_encrypt_data, translate_key_material, generate_as2805_kek_validation
+                generate_auth_request_cryptogram, verify_auth_request_cryptogram,
+                generate_card_validation_data, verify_card_validation_data,
+                encrypt_data, decrypt_data, re_encrypt_data,
+                translate_key_material, generate_as2805_kek_validation
 
   Control plane — create_key, import_key, export_key, get_key, list_keys,
                   delete_key, restore_key, start_key_usage, stop_key_usage,

@@ -3745,6 +3745,55 @@ relationships:
 status: active
 ```
 
+### Futurex Excrypt Key-Exchange Wire Format (Tags and Wrap Commands)
+
+```yaml
+id: format.futurex-excrypt-key-exchange-wire
+entity_type: format
+canonical_name: Futurex Excrypt Key-Exchange Wire Format — Framing, Tag Map, Wrap Commands
+summary: >
+  Tag map and framing for the Futurex Excrypt key EXCHANGE/EXPORT command family, as
+  used by the AWS public sample (aws-samples/samples-for-payment-cryptography-service,
+  key_exchange/hsm/futurex/commands.py); framing corroborated by apc-hsm-proxy
+  src/protocol/futurex.rs. MEDIUM CONFIDENCE — single source (AWS sample), NOT verified
+  against the Futurex TRM/firmware or live hardware. A maintainer with prior Futurex
+  Excrypt background reviewed it as "generally correct" but could NOT confirm individual
+  tag/enum semantics with certainty. Treat as a starting map; verify specific tag
+  meanings and enum values against the deployed module's documentation before relying
+  on them. Do not promote to high confidence without independent verification.
+domain:
+  - hsm
+  - key_management
+attributes:
+  confidence: medium
+  framing: "[AO<CMD>;<2-char-tag><value>;...;]"
+  tags:
+    FS: major/master-key selector (FS6 = PMK)
+    BG: wrapped key block
+    AE: KCV
+    AP: KEK
+    CT: "symmetric algorithm enum — 2=TDES2, 3=TDES3, 4=AES128, 5=AES192, 6=AES256"
+  commands:
+    GPGS: wraps a key under the master key; returns BG + AE
+    TWKA: wraps a key under a KEK
+    TRTP: builds a TR-34 export payload
+constraints:
+  - Scope — these are key EXCHANGE/EXPORT commands. This entry does NOT cover the
+    wrapped-key parameter as it appears inside a transaction (PIN/MAC) command — that
+    format (and where its KCV lives) is still unknown. Resolving Futurex wrapped working
+    keys to an APC ARN by KCV match is tracked in apc-hsm-proxy issue 53.
+  - The hsm_analysis registry grades TWKA and TRTP as directory confidence (existence
+    observed, semantics unverified against the Integration Guide); the command semantics
+    above come from the AWS sample only and carry this entry's medium confidence, not
+    the registry's authoritative grade.
+relationships:
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+  - type: related_to
+    target_id: tool.apc-hsm-proxy
+status: active
+```
+
 ### Generic Vendor Command Crosswalk Examples
 
 ```yaml
@@ -4134,6 +4183,104 @@ relationships:
   - type: related_to
     target_id: tool.cyberchef-payment-fork
     notes: CyberChef fork can be used to verify handler output (CVV, MAC, PIN) at the operation level.
+status: active
+```
+
+### HSM Fleet to APC Key Migration Playbook
+
+```yaml
+id: operation.hsm-fleet-to-apc-key-migration
+entity_type: operation
+canonical_name: HSM Fleet (Thales/Futurex) to APC Key Migration Playbook
+aliases:
+  - key migration workflow
+  - how do I move my keys to APC
+summary: >
+  End-to-end operator playbook for moving keys from a physical payShield or Futurex
+  fleet into AWS Payment Cryptography so an application can use them via apc-hsm-proxy.
+  Ties together the KB's TR-31, TR-34, KEY_CRYPTOGRAM, and KCV entries into one
+  sequence — inventory the source fleet, decide per-key disposition, import to APC,
+  wire up the proxy, cut over and decommission. Return this entry when an operator
+  asks "how do I move my keys?"
+domain:
+  - key_management
+  - hsm
+attributes:
+  step_1_inventory_source_fleet:
+    payshield: >
+      BU (Core/International, authoritative; supersedes legacy KA) retrieves a KCV per
+      key; KLTT-driven label inventory; payShield Manager exports.
+    futurex: >
+      KMAP returns the occupied-slot bitmap, then GPKR per slot returns KCV, key type,
+      major key, modifier, and usage; VKTE when only the KCV is needed. See the
+      hsm_analysis registry entries for the single-source wire-format caveat.
+    output: >
+      Spreadsheet of (label-or-slot, key type, algorithm, KCV, intended migration target).
+  step_2_decide_per_key_disposition:
+    keep_on_hsm: >
+      Variant-LMK or TKB-without-KC wire forms — operator pins the wire-form value in
+      proxy.yaml key_mappings; no import needed.
+    migrate_to_apc: >
+      Most cases — import via TR-34 (preferred for batch), TR-31, or KEY_CRYPTOGRAM
+      (single key, RSA-OAEP-wrapped clear bytes; test material with known bytes).
+    retire: No action.
+  step_3_import_to_apc:
+    tr34: >
+      GetParametersForImport(KeyMaterialType=TR_34_KEY_BLOCK) supplies the APC wrapping
+      key and import token; the payShield exports under it; the import call returns the ARN.
+    key_cryptogram: >
+      RSA-OAEP-SHA256 wrap under APC's ephemeral public key. Wrapping-strength rule
+      applies (rule.apc-key-wrapping-strength) — RSA_2048 wraps TDES only, AES-128
+      needs RSA_3072+, and AES-192/256 (and HMAC keys) cannot be RSA-wrapped at all;
+      use ECDH for those.
+    verify: >
+      The imported KeyCheckValue must match the source-HSM KCV before the key is
+      promoted to production (rule.kcv-validation-after-transfer). DES and AES KCV
+      methods match APC exactly (see the BU registry entry).
+  step_4_wire_up_proxy:
+    wrapped_key_wire_forms: >
+      X9.143 / TR-31-with-KC wire forms need no configuration; apc-hsm-proxy's startup
+      list_keys scan resolves them by KCV.
+    label_or_variant_lmk_wire_forms: >
+      Add a proxy.yaml key_mappings entry pinning the wire value to the APC ARN.
+    cross_check: >
+      Run apc-proxy --verify-only (apc-hsm-proxy issue 9) to cross-check KCVs between
+      the source HSM and APC before cutting traffic over.
+  step_5_cutover_and_decommission:
+    soak: Point one application instance at the proxy; soak under representative traffic.
+    compare: >
+      Compare results against the original HSM path for a deterministic subset
+      (PIN translate, MAC generate).
+    decommission: >
+      Schedule HSM-side key deletion only after the APC keys have served production
+      for the agreed observation window.
+constraints:
+  - Private keys cannot move — APC never imports or exports private key material
+    (rule.apc-private-keys-non-exportable); a flow that depends on moving a private key
+    off the source HSM must be re-architected
+  - Wrapping-key strength rules gate every import path (rule.apc-key-wrapping-strength);
+    HMAC keys import only under an AES-256 KEK with the TR-31 HM optional header
+  - Key attributes are immutable after creation (rule.apc-key-attributes-immutable) —
+    choose usage and modes to match the target operation before import; e.g. E0 IMKs
+    need DeriveKey for cryptogram operations, but KEY_CRYPTOGRAM import of E0/D0/P0
+    requires NoRestrictions (rule.apc-d0-e0-p0-norestrictions)
+relationships:
+  - type: uses
+    target_id: key-block.tr34
+  - type: uses
+    target_id: key-block.tr31
+  - type: uses
+    target_id: concept.apc-key-cryptogram-import
+  - type: uses
+    target_id: artifact.kcv
+  - type: related_to
+    target_id: tool.apc-hsm-proxy
+  - type: related_to
+    target_id: concept.apc-key-lifecycle
+  - type: related_to
+    target_id: rule.kcv-validation-after-transfer
+  - type: related_to
+    target_id: concept.apc-ecdh-key-agreement
 status: active
 ```
 
@@ -5214,6 +5361,66 @@ relationships:
 status: active
 ```
 
+### APC: GenerateAuthRequestCryptogram — Test/Reference ARQC Generation
+
+```yaml
+id: operation.apc-generate-auth-request-cryptogram
+entity_type: operation
+canonical_name: APC GenerateAuthRequestCryptogram
+summary: >
+  Mints an EMV Authorization Request Cryptogram (ARQC) from an E0 EMV app-cryptogram
+  master key + transaction data — the inverse of VerifyAuthRequestCryptogram
+  (POST /cryptogram/generate). Issuers normally VERIFY ARQCs (the chip/terminal
+  generates them), so in an issuer/APC context this op is primarily a TEST/reference
+  generator: it produces a valid ARQC to exercise a verification path or a
+  second-implementation cross-check. It is how apc-hsm-proxy drives its live ARQC
+  verify accept-path differentials (KS/JS/KQ/KW/K2) and how apc-crossval mints the
+  APC leg of the EMV ARQC comparison. Surfaces in AWS SDKs from ~1.110; absent from
+  earlier API-reference snapshots.
+domain:
+  - emv
+  - cryptography
+inputs:
+  - KeyIdentifier — E0 IMK (TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS), MUST be created/imported
+    with DeriveKey mode (NoRestrictions is rejected by the generate op specifically —
+    note this is the opposite of KEY_CRYPTOGRAM import, which requires NoRestrictions
+    for E0; see rule.apc-d0-e0-p0-norestrictions)
+  - MajorKeyDerivationMode — EMV_OPTION_A / EMV_OPTION_B (Option B needs PAN > 16 digits;
+    see rule.apc-arqc-verify-inputs / the EMV_OPTION_B PAN-length rule)
+  - SessionKeyDerivationAttributes — single-member union, Amex / Emv2000 / EmvCommon /
+    Mastercard / Visa. PrimaryAccountNumber and PanSequenceNumber are required members
+    INSIDE every branch (not top-level fields — SDK service model). Amex and Visa take
+    only PAN+PSN (no ATC member exists — matches the AGENTS.md Visa/Amex no-ATC/UN
+    constraint); Emv2000/EmvCommon add required ApplicationTransactionCounter;
+    Mastercard adds required ATC and UnpredictableNumber.
+  - TransactionData — caller MUST pre-apply EMV (ISO 9797-1 method 2) padding, exactly as on
+    the verify side (rule.apc-arqc-verify-inputs) — append 0x80 then 0x00 to the next 8-byte
+    boundary (always ≥ 1 pad byte). APC does NOT pad it; unpadded / non-8-byte-aligned data is
+    rejected (ValidationException "TransactionData should be of length multiple of 16" hex chars)
+    or silently mismatches. This padding requirement is symmetric across generate and verify.
+constraints:
+  - TDES E0 only. GenerateAuthRequestCryptogram REJECTS every AES E0 key — AES-128 AND
+    AES-256 alike, under all SessionKeyDerivationMode values — with an invalid
+    key-algorithm error. This is ASYMMETRIC with VerifyAuthRequestCryptogram, which
+    REQUIRES AES-256 E0 for AES ARQC verification (rule.apc-arqc-aes256-required).
+    Net effect - APC cannot mint an AES ARQC, so an AES ARQC cannot be produced in APC
+    to feed an AES ARQC verification or cross-check. Not documented in the APC public API.
+  - E0 IMK must be DeriveKey mode (rule.apc-emv-master-key-derive-only); NoRestrictions
+    is additionally rejected by this generate op specifically.
+relationships:
+  - type: related_to
+    target_id: rule.apc-arqc-verify-inputs
+  - type: related_to
+    target_id: rule.apc-arqc-aes256-required
+  - type: related_to
+    target_id: rule.apc-emv-master-key-derive-only
+  - type: related_to
+    target_id: rule.apc-d0-e0-p0-norestrictions
+  - type: related_to
+    target_id: artifact.arqc
+status: active
+```
+
 ## APC Constraint Rules
 
 ### APC: Wrapping Key Strength Enforcement
@@ -5545,7 +5752,9 @@ constraints:
   - APC ISO9797_ALGORITHM3 → Method 1 (right-pad with 0x00)
   - Method 2 (ISO 7816-4: append 0x80 then zeros) is not supported by APC for this algorithm
   - EMV issuer-script MAC operations often use Method 2 — these will NOT match APC GenerateMac output
-  - To produce an APC-compatible MAC, use explicit Method 1 in the client MAC library
+    on the raw ISO9797_ALGORITHM3 path; the EmvMac path with caller-applied Method 2 padding DOES
+    yield an EMV issuer-script MAC (see rule.apc-emvmac-issuer-script-session-key)
+  - To produce an APC-compatible MAC on this path, use explicit Method 1 in the client MAC library
 examples:
   - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' now exposes a padding method selector (default Method 2)"
 relationships:
@@ -5553,6 +5762,57 @@ relationships:
     target_id: algorithm.mac-iso9797
   - type: related_to
     target_id: rule.apc-generate-mac-length-nibbles
+  - type: related_to
+    target_id: rule.apc-emvmac-issuer-script-session-key
+status: active
+```
+
+### APC: GenerateMac EmvMac Derives Issuer-Script Session Keys (IMK-SMI → SK-SMI)
+
+```yaml
+id: rule.apc-emvmac-issuer-script-session-key
+entity_type: constraint_rule
+canonical_name: APC GenerateMac EmvMac Performs Full Issuer-Script Session-Key Derivation
+summary: >
+  For EMV issuer-script (secure-messaging integrity) MACs, APC GenerateMac with
+  MacAttributes=EmvMac performs the entire session-key derivation itself: given an
+  E2 IMK (DeriveKey usage) it derives MK-SMI → SK-SMI internally and returns the MAC.
+  The client never derives a session key. Verified live against APC (2026-07,
+  apc-hsm-proxy issuer_script_mac differential, 15/15 across five scheme mappings).
+domain:
+  - emv
+  - cryptography
+  - key_management
+attributes:
+  emvmac_parameters:
+    MajorKeyDerivationMode: EMV_OPTION_A or EMV_OPTION_B (IMK → card master key step)
+    PrimaryAccountNumber: clear PAN digits
+    PanSequenceNumber: 2-digit PSN
+    SessionKeyDerivationMode: EMV2000 | EMV_COMMON_SESSION_KEY | AMEX | VISA | MASTERCARD_SESSION_KEY
+    SessionKeyDerivationValue: tagged union — exactly one of ApplicationTransactionCounter or ApplicationCryptogram
+  value_type_rule_verified_live:
+    ApplicationTransactionCounter_required_by: [EMV2000, AMEX, VISA]
+    ApplicationCryptogram_required_by: [EMV_COMMON_SESSION_KEY, MASTERCARD_SESSION_KEY]
+    mismatch_behavior: ValidationException (rejected before any HSM operation)
+    note: Mastercard M/Chip callers pass the 8-byte RANDi in the ApplicationCryptogram member
+  payshield_scheme_mapping_mode0_integrity:
+    "JU '1' UnionPay CUP 4.2": EMV2000 + ATC
+    "KU '0' Visa VIS": VISA + ATC
+    "KU '1' Mastercard M/Chip": MASTERCARD_SESSION_KEY + AC (RANDi)
+    "KU '2' Amex AEIPS": AMEX + ATC
+    "KU '5' JCB CVN04": EMV_COMMON_SESSION_KEY + AC
+constraints:
+  - EmvMac does NOT pad MessageData — the caller must apply ISO 9797-1 Method 2 (EMV '80' padding) before the call; this is the APC path that DOES yield an EMV Method-2 issuer-script MAC (contrast rule.apc-iso9797-algorithm3-method1, which covers the raw ISO9797_ALGORITHM3 path)
+  - MacLength=4 is accepted (payShield issuer-script MACs are 4 bytes)
+  - No IV input and no branch/height key-tree parameters — payShield KY-style EMV2000 secure-messaging derivation (IV-SMI + key-tree, PUGD0537-004 Rev A) cannot be mapped onto EmvMac
+  - Confidentiality / PIN-change secure messaging is a separate API (GenerateMacEmvPinChange, E1 PEK) — EmvMac covers integrity-only scripts
+relationships:
+  - type: related_to
+    target_id: operation.apc-generate-mac
+  - type: related_to
+    target_id: operation.emv-secure-messaging
+  - type: related_to
+    target_id: rule.apc-iso9797-algorithm3-method1
 status: active
 ```
 

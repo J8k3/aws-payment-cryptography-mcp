@@ -614,6 +614,54 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
     # ── EMV / ARQC ───────────────────────────────────────────────────────────
 
     @mcp.tool()
+    def generate_auth_request_cryptogram(
+        key_identifier: str,
+        transaction_data: str,
+        major_key_derivation_mode: str,
+        session_key_derivation_attributes: dict,
+    ) -> dict:
+        """
+        Call this to mint a test/reference ARQC — e.g. to exercise an ARQC
+        verification path, drive a proxy differential test, or produce the APC leg
+        of a cross-implementation check. Issuers normally VERIFY ARQCs (the chip
+        generates them), so this operation is primarily a test-vector generator.
+        The inverse of verify_auth_request_cryptogram (POST /cryptogram/generate).
+
+        Required key type: E0 (EMV Application Cryptogram Master Key), TDES only,
+        created/imported with DeriveKey mode. Every AES E0 key is rejected —
+        asymmetric with verify_auth_request_cryptogram, which requires AES-256 E0
+        for AES ARQCs — so APC cannot mint an AES ARQC. NoRestrictions E0 keys are
+        also rejected by this operation specifically.
+
+        transaction_data must be pre-padded with ISO 9797-1 method-2 (EMV) padding:
+        append 0x80 then 0x00 to the next 8-byte boundary. APC does not pad,
+        exactly as on the verify side.
+
+        session_key_derivation_attributes — exactly one member; PAN and PSN live
+        inside it. Amex and Visa take only PAN+PSN (no ATC/UN — do not forward
+        payShield ATC/UN wire fields for these schemes):
+          {"Visa": {"PrimaryAccountNumber": "...", "PanSequenceNumber": "01"}}
+          {"Amex": {"PrimaryAccountNumber": "...", "PanSequenceNumber": "01"}}
+          {"Emv2000": {..., "ApplicationTransactionCounter": "0001"}}
+          {"EmvCommon": {..., "ApplicationTransactionCounter": "0001"}}
+          {"Mastercard": {..., "ApplicationTransactionCounter": "0001",
+                          "UnpredictableNumber": "12345678"}}
+
+        Args:
+            key_identifier: ARN or alias of TDES E0 key (DeriveKey mode)
+            transaction_data: Hex-encoded EMV transaction data, method-2 pre-padded
+            major_key_derivation_mode: EMV_OPTION_A (PAN <= 16 digits) or EMV_OPTION_B (PAN > 16 digits)
+            session_key_derivation_attributes: single-member union, see above
+        """
+        return _call(
+            client().generate_auth_request_cryptogram,
+            KeyIdentifier=key_identifier,
+            TransactionData=transaction_data,
+            MajorKeyDerivationMode=major_key_derivation_mode,
+            SessionKeyDerivationAttributes=session_key_derivation_attributes,
+        )
+
+    @mcp.tool()
     def verify_auth_request_cryptogram(
         key_identifier: str,
         transaction_data: str,
