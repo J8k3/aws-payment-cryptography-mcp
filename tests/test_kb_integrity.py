@@ -6,8 +6,9 @@ entries are YAML so agents can extract structured claims. A block that fails to
 parse silently degrades into prose the moment a consumer tries to treat it as
 data — these tests make that a named failure instead.
 
-Scope is deliberately narrow: parseability and id uniqueness. Provenance and
-relationship hygiene are editorial concerns handled at review time.
+Scope: parseability, id uniqueness, and provenance. Every entry must be
+traceable to a source — a non-empty references: list or an explicit inline
+citation. Uncited claims fail CI.
 """
 
 import re
@@ -47,6 +48,38 @@ class TestKbYamlIntegrity:
             f"KB YAML blocks fail to parse: {failures}. Usual culprit is an "
             "unquoted 'word:' followed by a space inside a plain scalar — "
             "use an em-dash or quote the string."
+        )
+
+    def test_every_entry_cites_a_source(self, parsed_blocks):
+        """No uncited claims: each entry needs references: or an inline citation.
+
+        The inline-citation pattern accepts the KB's established prose
+        conventions ("Source: PUGD0537-004 p.488", "Verified live against APC",
+        "per PCI PIN v3.1", "EMV Book 2 Annex A1", ...). New entries should
+        prefer the structured references: list pointing at the Sources ledger.
+        """
+        inline_citation = re.compile(
+            r"(?i)\b(source|verified|per PCI|per ISO|per EMV|PUGD\d|X9\.|ISO \d{4,5}"
+            r"|EMV Book|Annex|FAQ|whitepaper|API reference|aws-samples|docs\.aws"
+            r"|sources ledger)\b"
+        )
+        uncited = []
+        for _label, raw in parsed_blocks:
+            try:
+                doc = yaml.safe_load(raw)
+            except yaml.YAMLError:
+                continue  # reported by the parse test
+            if not isinstance(doc, dict) or not isinstance(doc.get("id"), str):
+                continue
+            if doc["id"] == "string":
+                continue  # the canonical-shape template block
+            if doc.get("references") or inline_citation.search(raw):
+                continue
+            uncited.append(doc["id"])
+        assert not uncited, (
+            f"KB entries with no provenance: {uncited}. Add a references: list "
+            "naming a Sources-ledger row, public standard, or verification "
+            "event (see the Canonical Record Shape section)."
         )
 
     def test_entry_ids_are_unique(self, parsed_blocks):
