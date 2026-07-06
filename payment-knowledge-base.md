@@ -4610,9 +4610,9 @@ domain:
   - pin_processing
   - cryptography
 constraints:
-  - Pass 1: scan the 16-character TDES-encrypted PVV input left to right; collect only decimal digits
+  - Pass 1 — scan the 16-character TDES-encrypted PVV input left to right; collect only decimal digits
     (0-9). Stop when 4 digits are found.
-  - Pass 2: only if pass 1 produced fewer than 4 digits — rescan the same 16 characters, mapping
+  - Pass 2 — only if pass 1 produced fewer than 4 digits — rescan the same 16 characters, mapping
     each hex letter using A=0, B=1, C=2, D=3, E=4, F=5. Append mapped digits until 4 total.
   - A single-pass that immediately maps hex letters will produce incorrect PVV whenever a hex letter
     appears before the fourth decimal digit in the output.
@@ -4646,23 +4646,23 @@ domain:
 constraints:
   - The ARQC preimage is constructed by concatenating EMV transaction data in a fixed order
     defined by the card scheme (Visa, Mastercard, etc.) and the issuer's personalization profile.
-  - Typical elements included (in order): amount authorized (tag 9F02), amount other (9F03),
+  - Typical elements included, in order — amount authorized (tag 9F02), amount other (9F03),
     terminal country code (9F1A), terminal verification results (95), transaction currency code
     (5F2A), transaction date (9A), transaction type (9C), unpredictable number (9F37),
     application interchange profile (82), application transaction counter (9F36),
     issuer application data / card verification results (9F10 sub-fields as applicable).
-  - For AES EMV keys (AES-based session key derivation): cryptogram = leftmost 8 bytes of AES-CMAC(session_key, preimage_bytes).
-  - For TDES EMV keys: cryptogram = ISO 9797-1 Algorithm 3 (Retail MAC) over preimage_bytes using the TDES session key.
+  - "For AES EMV keys (AES-based session key derivation): cryptogram = leftmost 8 bytes of AES-CMAC(session_key, preimage_bytes)."
+  - "For TDES EMV keys: cryptogram = ISO 9797-1 Algorithm 3 (Retail MAC) over preimage_bytes using the TDES session key."
   - APC VerifyAuthRequestCryptogram takes the transaction data (CDOL-R1 or full chip data TLV)
     and key ARN; it assembles the preimage internally per EMV Book 2 Annex A1.
   - When using a software tool (e.g., CyberChef EMV Verify ARQC), the preimage must be
     assembled externally before passing it to the operation; the tool does not parse TLV.
   - The session key is typically derived from the issuer master key (E0 type) using ATC-based
     EMV key derivation (Option A or Common Session Key derivation) applied before computing the ARQC.
-  - ARPC (Method 1) for both TDES and AES: X = ARC (2 bytes) || 0x0000000000000000 (6 zeros) → 8 bytes;
-    Y = ARQC XOR X. For TDES: ARPC = 3DES(SK_AC)[Y] (one-block ECB). For AES: ARPC = leftmost 8 bytes of
+  - ARPC (Method 1) for both TDES and AES — X = ARC (2 bytes) || 0x0000000000000000 (6 zeros) → 8 bytes;
+    Y = ARQC XOR X. For TDES, ARPC = 3DES(SK_AC)[Y] (one-block ECB). For AES, ARPC = leftmost 8 bytes of
     AES(SK_AC)[Y || 0x0000000000000000] (16-byte AES-ECB). Both methods XOR the ARC into the ARQC —
-    they do NOT use concatenation or CMAC. ARPC Method 2 (4 bytes): MAC(SK_AC)[ARQC || CSU ||
+    they do NOT use concatenation or CMAC. ARPC Method 2 (4 bytes) — MAC(SK_AC)[ARQC || CSU ||
     ProprietaryAuthData] truncated to 4 bytes — Retail MAC (ISO 9797-1 Alg 3) for 3DES; CMAC for AES.
     The APC VerifyAuthRequestCryptogram operation handles both when AuthResponseAttributes are included.
 relationships:
@@ -5975,8 +5975,8 @@ constraints:
   - P0 with Encrypt → rejected; use NoRestrictions=true
   - NoRestrictions=true bypasses mode enforcement and is the only import-compatible option
     for these three usage types
-  - Side effect: D0 keys imported with NoRestrictions are then rejected by re_encrypt_data
-    ("KeyUsages not allowed for this operation") — APC does not permit re-encrypt on
+  - Side effect — D0 keys imported with NoRestrictions are then rejected by re_encrypt_data
+    ("KeyUsages not allowed for this operation"); APC does not permit re-encrypt on
     unrestricted D0 keys
 relationships:
   - type: related_to
@@ -6149,8 +6149,8 @@ attributes:
     - any symmetric key outside an SCD
   exempt:
     - per-transaction DUKPT working keys stored inside an SCD
-    - issuer keys: PVV, CVV, EMV personalization keys (not in scope for PCI PIN key block
-      requirement; key blocks recommended as best practice but not mandated — Q13)
+    - issuer keys (PVV, CVV, EMV personalization keys) — not in scope for PCI PIN key block
+      requirement; key blocks recommended as best practice but not mandated — Q13
   standards: ["ANSI TR-31", "ISO 20038"]
   rollout_phases:
     phase_1: "2019-06-01 — internal connections and key storage within Service Provider environments (all applications and databases connected to HSMs)"
@@ -6462,7 +6462,7 @@ constraints:
   - Format 4 → Format 0/3 translation at HSM is a valid interim strategy while upstream catches up
   - Tokens used as PAN in Format 4 blocks must preserve PAN format (Luhn, length)
   - Cleartext key injection ban (Req 32-9 normative): entities injecting into POI v5+ devices on behalf of others — 1 January 2024; processors injecting into their own devices — 1 January 2026
-  - "Strong Cryptography" is defined only in the PCI DSS Glossary; PCI DSS itself has no
+  - The term "Strong Cryptography" is defined only in the PCI DSS Glossary; PCI DSS itself has no
     cryptographic algorithm requirements — algorithm mandates come from PCI PIN, PCI PTS,
     PCI P2PE, PCI CPoC, and PCI SPoC
 references:
@@ -6566,7 +6566,7 @@ attributes:
       2-key TDEA provides only 80-bit security — below the minimum for any key encipherment
       since it fails to protect even 3-key TDEA (112-bit). Prohibited as encipherment key.
 constraints:
-  - For AES-128 wrapping: RSA-3072 or EC-256 meet the 128-bit security threshold; for AES-256 wrapping: use EC-521 or RSA-15360 per PCI PIN Annex C — APC uses ECDH (K3 key) for AES-256 (RSA wrap limited to TDES and AES-128)
+  - "For AES-128 wrapping: RSA-3072 or EC-256 meet the 128-bit security threshold; for AES-256 wrapping: use EC-521 or RSA-15360 per PCI PIN Annex C — APC uses ECDH (K3 key) for AES-256 (RSA wrap limited to TDES and AES-128)"
   - TDEA KBPK (TR-31 key-block protection key) must be 3-key TDEA to protect 3-key TDEA payloads
   - TDEA KBPK cannot be used to protect AES key payloads — use AES-128+ KBPK for AES keys
   - APC import flow uses RSA-3072 OAEP for TDES and AES-128; for AES-256, use ECDH (K3 key) — RSA-3072 is 128-bit security and does not cover AES-256 (256-bit) per Annex C
@@ -8785,7 +8785,7 @@ attributes:
     encoding: Non-TLV (proprietary)
   encipherment:
     mode: ECB or CBC per ISO/IEC 10116
-    padding: "'80' || '00'..." to block boundary
+    padding: "'80' || '00'... to block boundary"
   mac_3DES:
     spec: ISO/IEC 9797-1
     padding: Mandatory '80' padding (method 2)
@@ -9346,7 +9346,7 @@ domain:
   - cryptography
 attributes:
   ksn_length:
-    tdes_dukpt: 10 bytes (80 bits) — typically 3 bytes key_set_id + 5 bytes KSN counter; in Thales: 6+0+5 digit descriptor "605"
+    tdes_dukpt: 10 bytes (80 bits) — typically 3 bytes key_set_id + 5 bytes KSN counter; Thales descriptor "605" (6+0+5 digits)
     aes_dukpt: 12 bytes (96 bits) — 8 bytes IKI (initial key identifier) + 4 bytes transaction counter per X9.24-3; passed to APC as a 24-character hex string
   bdk_algorithm:
     tdes_dukpt: TDES (triple-length 3DES, 168-bit nominal / 112-bit effective) — Variant or Key Block LMK
