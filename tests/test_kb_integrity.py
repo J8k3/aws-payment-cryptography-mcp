@@ -82,6 +82,30 @@ class TestKbYamlIntegrity:
             "event (see the Canonical Record Shape section)."
         )
 
+    def test_ledger_citations_resolve(self):
+        """Every 'Sources ledger <date>' citation must match a real ledger row.
+
+        The Sources table at the end of the KB is the provenance anchor; a
+        citation pointing at a date with no ingestion row is a broken pointer
+        (typo, or someone cited the ledger without adding the row).
+        """
+        text = _KB_PATH.read_text(encoding="utf-8")
+        ledger_dates = set()
+        for row in re.findall(r"^\| ([0-9/ ()a-z-]+?) \|", text, re.M):
+            ledger_dates.update(re.findall(r"\d{4}-\d{2}-\d{2}", row))
+        assert ledger_dates, "Sources ledger table not found or has no dated rows"
+        broken = sorted(
+            {
+                date
+                for date in re.findall(r"Sources ledger (\d{4}-\d{2}-\d{2})", text)
+                if date not in ledger_dates
+            }
+        )
+        assert not broken, (
+            f"Citations reference Sources-ledger dates with no matching row: "
+            f"{broken}. Add the ingestion row or fix the citation date."
+        )
+
     def test_entry_ids_are_unique(self, parsed_blocks):
         seen, dupes = {}, {}
         for _label, raw in parsed_blocks:
