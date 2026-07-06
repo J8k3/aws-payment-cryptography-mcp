@@ -3745,6 +3745,55 @@ relationships:
 status: active
 ```
 
+### Futurex Excrypt Key-Exchange Wire Format (Tags and Wrap Commands)
+
+```yaml
+id: format.futurex-excrypt-key-exchange-wire
+entity_type: format
+canonical_name: Futurex Excrypt Key-Exchange Wire Format — Framing, Tag Map, Wrap Commands
+summary: >
+  Tag map and framing for the Futurex Excrypt key EXCHANGE/EXPORT command family, as
+  used by the AWS public sample (aws-samples/samples-for-payment-cryptography-service,
+  key_exchange/hsm/futurex/commands.py); framing corroborated by apc-hsm-proxy
+  src/protocol/futurex.rs. MEDIUM CONFIDENCE — single source (AWS sample), NOT verified
+  against the Futurex TRM/firmware or live hardware. A maintainer with prior Futurex
+  Excrypt background reviewed it as "generally correct" but could NOT confirm individual
+  tag/enum semantics with certainty. Treat as a starting map; verify specific tag
+  meanings and enum values against the deployed module's documentation before relying
+  on them. Do not promote to high confidence without independent verification.
+domain:
+  - hsm
+  - key_management
+attributes:
+  confidence: medium
+  framing: "[AO<CMD>;<2-char-tag><value>;...;]"
+  tags:
+    FS: major/master-key selector (FS6 = PMK)
+    BG: wrapped key block
+    AE: KCV
+    AP: KEK
+    CT: "symmetric algorithm enum — 2=TDES2, 3=TDES3, 4=AES128, 5=AES192, 6=AES256"
+  commands:
+    GPGS: wraps a key under the master key; returns BG + AE
+    TWKA: wraps a key under a KEK
+    TRTP: builds a TR-34 export payload
+constraints:
+  - Scope — these are key EXCHANGE/EXPORT commands. This entry does NOT cover the
+    wrapped-key parameter as it appears inside a transaction (PIN/MAC) command — that
+    format (and where its KCV lives) is still unknown. Resolving Futurex wrapped working
+    keys to an APC ARN by KCV match is tracked in apc-hsm-proxy issue 53.
+  - The hsm_analysis registry grades TWKA and TRTP as directory confidence (existence
+    observed, semantics unverified against the Integration Guide); the command semantics
+    above come from the AWS sample only and carry this entry's medium confidence, not
+    the registry's authoritative grade.
+relationships:
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+  - type: related_to
+    target_id: tool.apc-hsm-proxy
+status: active
+```
+
 ### Generic Vendor Command Crosswalk Examples
 
 ```yaml
