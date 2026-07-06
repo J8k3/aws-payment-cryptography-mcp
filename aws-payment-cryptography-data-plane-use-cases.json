@@ -648,6 +648,48 @@
       }
     },
     {
+      "name": "GenerateAuthRequestCryptogram",
+      "endpoint": "POST /cryptogram/generate",
+      "purpose": "Generate an ARQC from an EMV application-cryptogram master key (E0) and transaction data — the inverse of VerifyAuthRequestCryptogram. In an issuer context this is primarily a test/reference generator (the chip generates production ARQCs).",
+      "status": "documented",
+      "required_fields": [
+        "KeyIdentifier",
+        "MajorKeyDerivationMode",
+        "PanSequenceNumber",
+        "PrimaryAccountNumber",
+        "SessionKeyDerivationAttributes",
+        "TransactionData"
+      ],
+      "use_cases": [
+        {
+          "id": "generate-arqc",
+          "status": "documented",
+          "behavioral_dimensions": {
+            "MajorKeyDerivationMode": [
+              "EMV_OPTION_A",
+              "EMV_OPTION_B"
+            ],
+            "SessionKeyDerivationAttributes": [
+              "Amex",
+              "Emv2000",
+              "EmvCommon",
+              "Mastercard",
+              "Visa"
+            ]
+          },
+          "notes": [
+            "TDES E0 keys only: the operation rejects every AES E0 key (AES-128 and AES-256, under all session-key derivation modes) with an invalid-key-algorithm error. This is asymmetric with VerifyAuthRequestCryptogram, which requires AES-256 E0 for AES ARQC verification — net effect: APC cannot mint an AES ARQC. Verified live (us-east-1, 2026-07); not documented in the public API reference.",
+            "The E0 key must be created/imported with DeriveKey mode; NoRestrictions is rejected by this operation specifically.",
+            "TransactionData must arrive pre-padded (ISO 9797-1 method 2: append 0x80 then 0x00 to an 8-byte boundary), exactly as on the verify side."
+          ]
+        }
+      ],
+      "source_reference": {
+        "note": "Operation postdates the API-reference PDF snapshot this catalog was generated from (2026-05-14); surfaced in AWS SDKs from ~1.110. Behavior verified against live APC (apc-hsm-proxy AES ARQC probe + apc-crossval).",
+        "union_type": "SessionKeyDerivation"
+      }
+    },
+    {
       "name": "GenerateCardValidationData",
       "endpoint": "POST /cardvalidationdata/generate",
       "purpose": "Generate card validation values such as CVV, CVV2, CSC, dCVV, or dCVC.",

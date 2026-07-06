@@ -5214,6 +5214,62 @@ relationships:
 status: active
 ```
 
+### APC: GenerateAuthRequestCryptogram — Test/Reference ARQC Generation
+
+```yaml
+id: operation.apc-generate-auth-request-cryptogram
+entity_type: operation
+canonical_name: APC GenerateAuthRequestCryptogram
+summary: >
+  Mints an EMV Authorization Request Cryptogram (ARQC) from an E0 EMV app-cryptogram
+  master key + transaction data — the inverse of VerifyAuthRequestCryptogram
+  (POST /cryptogram/generate). Issuers normally VERIFY ARQCs (the chip/terminal
+  generates them), so in an issuer/APC context this op is primarily a TEST/reference
+  generator: it produces a valid ARQC to exercise a verification path or a
+  second-implementation cross-check. It is how apc-hsm-proxy drives its live ARQC
+  verify accept-path differentials (KS/JS/KQ/KW/K2) and how apc-crossval mints the
+  APC leg of the EMV ARQC comparison. Surfaces in AWS SDKs from ~1.110; absent from
+  earlier API-reference snapshots.
+domain:
+  - emv
+  - cryptography
+inputs:
+  - KeyIdentifier — E0 IMK (TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS), MUST be created/imported
+    with DeriveKey mode (NoRestrictions is rejected by the generate op specifically —
+    note this is the opposite of KEY_CRYPTOGRAM import, which requires NoRestrictions
+    for E0; see rule.apc-d0-e0-p0-norestrictions)
+  - MajorKeyDerivationMode — EMV_OPTION_A / EMV_OPTION_B (Option B needs PAN > 16 digits;
+    see rule.apc-arqc-verify-inputs / the EMV_OPTION_B PAN-length rule)
+  - SessionKeyDerivationAttributes — Amex / Emv2000 / EmvCommon / Mastercard(+UN) / Visa
+  - TransactionData — caller MUST pre-apply EMV (ISO 9797-1 method 2) padding, exactly as on
+    the verify side (rule.apc-arqc-verify-inputs) — append 0x80 then 0x00 to the next 8-byte
+    boundary (always ≥ 1 pad byte). APC does NOT pad it; unpadded / non-8-byte-aligned data is
+    rejected (ValidationException "TransactionData should be of length multiple of 16" hex chars)
+    or silently mismatches. This padding requirement is symmetric across generate and verify.
+  - PrimaryAccountNumber, PanSequenceNumber
+constraints:
+  - TDES E0 only. GenerateAuthRequestCryptogram REJECTS every AES E0 key — AES-128 AND
+    AES-256 alike, under all SessionKeyDerivationMode values — with an invalid
+    key-algorithm error. This is ASYMMETRIC with VerifyAuthRequestCryptogram, which
+    REQUIRES AES-256 E0 for AES ARQC verification (rule.apc-arqc-aes256-required).
+    Net effect - APC cannot mint an AES ARQC, so an AES ARQC cannot be produced in APC
+    to feed an AES ARQC verification or cross-check. Not documented in the APC public API.
+  - E0 IMK must be DeriveKey mode (rule.apc-emv-master-key-derive-only); NoRestrictions
+    is additionally rejected by this generate op specifically.
+relationships:
+  - type: related_to
+    target_id: rule.apc-arqc-verify-inputs
+  - type: related_to
+    target_id: rule.apc-arqc-aes256-required
+  - type: related_to
+    target_id: rule.apc-emv-master-key-derive-only
+  - type: related_to
+    target_id: rule.apc-d0-e0-p0-norestrictions
+  - type: related_to
+    target_id: artifact.arqc
+status: active
+```
+
 ## APC Constraint Rules
 
 ### APC: Wrapping Key Strength Enforcement
