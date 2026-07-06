@@ -5387,13 +5387,17 @@ inputs:
     for E0; see rule.apc-d0-e0-p0-norestrictions)
   - MajorKeyDerivationMode — EMV_OPTION_A / EMV_OPTION_B (Option B needs PAN > 16 digits;
     see rule.apc-arqc-verify-inputs / the EMV_OPTION_B PAN-length rule)
-  - SessionKeyDerivationAttributes — Amex / Emv2000 / EmvCommon / Mastercard(+UN) / Visa
+  - SessionKeyDerivationAttributes — single-member union, Amex / Emv2000 / EmvCommon /
+    Mastercard / Visa. PrimaryAccountNumber and PanSequenceNumber are required members
+    INSIDE every branch (not top-level fields — SDK service model). Amex and Visa take
+    only PAN+PSN (no ATC member exists — matches the AGENTS.md Visa/Amex no-ATC/UN
+    constraint); Emv2000/EmvCommon add required ApplicationTransactionCounter;
+    Mastercard adds required ATC and UnpredictableNumber.
   - TransactionData — caller MUST pre-apply EMV (ISO 9797-1 method 2) padding, exactly as on
     the verify side (rule.apc-arqc-verify-inputs) — append 0x80 then 0x00 to the next 8-byte
     boundary (always ≥ 1 pad byte). APC does NOT pad it; unpadded / non-8-byte-aligned data is
     rejected (ValidationException "TransactionData should be of length multiple of 16" hex chars)
     or silently mismatches. This padding requirement is symmetric across generate and verify.
-  - PrimaryAccountNumber, PanSequenceNumber
 constraints:
   - TDES E0 only. GenerateAuthRequestCryptogram REJECTS every AES E0 key — AES-128 AND
     AES-256 alike, under all SessionKeyDerivationMode values — with an invalid
