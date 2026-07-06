@@ -4186,6 +4186,104 @@ relationships:
 status: active
 ```
 
+### HSM Fleet to APC Key Migration Playbook
+
+```yaml
+id: operation.hsm-fleet-to-apc-key-migration
+entity_type: operation
+canonical_name: HSM Fleet (Thales/Futurex) to APC Key Migration Playbook
+aliases:
+  - key migration workflow
+  - how do I move my keys to APC
+summary: >
+  End-to-end operator playbook for moving keys from a physical payShield or Futurex
+  fleet into AWS Payment Cryptography so an application can use them via apc-hsm-proxy.
+  Ties together the KB's TR-31, TR-34, KEY_CRYPTOGRAM, and KCV entries into one
+  sequence — inventory the source fleet, decide per-key disposition, import to APC,
+  wire up the proxy, cut over and decommission. Return this entry when an operator
+  asks "how do I move my keys?"
+domain:
+  - key_management
+  - hsm
+attributes:
+  step_1_inventory_source_fleet:
+    payshield: >
+      BU (Core/International, authoritative; supersedes legacy KA) retrieves a KCV per
+      key; KLTT-driven label inventory; payShield Manager exports.
+    futurex: >
+      KMAP returns the occupied-slot bitmap, then GPKR per slot returns KCV, key type,
+      major key, modifier, and usage; VKTE when only the KCV is needed. See the
+      hsm_analysis registry entries for the single-source wire-format caveat.
+    output: >
+      Spreadsheet of (label-or-slot, key type, algorithm, KCV, intended migration target).
+  step_2_decide_per_key_disposition:
+    keep_on_hsm: >
+      Variant-LMK or TKB-without-KC wire forms — operator pins the wire-form value in
+      proxy.yaml key_mappings; no import needed.
+    migrate_to_apc: >
+      Most cases — import via TR-34 (preferred for batch), TR-31, or KEY_CRYPTOGRAM
+      (single key, RSA-OAEP-wrapped clear bytes; test material with known bytes).
+    retire: No action.
+  step_3_import_to_apc:
+    tr34: >
+      GetParametersForImport(KeyMaterialType=TR_34_KEY_BLOCK) supplies the APC wrapping
+      key and import token; the payShield exports under it; the import call returns the ARN.
+    key_cryptogram: >
+      RSA-OAEP-SHA256 wrap under APC's ephemeral public key. Wrapping-strength rule
+      applies (rule.apc-key-wrapping-strength) — RSA_2048 wraps TDES only, AES-128
+      needs RSA_3072+, and AES-192/256 (and HMAC keys) cannot be RSA-wrapped at all;
+      use ECDH for those.
+    verify: >
+      The imported KeyCheckValue must match the source-HSM KCV before the key is
+      promoted to production (rule.kcv-validation-after-transfer). DES and AES KCV
+      methods match APC exactly (see the BU registry entry).
+  step_4_wire_up_proxy:
+    wrapped_key_wire_forms: >
+      X9.143 / TR-31-with-KC wire forms need no configuration; apc-hsm-proxy's startup
+      list_keys scan resolves them by KCV.
+    label_or_variant_lmk_wire_forms: >
+      Add a proxy.yaml key_mappings entry pinning the wire value to the APC ARN.
+    cross_check: >
+      Run apc-proxy --verify-only (apc-hsm-proxy issue 9) to cross-check KCVs between
+      the source HSM and APC before cutting traffic over.
+  step_5_cutover_and_decommission:
+    soak: Point one application instance at the proxy; soak under representative traffic.
+    compare: >
+      Compare results against the original HSM path for a deterministic subset
+      (PIN translate, MAC generate).
+    decommission: >
+      Schedule HSM-side key deletion only after the APC keys have served production
+      for the agreed observation window.
+constraints:
+  - Private keys cannot move — APC never imports or exports private key material
+    (rule.apc-private-keys-non-exportable); a flow that depends on moving a private key
+    off the source HSM must be re-architected
+  - Wrapping-key strength rules gate every import path (rule.apc-key-wrapping-strength);
+    HMAC keys import only under an AES-256 KEK with the TR-31 HM optional header
+  - Key attributes are immutable after creation (rule.apc-key-attributes-immutable) —
+    choose usage and modes to match the target operation before import; e.g. E0 IMKs
+    need DeriveKey for cryptogram operations, but KEY_CRYPTOGRAM import of E0/D0/P0
+    requires NoRestrictions (rule.apc-d0-e0-p0-norestrictions)
+relationships:
+  - type: uses
+    target_id: key-block.tr34
+  - type: uses
+    target_id: key-block.tr31
+  - type: uses
+    target_id: concept.apc-key-cryptogram-import
+  - type: uses
+    target_id: artifact.kcv
+  - type: related_to
+    target_id: tool.apc-hsm-proxy
+  - type: related_to
+    target_id: concept.apc-key-lifecycle
+  - type: related_to
+    target_id: rule.kcv-validation-after-transfer
+  - type: related_to
+    target_id: concept.apc-ecdh-key-agreement
+status: active
+```
+
 ## APC SDK Implementation Notes
 
 ### verify_pin_data Type Naming Trap
