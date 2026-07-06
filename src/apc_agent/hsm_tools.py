@@ -40,6 +40,8 @@ _PROXY_HANDLERS: dict[str, set[str]] = {
         "KQ",                              # ARQC/ARPC
         "KW",                              # ARQC/ARPC (EMV & Cloud-Based SKD)
         "JS",                              # ARQC/ARPC (UnionPay/CUP)
+        "KS", "K2",                        # CAP / EMV DDA ARQC verify (→ verify_auth_request_cryptogram)
+        "JU", "KU",                        # Issuer-script MAC (mode 0 integrity, via GenerateMac/EmvMac)
         "B2",                              # Heartbeat/diagnostics
     },
 }
