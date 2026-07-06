@@ -79,6 +79,13 @@ p.488", "Verified live against APC 2026-07"). Enforced by `tests/test_kb_integri
 an entry with no citation signal fails CI. When adding records from a new source, also add
 a row to the Sources ledger.
 
+Cite the latest edition of a document when possible. If the latest edition is not
+obtainable (paywalled, gated) and an older edition is held, cite the edition actually
+consulted and note in the Sources-ledger row that a newer edition exists and whether the
+cited content is edition-stable — never let an older edition read as if it were current.
+Include the edition/version and date in the citation (e.g. "ISO 9564-1:2017", "FIPS 197
+(2023 update)", "EMV Book 2 v4.3 §8.2.1") so a version gap is visible at the point of use.
+
 ## Card Data
 
 ### Primary Account Number
@@ -964,7 +971,7 @@ attributes:
   length_length_bytes: "1-3"
   supports_constructed_tags: true
 references:
-  - "ISO/IEC 8825 BER encoding; EMV Book 3 Annex B (definitional)"
+  - "ITU-T X.690 (02/2021, current) = ISO/IEC 8825-1 BER/DER — held source, Sources ledger 2026-07-06; EMV Book 3 Annex B"
   - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
@@ -3175,7 +3182,7 @@ relationships:
   - type: related_to
     target_id: concept.pan
 references:
-  - "NIST SP 800-38G — FF1/FF3-1 (definitional)"
+  - "NIST SP 800-38G (2016, current) — FF1/FF3-1; held source, Sources ledger 2026-07-06"
   - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
@@ -3546,7 +3553,7 @@ relationships:
   - type: related_to
     target_id: key-block.tr34
 references:
-  - "NIST SP 800-56A (definitional)"
+  - "NIST SP 800-56A r3 (2018, current) — ECDH/key agreement; held source, Sources ledger 2026-07-06"
   - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
@@ -3579,7 +3586,7 @@ summary: Triple application of DES widely used in legacy and current payment cry
 domain:
   - cryptography
 references:
-  - "NIST SP 800-67 — TDEA (definitional)"
+  - "NIST SP 800-67 r2 (2017, current) — TDEA; held source, Sources ledger 2026-07-06"
   - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
@@ -3599,7 +3606,7 @@ attributes:
     - 192
     - 256
 references:
-  - "FIPS 197 — AES (definitional)"
+  - "NIST FIPS 197 (2001, update 2023-05-09 — current) — AES; held source, Sources ledger 2026-07-06"
   - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
@@ -3614,7 +3621,7 @@ summary: Message authentication code construction based on a cryptographic hash 
 domain:
   - cryptography
 references:
-  - "FIPS 198-1 / RFC 2104 — HMAC (definitional)"
+  - "NIST FIPS 198-1 (2008, current) / RFC 2104 (1997) — HMAC; held sources, Sources ledger 2026-07-06"
   - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
@@ -10971,8 +10978,8 @@ that publish annual revisions).
 | 2026-07-05 | aws-samples/samples-for-payment-cryptography-service — migration_guidance/payshield-command-mapping.md (verified against source), key_exchange/utils/apc.py, key_exchange/hsm/futurex/commands.py (single source, not TRM-verified) | AWS | accessed 2026-07-05 | hsm, key_management, emv, cryptography |
 | 2026-07-03 | apc-hsm-proxy live differentials vs APC us-east-1: issuer-script MAC JU/KU 15/15 (EmvMac session-key derivation + SessionKeyDerivationValue union rule), KS/K2 ARQC verify, GenerateAuthRequestCryptogram probes (TDES-only rejection of all AES E0, DeriveKey required, method-2 pre-padding) | Live API testing (apc-hsm-proxy / apc-crossval) | live 2026-07 | emv, cryptography, key_management |
 | 2026-07-06 | AWS SDK service models — botocore payment-cryptography-data (operation existence, required members, endpoints; mechanically enforced by tests/test_use_cases_grounding.py); aws-sdk-rust paymentcryptographydata v1.x struct types | AWS | installed SDK version, re-checked every CI run | key_management, cryptography, emv |
-| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs cached locally as .tmp-emv-book2-v43.pdf / .tmp-emv-book3-v43.pdf, from Internet Archive captures of the original EMVCo files). Now HELD sources — usable for direct content verification. v4.4 was never publicly archived (EMVCo gated it), so entries citing v4.4 specifically are checked against v4.3 with a note that clause numbers can differ | EMVCo (via Internet Archive) | v4.3, Nov 2011; cached 2026-07-06 | emv, cryptography, key_management |
-| 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally: FIPS 197 (AES), FIPS 198-1 (HMAC), SP 800-38G (FF1/FF3-1 FPE), SP 800-67r2 (TDEA), SP 800-56A r3 (ECDH/key agreement), ITU-T X.690 (= ISO/IEC 8825 BER/DER), RFC 2104 (HMAC). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | current editions; cached 2026-07-06 | cryptography, key_management |
-| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). PIN block formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror) for APDU/ATR definitional claims. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — their entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 via impl; cached 2026-07-06 | pin_processing, emv, cryptography |
+| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs cached locally as .tmp-emv-book2-v43.pdf / .tmp-emv-book3-v43.pdf, from Internet Archive captures of the original EMVCo files). Now HELD sources — usable for direct content verification. VERSION CURRENCY: v4.4 (October 2022) is the current edition and is the one that SHOULD be cited; it is gated behind EMVCo login and only appears on copyright-infringing re-hosts, so it is NOT held. Entries verified here against v4.3 note the edition; the fundamentals checked (ARPC Method 1/2, session-key derivation Annex A1, cryptogram types) are stable across the v4.3→v4.4 boundary, but clause/table numbers can shift — prefer a v4.4 citation whenever v4.4 becomes obtainable | EMVCo (via Internet Archive) | held: v4.3 Nov 2011; LATEST: v4.4 Oct 2022 (gated); cached 2026-07-06 | emv, cryptography, key_management |
+| 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally, each the CURRENT edition: FIPS 197 (AES, 2001 w/ update 2023-05-09), FIPS 198-1 (HMAC, 2008), SP 800-38G (FF1/FF3-1 FPE, 2016 — no finalized revision), SP 800-67r2 (TDEA, 2017), SP 800-56A r3 (ECDH/key agreement, 2018), ITU-T X.690 (= ISO/IEC 8825 BER/DER, 02/2021), RFC 2104 (HMAC, 1997). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | latest editions as noted; cached 2026-07-06 | cryptography, key_management |
+| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
 | 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). EMV Books, PCI standards, ISO/NIST specs, and PUGD0541 are not held on disk; entries citing them remain ledger-backed only. | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
