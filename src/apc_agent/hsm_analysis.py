@@ -1176,12 +1176,24 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                confidence="medium"),
     HsmCommand("Thales/Futurex", "International", "BU",
                "Generate a Key Check Value", "KEY_MGMT",
-               "Generates a KCV for key verification. Response code: BV.",
+               "Generates a check value for a key encrypted under an LMK pair. Response code: BV. "
+               "payShield 10K Core host command. Supersedes legacy KA (KB) per KA's own spec "
+               "(PUGD0538-003 p.73); KA is additionally disabled when 'Enforce key type 002 "
+               "separation for PCI HSM compliance' = 'Y'.",
                None, None,
-               "EFTlab source — reference quality. "
+               "Source: PUGD0537-004 Rev A Core Host Commands — AUTHORITATIVE. "
+               "Key Block LMK form uses reserved fields: 2-digit Key Type='FF', Key Length Flag='F', "
+               "Key='S'+block, 3-digit Key Type='FFF'; response always carries 6 valid KCV digits "
+               "for key blocks. Variant LMK form: 2-digit Key Type Code ('00'-'9E', the 3-digit code "
+               "minus its middle digit) + Key Length Flag 0/1/2 (single/double/triple). "
+               "Optional trailer ';' + '0' + '0' + KCV type ('0'=16-digit, '1'=6-digit). "
+               "6-digit KCV requires no authorization; 16-digit requires authorization "
+               "(e.g. activity generate.zpk.host under multiple-authorized-activities). "
+               "KCV method: DES = zero-block encryption; AES = zero-block CMAC (per PCI PIN Annex C); "
+               "HMAC = HMAC of a zero-length message — DES and AES match APC's KeyCheckValue exactly. "
                "APC includes KCV in all key creation and import responses. "
-               "AES keys must use CMAC method for KCV per PCI PIN Annex C.",
-               confidence="medium"),
+               "Used by apc-hsm-proxy --verify-only as the HSM-side KCV cross-check primitive.",
+               confidence="high"),
     # Encryption
     HsmCommand("Thales/Futurex", "International", "M0",
                "Encrypt a Block of Data", "ENCRYPT",
@@ -1863,7 +1875,9 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                None, None,
                "In APC: KCV is included in all create_key and import_key responses "
                "(KeyCheckValue field). No separate APC call needed. "
-               "AES keys must use CMAC-based KCV — never ECB-zeros method."),
+               "AES keys must use CMAC-based KCV — never ECB-zeros method. "
+               "Superseded by BU per KA's own spec (PUGD0538-003 p.73); KA is disabled when "
+               "'Enforce key type 002 separation for PCI HSM compliance' = 'Y'."),
     # ── Legacy Message Encryption ─────────────────────────────────────────────
     HsmCommand("Thales", "Legacy", "HE",
                "Encrypt Data Block", "ENCRYPT",
