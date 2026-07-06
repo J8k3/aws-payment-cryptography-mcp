@@ -5601,7 +5601,9 @@ constraints:
   - APC ISO9797_ALGORITHM3 → Method 1 (right-pad with 0x00)
   - Method 2 (ISO 7816-4: append 0x80 then zeros) is not supported by APC for this algorithm
   - EMV issuer-script MAC operations often use Method 2 — these will NOT match APC GenerateMac output
-  - To produce an APC-compatible MAC, use explicit Method 1 in the client MAC library
+    on the raw ISO9797_ALGORITHM3 path; the EmvMac path with caller-applied Method 2 padding DOES
+    yield an EMV issuer-script MAC (see rule.apc-emvmac-issuer-script-session-key)
+  - To produce an APC-compatible MAC on this path, use explicit Method 1 in the client MAC library
 examples:
   - "CyberChef 'MAC Generate' with ISO 9797-3 Method 1 matches APC; 'EMV Generate MAC' now exposes a padding method selector (default Method 2)"
 relationships:
@@ -5609,6 +5611,57 @@ relationships:
     target_id: algorithm.mac-iso9797
   - type: related_to
     target_id: rule.apc-generate-mac-length-nibbles
+  - type: related_to
+    target_id: rule.apc-emvmac-issuer-script-session-key
+status: active
+```
+
+### APC: GenerateMac EmvMac Derives Issuer-Script Session Keys (IMK-SMI → SK-SMI)
+
+```yaml
+id: rule.apc-emvmac-issuer-script-session-key
+entity_type: constraint_rule
+canonical_name: APC GenerateMac EmvMac Performs Full Issuer-Script Session-Key Derivation
+summary: >
+  For EMV issuer-script (secure-messaging integrity) MACs, APC GenerateMac with
+  MacAttributes=EmvMac performs the entire session-key derivation itself: given an
+  E2 IMK (DeriveKey usage) it derives MK-SMI → SK-SMI internally and returns the MAC.
+  The client never derives a session key. Verified live against APC (2026-07,
+  apc-hsm-proxy issuer_script_mac differential, 15/15 across five scheme mappings).
+domain:
+  - emv
+  - cryptography
+  - key_management
+attributes:
+  emvmac_parameters:
+    MajorKeyDerivationMode: EMV_OPTION_A or EMV_OPTION_B (IMK → card master key step)
+    PrimaryAccountNumber: clear PAN digits
+    PanSequenceNumber: 2-digit PSN
+    SessionKeyDerivationMode: EMV2000 | EMV_COMMON_SESSION_KEY | AMEX | VISA | MASTERCARD_SESSION_KEY
+    SessionKeyDerivationValue: tagged union — exactly one of ApplicationTransactionCounter or ApplicationCryptogram
+  value_type_rule_verified_live:
+    ApplicationTransactionCounter_required_by: [EMV2000, AMEX, VISA]
+    ApplicationCryptogram_required_by: [EMV_COMMON_SESSION_KEY, MASTERCARD_SESSION_KEY]
+    mismatch_behavior: ValidationException (rejected before any HSM operation)
+    note: Mastercard M/Chip callers pass the 8-byte RANDi in the ApplicationCryptogram member
+  payshield_scheme_mapping_mode0_integrity:
+    "JU '1' UnionPay CUP 4.2": EMV2000 + ATC
+    "KU '0' Visa VIS": VISA + ATC
+    "KU '1' Mastercard M/Chip": MASTERCARD_SESSION_KEY + AC (RANDi)
+    "KU '2' Amex AEIPS": AMEX + ATC
+    "KU '5' JCB CVN04": EMV_COMMON_SESSION_KEY + AC
+constraints:
+  - EmvMac does NOT pad MessageData — the caller must apply ISO 9797-1 Method 2 (EMV '80' padding) before the call; this is the APC path that DOES yield an EMV Method-2 issuer-script MAC (contrast rule.apc-iso9797-algorithm3-method1, which covers the raw ISO9797_ALGORITHM3 path)
+  - MacLength=4 is accepted (payShield issuer-script MACs are 4 bytes)
+  - No IV input and no branch/height key-tree parameters — payShield KY-style EMV2000 secure-messaging derivation (IV-SMI + key-tree, PUGD0537-004 Rev A) cannot be mapped onto EmvMac
+  - Confidentiality / PIN-change secure messaging is a separate API (GenerateMacEmvPinChange, E1 PEK) — EmvMac covers integrity-only scripts
+relationships:
+  - type: related_to
+    target_id: operation.apc-generate-mac
+  - type: related_to
+    target_id: operation.emv-secure-messaging
+  - type: related_to
+    target_id: rule.apc-iso9797-algorithm3-method1
 status: active
 ```
 
