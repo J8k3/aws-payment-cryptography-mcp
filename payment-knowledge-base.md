@@ -384,6 +384,8 @@ constraints:
   - Uses the right-most 12 PAN digits excluding the check digit.
 examples:
   - "041111FFFFFFFFFF XOR 0000642221737511"
+references:
+  - "ISO 9564-1:2017 clause 9.3.2 — verified against openemv/pinblock reference implementation (github.com/openemv/pinblock), Sources ledger 2026-07-06: control+length nibble, F-pad, XOR of PIN field with right-most 12 PAN digits ex check digit"
 status: active
 ```
 
@@ -405,6 +407,8 @@ attributes:
   pan_required: false
   pin_length_min: 4
   pin_length_max: 12
+references:
+  - "ISO 9564-1:2017 clause 9.3.3 — verified against openemv/pinblock, Sources ledger 2026-07-06: PAN-independent, nonce fill (no XOR)"
 status: active
 ```
 
@@ -424,6 +428,8 @@ domain:
 attributes:
   pan_required: false
   offline_local_use_only: true
+references:
+  - "ISO 9564-1:2017 clause 9.3.4 — verified against openemv/pinblock, Sources ledger 2026-07-06: standalone PIN field, F-pad, no PAN"
 status: active
 ```
 
@@ -442,6 +448,8 @@ domain:
   - cryptography
 attributes:
   pan_required: true
+references:
+  - "ISO 9564-1:2017 clause 9.3.5 — verified against openemv/pinblock, Sources ledger 2026-07-06: like format 0 but random (0xA-0xF) fill, XORed with same 12 PAN digits"
 status: active
 ```
 
@@ -461,6 +469,8 @@ domain:
 attributes:
   pan_required: true
   associated_cipher_family: AES
+references:
+  - "ISO 9564-1:2017 clauses 9.4.2.2.2-9.4.2.2.3 — verified against openemv/pinblock, Sources ledger 2026-07-06: 128-bit block, separate 64-bit PIN and PAN fields (no XOR), M-nibble for PAN digits beyond 12"
 status: active
 ```
 
@@ -1882,7 +1892,7 @@ relationships:
   - type: related_to
     target_id: algorithm.emv-key-derivation
 references:
-  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 8 ARPC Methods 1 and 2"
+  - "EMV Book 2 Security and Key Management v4.3 §8.2.1-8.2.2 — verified verbatim against held PDF 2026-07-06 (Method 1: X := ARC||6 zero bytes, Y := ARQC XOR X, ARPC := DES3(SK_AC)[Y]; Method 2 CSU-based MAC), Sources ledger 2026-07-06"
 status: active
 ```
 
@@ -5062,6 +5072,8 @@ relationships:
     target_id: algorithm.emv-key-derivation
   - type: related_to
     target_id: tool.cyberchef-payment-fork
+references:
+  - "EMV Book 2 Security and Key Management v4.3 §8 (application cryptograms) and §8.2.1-8.2.2 (ARPC) — ARPC Method 1 construction verified verbatim against held PDF 2026-07-06, Sources ledger 2026-07-06"
 status: active
 ```
 
@@ -10959,5 +10971,8 @@ that publish annual revisions).
 | 2026-07-05 | aws-samples/samples-for-payment-cryptography-service — migration_guidance/payshield-command-mapping.md (verified against source), key_exchange/utils/apc.py, key_exchange/hsm/futurex/commands.py (single source, not TRM-verified) | AWS | accessed 2026-07-05 | hsm, key_management, emv, cryptography |
 | 2026-07-03 | apc-hsm-proxy live differentials vs APC us-east-1: issuer-script MAC JU/KU 15/15 (EmvMac session-key derivation + SessionKeyDerivationValue union rule), KS/K2 ARQC verify, GenerateAuthRequestCryptogram probes (TDES-only rejection of all AES E0, DeriveKey required, method-2 pre-padding) | Live API testing (apc-hsm-proxy / apc-crossval) | live 2026-07 | emv, cryptography, key_management |
 | 2026-07-06 | AWS SDK service models — botocore payment-cryptography-data (operation existence, required members, endpoints; mechanically enforced by tests/test_use_cases_grounding.py); aws-sdk-rust paymentcryptographydata v1.x struct types | AWS | installed SDK version, re-checked every CI run | key_management, cryptography, emv |
+| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs cached locally as .tmp-emv-book2-v43.pdf / .tmp-emv-book3-v43.pdf, from Internet Archive captures of the original EMVCo files). Now HELD sources — usable for direct content verification. v4.4 was never publicly archived (EMVCo gated it), so entries citing v4.4 specifically are checked against v4.3 with a note that clause numbers can differ | EMVCo (via Internet Archive) | v4.3, Nov 2011; cached 2026-07-06 | emv, cryptography, key_management |
+| 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally: FIPS 197 (AES), FIPS 198-1 (HMAC), SP 800-38G (FF1/FF3-1 FPE), SP 800-67r2 (TDEA), SP 800-56A r3 (ECDH/key agreement), ITU-T X.690 (= ISO/IEC 8825 BER/DER), RFC 2104 (HMAC). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | current editions; cached 2026-07-06 | cryptography, key_management |
+| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). PIN block formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror) for APDU/ATR definitional claims. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — their entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 via impl; cached 2026-07-06 | pin_processing, emv, cryptography |
 | 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). EMV Books, PCI standards, ISO/NIST specs, and PUGD0541 are not held on disk; entries citing them remain ledger-backed only. | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
