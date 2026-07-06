@@ -655,8 +655,6 @@
       "required_fields": [
         "KeyIdentifier",
         "MajorKeyDerivationMode",
-        "PanSequenceNumber",
-        "PrimaryAccountNumber",
         "SessionKeyDerivationAttributes",
         "TransactionData"
       ],
@@ -680,7 +678,8 @@
           "notes": [
             "TDES E0 keys only: the operation rejects every AES E0 key (AES-128 and AES-256, under all session-key derivation modes) with an invalid-key-algorithm error. This is asymmetric with VerifyAuthRequestCryptogram, which requires AES-256 E0 for AES ARQC verification — net effect: APC cannot mint an AES ARQC. Verified live (us-east-1, 2026-07); not documented in the public API reference.",
             "The E0 key must be created/imported with DeriveKey mode; NoRestrictions is rejected by this operation specifically.",
-            "TransactionData must arrive pre-padded (ISO 9797-1 method 2: append 0x80 then 0x00 to an 8-byte boundary), exactly as on the verify side."
+            "TransactionData must arrive pre-padded (ISO 9797-1 method 2: append 0x80 then 0x00 to an 8-byte boundary), exactly as on the verify side.",
+            "PrimaryAccountNumber and PanSequenceNumber are required members INSIDE each SessionKeyDerivationAttributes union branch, not top-level fields (per the SDK service model). Amex and Visa branches take only PAN+PSN — no ApplicationTransactionCounter member exists for them; Emv2000/EmvCommon add required ATC; Mastercard adds required ATC and UnpredictableNumber."
           ]
         }
       ],

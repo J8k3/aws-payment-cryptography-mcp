@@ -284,3 +284,58 @@ class TestGenerateMac:
             )
         call_kwargs = mock_client.generate_mac.call_args.kwargs
         assert "MacLength" not in call_kwargs
+
+
+class TestGenerateAuthRequestCryptogram:
+    def test_passes_correct_params_to_boto3(self, tools):
+        mock_client = MagicMock()
+        mock_client.generate_auth_request_cryptogram.return_value = {
+            "AuthRequestCryptogram": "8C8E19CED4DBBF59"
+        }
+        skda = {
+            "Visa": {
+                "PrimaryAccountNumber": "4111111111111111",
+                "PanSequenceNumber": "01",
+            }
+        }
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            result = tools["generate_auth_request_cryptogram"](
+                key_identifier="alias/emv-e0-imk",
+                transaction_data="0000000010000000000000000840800000000008401507150001234567891E030000" + "8000000000000000000000000000",
+                major_key_derivation_mode="EMV_OPTION_A",
+                session_key_derivation_attributes=skda,
+            )
+        call_kwargs = mock_client.generate_auth_request_cryptogram.call_args.kwargs
+        assert call_kwargs["KeyIdentifier"] == "alias/emv-e0-imk"
+        assert call_kwargs["MajorKeyDerivationMode"] == "EMV_OPTION_A"
+        assert call_kwargs["SessionKeyDerivationAttributes"] == skda
+        assert result["AuthRequestCryptogram"] == "8C8E19CED4DBBF59"
+
+    def test_aws_error_surfaces_as_error_dict(self, tools):
+        # TDES-only: AES E0 keys are rejected by the service — the tool must
+        # surface that as an error dict, not raise.
+        from botocore.exceptions import ClientError
+
+        mock_client = MagicMock()
+        mock_client.generate_auth_request_cryptogram.side_effect = ClientError(
+            {"Error": {"Code": "ValidationException",
+                       "Message": "KeyAlgorithm of the input key is invalid"}},
+            "GenerateAuthRequestCryptogram",
+        )
+        with patch("apc_agent.data_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            result = tools["generate_auth_request_cryptogram"](
+                key_identifier="alias/emv-e0-aes256",
+                transaction_data="00" * 16,
+                major_key_derivation_mode="EMV_OPTION_A",
+                session_key_derivation_attributes={
+                    "Emv2000": {
+                        "PrimaryAccountNumber": "4111111111111111",
+                        "PanSequenceNumber": "01",
+                        "ApplicationTransactionCounter": "0001",
+                    }
+                },
+            )
+        assert result["aws_error_code"] == "ValidationException"
+        assert "invalid" in result["error"]
