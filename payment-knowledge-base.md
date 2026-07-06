@@ -4343,7 +4343,7 @@ attributes:
   request_code: B8
   response_code: B9
 references:
-  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Core Host Commands PUGD0537-004 Rev A — 'TR-34 Key Export' (~p.194); verified against local PDF 2026-07-06. NOT in the Legacy Host Commands manual."
 status: active
 ```
 
@@ -4363,7 +4363,7 @@ attributes:
   request_code: BA
   response_code: BB
 references:
-  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Core Host Commands PUGD0537-004 Rev A — 'Encrypt a Clear PIN' (p.247, clear-PIN facilities section); verified against local PDF 2026-07-06. NOT in the Legacy Host Commands manual."
 status: active
 ```
 
@@ -4383,7 +4383,7 @@ attributes:
   request_code: BI
   response_code: BJ
 references:
-  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14 — 'Generate a BDK', superseded by A0 (which does not support key scheme '0'); verified against local PDF 2026-07-06"
 status: active
 ```
 
@@ -5141,7 +5141,7 @@ attributes:
     - DDA
     - CDA
 references:
-  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Sections 5-6 ODA"
+  - "EMV Book 2 Security and Key Management v4.3 — Section 5 SDA (targeted read, Sources ledger 2026-05-22); Section 6 DDA/CDA definitional (section not in the targeted-read row)"
 status: active
 ```
 
@@ -5181,7 +5181,7 @@ relationships:
   - type: related_to
     target_id: operation.emv-offline-data-authentication
 references:
-  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 6 DDA"
+  - "EMV Book 2 Security and Key Management v4.3 — Section 6 DDA (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -5203,7 +5203,7 @@ relationships:
   - type: related_to
     target_id: artifact.arqc
 references:
-  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 6.6 CDA"
+  - "EMV Book 2 Security and Key Management v4.3 — Section 6.6 CDA (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -5320,7 +5320,7 @@ relationships:
   - type: related_to
     target_id: concept.cvm
 references:
-  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 7 PIN encipherment"
+  - "EMV Book 2 Security and Key Management v4.3 — Section 7 PIN encipherment (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -10959,3 +10959,4 @@ that publish annual revisions).
 | 2026-07-05 | aws-samples/samples-for-payment-cryptography-service — migration_guidance/payshield-command-mapping.md (verified against source), key_exchange/utils/apc.py, key_exchange/hsm/futurex/commands.py (single source, not TRM-verified) | AWS | accessed 2026-07-05 | hsm, key_management, emv, cryptography |
 | 2026-07-03 | apc-hsm-proxy live differentials vs APC us-east-1: issuer-script MAC JU/KU 15/15 (EmvMac session-key derivation + SessionKeyDerivationValue union rule), KS/K2 ARQC verify, GenerateAuthRequestCryptogram probes (TDES-only rejection of all AES E0, DeriveKey required, method-2 pre-padding) | Live API testing (apc-hsm-proxy / apc-crossval) | live 2026-07 | emv, cryptography, key_management |
 | 2026-07-06 | AWS SDK service models — botocore payment-cryptography-data (operation existence, required members, endpoints; mechanically enforced by tests/test_use_cases_grounding.py); aws-sdk-rust paymentcryptographydata v1.x struct types | AWS | installed SDK version, re-checked every CI run | key_management, cryptography, emv |
+| 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
