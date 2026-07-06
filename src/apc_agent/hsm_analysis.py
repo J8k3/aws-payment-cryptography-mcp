@@ -285,6 +285,49 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "Futurex HSMs pad shorter key blocks to at least 3DES length automatically. "
                "After migration, only key blocks should be stored — disable cryptograms in Key Block Policy. "
                "Source: Futurex TR-31 Key Block Implementation Whitepaper (2024)."),
+    # ── Key table enumeration family ───────────────────────────────────────────
+    # confidence="medium": wire formats confirmed by a single working implementation
+    # (AWS.Magnus.KeyCeremonyTool HsmKeyCeremonyClient.cs), NOT corroborated by the
+    # Futurex General Payment HSM Integration Guide (2024), which does not document
+    # these commands' field layouts (GPKR's existence is confirmed by docs.futurex.com,
+    # "General Purpose Key settings get (read only)"). Verify tag semantics against the
+    # deployed module's documentation before relying on them; do not promote to high
+    # without an authoritative Futurex source.
+    HsmCommand("Futurex", "Excrypt", "KMAP", "Bitmap Key Table", "KEY_MGMT",
+               "Returns a hex bitmap of which symmetric key slots are occupied. Each bit "
+               "represents one slot (1=occupied, 0=empty). AK field controls which tables to "
+               "include: first char=symmetric, second=asymmetric, third=Diebold. AK=100 requests "
+               "symmetric table only.",
+               None, None,
+               "Request: [AOKMAP;AK100;]. Response BD field = hex bitmap string. Parse each hex "
+               "nibble into 4 bits (MSB to LSB) to get slot occupancy. Use to enumerate all "
+               "occupied key slots before calling GPKR per slot. No APC equivalent — APC uses "
+               "list_keys for enumeration. "
+               "Source: AWS.Magnus.KeyCeremonyTool (single working implementation — see family note).",
+               confidence="medium"),
+    HsmCommand("Futurex", "Excrypt", "GPKR", "General Purpose Key Settings Get", "KEY_MGMT",
+               "Returns metadata for a specific key slot: key type (algorithm), KCV, major key, "
+               "key modifier, and key usage. Used after KMAP to retrieve per-slot details for key "
+               "inventory and reconciliation.",
+               None, None,
+               "Request: [AOGPKR;BD{slotId};BE0;] where BE=0 is symmetric (default), BE=1 is "
+               "asymmetric. Response fields: CT=key type/algorithm, AE=KCV, FS=major key "
+               "(1=MFK 6=PMK 7=FTK), AS=key modifier (0=KEK 1=PEK 2=DEK 3=MAK 4=PVK 5=ATM 9=PGK), "
+               "CY=key usage. Combined with KMAP this provides a full key inventory including "
+               "(usage, algorithm, KCV) tuples that can be matched against APC list_keys+get_key "
+               "for automated ARN resolution. "
+               "Source: AWS.Magnus.KeyCeremonyTool. Field layout NOT documented in the Futurex "
+               "Integration Guide (2024); existence confirmed by docs.futurex.com — see family note.",
+               confidence="medium"),
+    HsmCommand("Futurex", "Excrypt", "VKTE", "Verify Key Table Entry", "KEY_MGMT",
+               "Verifies a key table entry and returns its KCV. Lighter than GPKR — use when only "
+               "the KCV is needed for a known slot.",
+               None, None,
+               "Request: [AOVKTE;BD{slotId};AS{modifier};] where AS is the key modifier "
+               "(0=KEK default). Response AE field = KCV. Use GPKR instead when key type and "
+               "usage are also needed. "
+               "Source: AWS.Magnus.KeyCeremonyTool (single working implementation — see family note).",
+               confidence="medium"),
     # ── Remote Key Loading / ECDH / RSA key-exchange family ───────────────────
     # confidence="directory": these command codes are OBSERVED in Futurex key-migration
     # and remote-key-loading flows, but their precise wire semantics and APC mappings are
@@ -1176,12 +1219,24 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                confidence="medium"),
     HsmCommand("Thales/Futurex", "International", "BU",
                "Generate a Key Check Value", "KEY_MGMT",
-               "Generates a KCV for key verification. Response code: BV.",
+               "Generates a check value for a key encrypted under an LMK pair. Response code: BV. "
+               "payShield 10K Core host command. Supersedes legacy KA (KB) per KA's own spec "
+               "(PUGD0538-003 p.73); KA is additionally disabled when 'Enforce key type 002 "
+               "separation for PCI HSM compliance' = 'Y'.",
                None, None,
-               "EFTlab source — reference quality. "
+               "Source: PUGD0537-004 Rev A Core Host Commands — AUTHORITATIVE. "
+               "Key Block LMK form uses reserved fields: 2-digit Key Type='FF', Key Length Flag='F', "
+               "Key='S'+block, 3-digit Key Type='FFF'; response always carries 6 valid KCV digits "
+               "for key blocks. Variant LMK form: 2-digit Key Type Code ('00'-'9E', the 3-digit code "
+               "minus its middle digit) + Key Length Flag 0/1/2 (single/double/triple). "
+               "Optional trailer ';' + '0' + '0' + KCV type ('0'=16-digit, '1'=6-digit). "
+               "6-digit KCV requires no authorization; 16-digit requires authorization "
+               "(e.g. activity generate.zpk.host under multiple-authorized-activities). "
+               "KCV method: DES = zero-block encryption; AES = zero-block CMAC (per PCI PIN Annex C); "
+               "HMAC = HMAC of a zero-length message — DES and AES match APC's KeyCheckValue exactly. "
                "APC includes KCV in all key creation and import responses. "
-               "AES keys must use CMAC method for KCV per PCI PIN Annex C.",
-               confidence="medium"),
+               "Used by apc-hsm-proxy --verify-only as the HSM-side KCV cross-check primitive.",
+               confidence="high"),
     # Encryption
     HsmCommand("Thales/Futurex", "International", "M0",
                "Encrypt a Block of Data", "ENCRYPT",
@@ -1863,7 +1918,9 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                None, None,
                "In APC: KCV is included in all create_key and import_key responses "
                "(KeyCheckValue field). No separate APC call needed. "
-               "AES keys must use CMAC-based KCV — never ECB-zeros method."),
+               "AES keys must use CMAC-based KCV — never ECB-zeros method. "
+               "Superseded by BU per KA's own spec (PUGD0538-003 p.73); KA is disabled when "
+               "'Enforce key type 002 separation for PCI HSM compliance' = 'Y'."),
     # ── Legacy Message Encryption ─────────────────────────────────────────────
     HsmCommand("Thales", "Legacy", "HE",
                "Encrypt Data Block", "ENCRYPT",
