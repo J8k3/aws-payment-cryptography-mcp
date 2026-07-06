@@ -938,7 +938,7 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "Verifies a large-message MAC; same layout as C2 with the MAC appended. Supports X9.9, "
                "X9.19 and AS2805, selected by the MAC generation Mode field (not AS2805-only).",
                "verify_mac", "TR31_M1_ISO_9797_1_MAC_KEY or TR31_M3_ISO_9797_3_MAC_KEY",
-               "Source: PUGD0537-004 Rev A, p.583 — AUTHORITATIVE. "
+               "Source: PUGD0537-004 Rev A, p.586 (C2 generate counterpart at p.583) — AUTHORITATIVE. "
                "In APC: verify_mac with the ISO 9797 algorithm selected by the MAC generation Mode."),
     HsmCommand("Thales/Futurex", "International", "MY",
                "Verify and Translate MAC", "MAC",
