@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install ruff pytest pytest-asyncio "moto[payment-cryptography]" -e .
+        run: pip install ruff pytest pytest-asyncio "moto[payment-cryptography]" pyyaml -e .
       - name: Lint
         run: ruff check src/ tests/
       - name: Run tests
