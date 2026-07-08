@@ -67,8 +67,24 @@ constraints:
   - string
 examples:
   - string
+references:
+  - string
 status: active | draft | deprecated
 ```
+
+Provenance is mandatory: every entry must carry a non-empty `references:` list naming
+its source (a row in the Sources ledger at the end of this file, a public standard, or
+a verification event), or an explicit inline citation in its prose (e.g. "Source: PUGD0537-004
+p.488", "Verified live against APC 2026-07"). Enforced by `tests/test_kb_integrity.py` —
+an entry with no citation signal fails CI. When adding records from a new source, also add
+a row to the Sources ledger.
+
+Cite the latest edition of a document when possible. If the latest edition is not
+obtainable (paywalled, gated) and an older edition is held, cite the edition actually
+consulted and note in the Sources-ledger row that a newer edition exists and whether the
+cited content is edition-stable — never let an older edition read as if it were current.
+Include the edition/version and date in the citation (e.g. "ISO 9564-1:2017", "FIPS 197
+(2023 update)", "EMV Book 2 v4.3 §8.2.1") so a version gap is visible at the point of use.
 
 ## Card Data
 
@@ -100,6 +116,9 @@ relationships:
     target_id: algorithm.luhn
   - type: related_to
     target_id: concept.iin
+references:
+  - "ISO/IEC 7812 — PAN structure (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -117,6 +136,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.pan
+references:
+  - "ISO/IEC 7812 — Major Industry Identifier (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -142,6 +164,9 @@ relationships:
     target_id: concept.mii
   - type: related_to
     target_id: concept.pan
+references:
+  - "ISO/IEC 7812 — Issuer Identification Number (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -159,6 +184,9 @@ domain:
   - card_data
 attributes:
   placement: leading_digits_of_pan
+references:
+  - "ISO/IEC 7812 — IIN/BIN usage (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -179,6 +207,9 @@ attributes:
   common_renderings:
     - YYMM
     - MMYY
+references:
+  - "ISO/IEC 7813 — track data elements (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -233,6 +264,9 @@ constraints:
   - Service code semantics primarily apply to magnetic-stripe-read processing rather than full chip processing.
   - Values of 2 or 6 in the first position are commonly used to indicate integrated-circuit-card contexts.
   - Not every syntactically possible three-digit combination is a valid network-approved service code.
+references:
+  - "ISO/IEC 7813 — service code positions (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -247,6 +281,9 @@ aliases:
 summary: Magnetic-stripe data format carrying PAN and cardholder-related information in alphanumeric form.
 domain:
   - card_data
+references:
+  - "ISO/IEC 7813 — Track 1 layout (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -260,6 +297,9 @@ summary: Magnetic-stripe data format carrying PAN, expiry date, service code, an
 domain:
   - card_data
   - iso8583
+references:
+  - "ISO/IEC 7813 — Track 2 layout (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -279,6 +319,9 @@ domain:
 relationships:
   - type: verifies
     target_id: concept.pan
+references:
+  - "ISO/IEC 7812-1 Annex B — Luhn check digit (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -296,6 +339,9 @@ summary: Secret numeric credential used to verify cardholder identity in card-pr
 domain:
   - pin_processing
   - cryptography
+references:
+  - "ISO 9564 — PIN management and security (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -314,6 +360,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.pin
+references:
+  - "ISO 9564-1 — PIN block formats (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -342,6 +391,8 @@ constraints:
   - Uses the right-most 12 PAN digits excluding the check digit.
 examples:
   - "041111FFFFFFFFFF XOR 0000642221737511"
+references:
+  - "openemv/pinblock reference implementation (github.com/openemv/pinblock) — HELD & verified 2026-07-06; it implements ISO 9564-1:2017 and attributes this to clause 9.3.2 (the ISO text itself is not held): control+length nibble, F-pad, XOR of PIN field with right-most 12 PAN digits ex check digit"
 status: active
 ```
 
@@ -363,6 +414,8 @@ attributes:
   pan_required: false
   pin_length_min: 4
   pin_length_max: 12
+references:
+  - "openemv/pinblock — HELD & verified 2026-07-06; implements ISO 9564-1:2017, attributes to clause 9.3.3 (ISO text not held): PAN-independent, nonce fill (no XOR)"
 status: active
 ```
 
@@ -382,6 +435,8 @@ domain:
 attributes:
   pan_required: false
   offline_local_use_only: true
+references:
+  - "openemv/pinblock — HELD & verified 2026-07-06; implements ISO 9564-1:2017, attributes to clause 9.3.4 (ISO text not held): standalone PIN field, F-pad, no PAN"
 status: active
 ```
 
@@ -400,6 +455,8 @@ domain:
   - cryptography
 attributes:
   pan_required: true
+references:
+  - "openemv/pinblock — HELD & verified 2026-07-06; implements ISO 9564-1:2017, attributes to clause 9.3.5 (ISO text not held): like format 0 but random (0xA-0xF) fill, XORed with same 12 PAN digits"
 status: active
 ```
 
@@ -419,6 +476,8 @@ domain:
 attributes:
   pan_required: true
   associated_cipher_family: AES
+references:
+  - "openemv/pinblock — HELD & verified 2026-07-06; implements ISO 9564-1:2017, attributes to clauses 9.4.2.2.2-9.4.2.2.3 (ISO text not held): 128-bit block, separate 64-bit PIN and PAN fields (no XOR), M-nibble for PAN digits beyond 12"
 status: active
 ```
 
@@ -434,6 +493,9 @@ summary: Australian-standard PIN-block representation used in payment switching 
 domain:
   - pin_processing
   - cryptography
+references:
+  - "AS 2805.3 — Australian PIN block format (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -458,6 +520,9 @@ attributes:
 relationships:
   - type: verifies
     target_id: concept.pin
+references:
+  - "Visa PVV method as implemented across HSM vendor manuals"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -473,6 +538,9 @@ summary: Derived offset value used in some issuer PIN verification methods, espe
 domain:
   - pin_processing
   - cryptography
+references:
+  - "IBM 3624 PIN offset method as implemented across HSM vendor manuals"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -524,6 +592,9 @@ constraints:
   - Validation data is padded with the pad character to reach 16 nibbles before encryption
   - Natural PIN and stored offset together disclose the clear PIN; both must be protected
   - Natural PIN derivation is fully deterministic for fixed keying material
+references:
+  - "IBM 3624 method as documented in HSM vendor manuals (Thales/Futurex)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -574,6 +645,9 @@ constraints:
   - PVKI is 1 digit (1-6); it is the first nibble of the PVV input and determines which PVK is used
   - The 11 PAN digits exclude the Luhn check digit (rightmost digit of the PAN)
   - The two-pass decimalization is mandatory per Visa spec; single-pass produces incorrect PVV
+references:
+  - "Visa PVV method as documented in HSM vendor manuals (Thales/Futurex)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -594,6 +668,9 @@ domain:
   - card_data
 attributes:
   common_service_code_example: "201"
+references:
+  - "Scheme CVV algorithm (Visa CVV / MC CVC family) via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -611,6 +688,9 @@ domain:
   - card_validation
 attributes:
   common_service_code_example: "000"
+references:
+  - "Scheme CVV2 convention (service code 000, MMYY swap) via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -643,6 +723,9 @@ relationships:
     target_id: artifact.icvv
   - type: related_to
     target_id: artifact.dcvv
+references:
+  - "Scheme security-code family taxonomy via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -660,6 +743,9 @@ domain:
   - emv
 attributes:
   common_service_code_example: "999"
+references:
+  - "iCVV convention (service code 999) via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -677,6 +763,9 @@ domain:
   - card_validation
   - emv
   - cryptography
+references:
+  - "Dynamic CVV schemes via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -691,6 +780,9 @@ aliases:
 summary: Network-specific card security code family commonly overlapping conceptually with CVV2/CVC2 terminology.
 domain:
   - card_validation
+references:
+  - "Amex CSC family via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -720,6 +812,9 @@ relationships:
     target_id: artifact.cvv2
   - type: related_to
     target_id: concept.card-security-code-family
+references:
+  - "Amex CSC v1 algorithm (CVV with actual service code) via tool-family analysis and CyberChef Payments implementation"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -753,6 +848,9 @@ relationships:
     target_id: artifact.amex-aevv
   - type: related_to
     target_id: concept.card-security-code-family
+references:
+  - "Amex CSC v2 algorithm (service code forced to 000) via tool-family analysis and CyberChef Payments implementation"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -782,6 +880,9 @@ relationships:
     target_id: artifact.icvv
   - type: related_to
     target_id: artifact.amex-csc2
+references:
+  - "Amex iCSC (CSC2 algorithm on chip) via tool-family analysis and CyberChef Payments implementation"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -814,6 +915,9 @@ relationships:
     target_id: artifact.amex-csc2
   - type: related_to
     target_id: operation.three-d-secure
+references:
+  - "Amex AEVV (CSC2 with repurposed fields) via tool-family analysis and CyberChef Payments implementation"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -841,6 +945,9 @@ relationships:
     target_id: artifact.dcvv
   - type: related_to
     target_id: artifact.arqc
+references:
+  - "Mastercard dCVC3 derivation via tool-family analysis and CyberChef Payments implementation"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -863,6 +970,9 @@ attributes:
   tag_length_bytes: "1-3"
   length_length_bytes: "1-3"
   supports_constructed_tags: true
+references:
+  - "ITU-T X.690 (02/2021, current) = ISO/IEC 8825-1 BER/DER — held source, Sources ledger 2026-07-06; EMV Book 3 Annex B"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -883,6 +993,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.emv-standard
+references:
+  - "ISO/IEC 7816 (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -927,6 +1040,9 @@ relationships:
     target_id: concept.iso7816
   - type: related_to
     target_id: artifact.apdu-response
+references:
+  - "ISO/IEC 7816-4 — APDU structure (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -941,6 +1057,9 @@ aliases:
 summary: Identifying element of an EMV TLV object that names the type of encoded payment data.
 domain:
   - emv
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -959,6 +1078,8 @@ domain:
 attributes:
   tag: "82"
   bitmapped: true
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -977,6 +1098,8 @@ domain:
 attributes:
   tag: "95"
   bitmapped: true
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -995,6 +1118,8 @@ domain:
 attributes:
   tag: "9B"
   bitmapped: true
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1012,6 +1137,8 @@ domain:
   - emv
 attributes:
   tag: "8E"
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1029,6 +1156,8 @@ domain:
 attributes:
   tag: "9F33"
   bitmapped: true
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1046,6 +1175,8 @@ domain:
 attributes:
   tag: "9F40"
   bitmapped: true
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1064,6 +1195,9 @@ domain:
 attributes:
   tag: "9F66"
   bitmapped: true
+references:
+  - "EMV Contactless specifications (Book C kernels) via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1082,6 +1216,9 @@ domain:
 attributes:
   tag: "9F6C"
   bitmapped: true
+references:
+  - "EMV Contactless specifications (Book C kernels) via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1104,6 +1241,8 @@ attributes:
     - TC
     - ARQC
     - AAC
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1126,6 +1265,9 @@ attributes:
     "9F26": Application Cryptogram
     "82": Application Interchange Profile
     "95": Terminal Verification Results
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Tag Catalog kabc.ca (public reference), Sources ledger 2026-05-22"
 status: active
 ```
 
@@ -1346,6 +1488,9 @@ attributes:
         - CTQ
       category: contactless
       typical_meaning: Contactless card-side qualifier map.
+references:
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Tag Catalog kabc.ca (public reference), Sources ledger 2026-05-22"
 status: active
 ```
 
@@ -1366,6 +1511,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.rid
+references:
+  - "ISO/IEC 7816-5 — AID registration; EMV Book 1 (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1384,6 +1532,9 @@ relationships:
     target_id: concept.emv-standard
   - type: related_to
     target_id: operation.three-d-secure
+references:
+  - "EMVCo public materials (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -1407,6 +1558,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.emvco
+references:
+  - "EMVCo specification family (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -1422,6 +1576,9 @@ summary: Registered namespace prefix used to identify the application provider o
 domain:
   - emv
   - reference_data
+references:
+  - "ISO/IEC 7816-5 — RID registration (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1448,6 +1605,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.iso7816
+references:
+  - "ISO/IEC 7816-3 — Answer To Reset (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -1468,6 +1628,9 @@ attributes:
   examples:
     "99 00": 1 PIN try left
     "9D 14": Application history list full
+references:
+  - "ISO/IEC 7816-4 — SW1/SW2 status words (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1485,6 +1648,8 @@ domain:
   - emv
   - cryptography
   - reference_data
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 5 certificate chain"
 status: active
 ```
 
@@ -1501,6 +1666,9 @@ domain:
   - emv
   - cryptography
   - testing
+references:
+  - "Public issuer test key reference lists via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1541,6 +1709,8 @@ relationships:
     target_id: message_field.iso8583-de55
   - type: related_to
     target_id: algorithm.emv-key-derivation
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 8 application cryptograms"
 status: active
 ```
 
@@ -1567,6 +1737,8 @@ relationships:
     target_id: artifact.arqc
   - type: related_to
     target_id: message_field.iso8583-de55
+references:
+  - "Visa Core Rules and Product and Service Rules (18 April 2026 edition), Sources ledger 2026-05-15 — full chip data requirements"
 status: active
 ```
 
@@ -1593,6 +1765,8 @@ relationships:
     target_id: concept.service-code
   - type: related_to
     target_id: format.track2
+references:
+  - "Visa Core Rules and Product and Service Rules (18 April 2026 edition), Sources ledger 2026-05-15 — magnetic-stripe image requirements"
 status: active
 ```
 
@@ -1623,6 +1797,9 @@ relationships:
     target_id: format.track2
 constraints:
   - Fallback should be distinguished from normal magnetic-stripe processing because the transaction originally began as a chip path.
+references:
+  - "Visa Core Rules and Product and Service Rules (18 April 2026 edition), Sources ledger 2026-05-15"
+  - "Mastercard Security Rules and Procedures (11 Feb 2025), Sources ledger 2026-05-15"
 status: active
 ```
 
@@ -1643,6 +1820,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: artifact.arqc
+references:
+  - "Visa VIS derivation key index convention"
+  - "Visa Core Rules and Product and Service Rules (18 April 2026 edition), Sources ledger 2026-05-15"
 status: active
 ```
 
@@ -1661,6 +1841,9 @@ domain:
 relationships:
   - type: related_to
     target_id: artifact.arqc
+references:
+  - "Scheme UDK derivation (VIS/M-Chip)"
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Annex A1.4"
 status: active
 ```
 
@@ -1680,6 +1863,8 @@ relationships:
     target_id: artifact.arqc
   - type: related_to
     target_id: artifact.arpc
+references:
+  - "Visa Core Rules and Product and Service Rules (18 April 2026 edition), Sources ledger 2026-05-15 — Visa Chip Authenticate service"
 status: active
 ```
 
@@ -1713,6 +1898,8 @@ relationships:
     target_id: artifact.arqc
   - type: related_to
     target_id: algorithm.emv-key-derivation
+references:
+  - "EMV Book 2 Security and Key Management v4.3 §8.2.1-8.2.2 — verified verbatim against held PDF 2026-07-06 (Method 1: X := ARC||6 zero bytes, Y := ARQC XOR X, ARPC := DES3(SK_AC)[Y]; Method 2 CSU-based MAC), Sources ledger 2026-07-06"
 status: active
 ```
 
@@ -1728,6 +1915,8 @@ summary: EMV cryptogram representing an approved offline or completed transactio
 domain:
   - emv
   - cryptography
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 8 cryptogram types"
 status: active
 ```
 
@@ -1743,6 +1932,8 @@ summary: EMV cryptogram representing a declined or rejected application decision
 domain:
   - emv
   - cryptography
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 8 cryptogram types"
 status: active
 ```
 
@@ -1758,6 +1949,9 @@ summary: 3-D Secure authentication value used to prove cardholder authentication
 domain:
   - card_validation
   - cryptography
+references:
+  - "EMVCo 3-D Secure specification — CAVV (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1773,6 +1967,9 @@ summary: Mastercard 3-D Secure authentication artifact analogous to CAVV.
 domain:
   - card_validation
   - cryptography
+references:
+  - "Mastercard SPA/AAV convention (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1788,6 +1985,9 @@ summary: American Express 3-D Secure authentication artifact analogous to CAVV.
 domain:
   - card_validation
   - cryptography
+references:
+  - "Amex AEVV convention (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -1821,6 +2021,9 @@ relationships:
     target_id: artifact.aav
   - type: related_to
     target_id: artifact.aevv
+references:
+  - "EMVCo 3-D Secure specification (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -1853,6 +2056,9 @@ relationships:
     target_id: concept.smart-card
   - type: related_to
     target_id: concept.tokenization
+references:
+  - "EMV Contactless specifications (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -1996,6 +2202,8 @@ attributes:
     - clearing
     - settlement
     - network_management
+references:
+  - "ISO 8583 message class taxonomy via parser/tooling analysis, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2409,6 +2617,8 @@ relationships:
     target_id: artifact.cvv2
   - type: related_to
     target_id: operation.three-d-secure
+references:
+  - "Industry card-present/card-not-present taxonomy via tooling analysis, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2429,6 +2639,9 @@ domain:
 relationships:
   - type: wraps
     target_id: key-block.tr31
+references:
+  - "ANSI X9.143 (TR-31) key usage taxonomy — K0"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2444,6 +2657,9 @@ summary: Interchange master key commonly used to protect keys exchanged between 
 domain:
   - key_management
   - cryptography
+references:
+  - "Industry ZMK/interchange key taxonomy per HSM vendor manuals"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2463,6 +2679,9 @@ domain:
 relationships:
   - type: encrypts
     target_id: artifact.encrypted-pin-block
+references:
+  - "ANSI X9.143 (TR-31) key usage taxonomy — P0"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2482,6 +2701,9 @@ domain:
 relationships:
   - type: verifies
     target_id: artifact.pvv
+references:
+  - "ANSI X9.143 (TR-31) key usage taxonomy — V0/V1/V2"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2498,6 +2720,9 @@ domain:
   - key_management
   - card_validation
   - cryptography
+references:
+  - "ANSI X9.143 (TR-31) key usage taxonomy — C0"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2516,6 +2741,9 @@ domain:
 relationships:
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "ANSI X9.24 — DUKPT base derivation key"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2538,6 +2766,9 @@ relationships:
     target_id: key-type.bdk
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "ANSI X9.24-1 — DUKPT initial PIN encryption key"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2564,6 +2795,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "ANSI X9.24 — key serial number structure"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2585,6 +2819,9 @@ relationships:
     target_id: key-type.ipek
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "ANSI X9.24-1 — DUKPT future key table"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2606,6 +2843,9 @@ relationships:
     target_id: key-type.future-key
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "ANSI X9.24 — DUKPT transaction key derivation"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2633,6 +2873,9 @@ relationships:
     target_id: artifact.ksn
   - type: related_to
     target_id: key-type.transaction-key
+references:
+  - "ANSI X9.24 — KSN transaction counter"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2652,6 +2895,9 @@ domain:
 relationships:
   - type: related_to
     target_id: artifact.ksn
+references:
+  - "ANSI X9.24 — KSN device identifier"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2668,6 +2914,8 @@ domain:
   - key_management
   - emv
   - cryptography
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Annex A1.4 ICC master key derivation"
 status: active
 ```
 
@@ -2683,6 +2931,8 @@ summary: Derived key scoped to a transaction, session, or short-lived cryptograp
 domain:
   - key_management
   - cryptography
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Annex A1.3 session key derivation"
 status: active
 ```
 
@@ -2703,6 +2953,9 @@ relationships:
     target_id: glossary.krd
   - type: related_to
     target_id: key-block.tr34
+references:
+  - "ANSI X9 TR-34 — Key Distribution Host role (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2723,6 +2976,9 @@ relationships:
     target_id: glossary.kdh
   - type: related_to
     target_id: key-block.tr34
+references:
+  - "ANSI X9 TR-34 — Key Receiving Device role (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2761,6 +3017,9 @@ attributes:
     - recovered_key_attributes
 constraints:
   - Vendor-specific transport wrappers or indicator prefixes are not necessarily part of the portable TR-31 block and may need to be removed before import into another system.
+references:
+  - "ANSI X9.143 / TR-31 key block specification (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2814,6 +3073,9 @@ relationships:
     target_id: glossary.krd
   - type: related_to
     target_id: artifact.tr34-credential-id
+references:
+  - "ANSI X9 TR-34; PCI PIN v3.1 Annex A (Sources ledger 2026-05-21)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2838,6 +3100,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: key-block.tr34
+references:
+  - "ANSI X9 TR-34 — credential/certificate identifiers"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2895,6 +3160,9 @@ constraints:
   - Compare KCVs across exporting and importing systems whenever both sides expose a compatible KCV method.
   - Compare the same visible hex length on both sides; common operational lengths are 4 or 6 hex characters.
   - Treat a KCV mismatch as evidence of translation, wrapping, integrity, or key-selection failure until proven otherwise.
+references:
+  - "Standard key-ceremony practice (KCV comparison) per PCI PIN v3.1 key-management requirements and HSM vendor guidance"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2913,6 +3181,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.pan
+references:
+  - "NIST SP 800-38G (2016, current) — FF1/FF3-1; held source, Sources ledger 2026-07-06"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -2929,6 +3200,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.pan
+references:
+  - "PCI SSC Tokenization Guidelines (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -2977,6 +3251,9 @@ relationships:
     target_id: key-type.future-key
   - type: related_to
     target_id: key-type.transaction-key
+references:
+  - "ANSI X9.24-1 (TDES) / X9.24-3 (AES) — DUKPT"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3164,6 +3441,9 @@ domain:
 relationships:
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "Legacy master/session key management per HSM vendor manuals"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -3183,6 +3463,9 @@ domain:
 relationships:
   - type: related_to
     target_id: key-type.bdk
+references:
+  - "ANSI X9.24 — TRSM definition"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -3225,6 +3508,8 @@ relationships:
     target_id: artifact.arqc
   - type: related_to
     target_id: artifact.arpc
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Annex A1.3/A1.4 (Options A/B/C, CSK)"
 status: active
 ```
 
@@ -3267,6 +3552,9 @@ relationships:
     target_id: key-block.tr31
   - type: related_to
     target_id: key-block.tr34
+references:
+  - "NIST SP 800-56A r3 (2018, current) — ECDH/key agreement; held source, Sources ledger 2026-07-06"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3281,6 +3569,9 @@ aliases:
 summary: Legacy symmetric block cipher historically used in payment environments.
 domain:
   - cryptography
+references:
+  - "FIPS 46-3 (withdrawn) — DES (definitional)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3294,6 +3585,9 @@ aliases:
 summary: Triple application of DES widely used in legacy and current payment cryptography environments.
 domain:
   - cryptography
+references:
+  - "NIST SP 800-67 r2 (2017, current) — TDEA; held source, Sources ledger 2026-07-06"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3311,6 +3605,9 @@ attributes:
     - 128
     - 192
     - 256
+references:
+  - "NIST FIPS 197 (2001, update 2023-05-09 — current) — AES; held source, Sources ledger 2026-07-06"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3323,6 +3620,9 @@ aliases:
 summary: Message authentication code construction based on a cryptographic hash and shared secret.
 domain:
   - cryptography
+references:
+  - "NIST FIPS 198-1 (2008, current) / RFC 2104 (1997) — HMAC; held sources, Sources ledger 2026-07-06"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3410,6 +3710,9 @@ attributes:
     - card_verification
     - EMV_cryptography
     - MAC_processing
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -3434,6 +3737,8 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.payment-hsm
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — issuing use cases"
 status: active
 ```
 
@@ -3460,6 +3765,8 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.payment-hsm
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — acquiring use cases"
 status: active
 ```
 
@@ -3476,6 +3783,9 @@ domain:
 constraints:
   - Issuing and acquiring functions should be modeled as distinct operational domains.
   - Key domains, users, and ceremonies often differ between issuing and acquiring environments.
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "PCI PIN v3.1 domain-separation requirements (Sources ledger 2026-05-21)"
 status: active
 ```
 
@@ -3494,6 +3804,9 @@ domain:
   - cryptography
 attributes:
   scope: internal_to_hsm_or_cluster
+references:
+  - "Thales payShield 10K Installation and User Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3510,6 +3823,8 @@ domain:
   - hsm
   - key_management
   - cryptography
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — Master File Key"
 status: active
 ```
 
@@ -3525,6 +3840,8 @@ summary: HSM platform-level master key used in some product families for broader
 domain:
   - hsm
   - key_management
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — Platform Master Key"
 status: active
 ```
 
@@ -3541,6 +3858,8 @@ domain:
   - hsm
   - key_management
   - cryptography
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — Futurex Token Key"
 status: active
 ```
 
@@ -3563,6 +3882,9 @@ attributes:
     - split_knowledge
     - dual_control
     - threshold_reconstruction
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Installation and User Guide, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3581,6 +3903,9 @@ domain:
 relationships:
   - type: related_to
     target_id: operation.m-of-n-key-ceremony
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "PCI PIN v3.1 split-knowledge requirements (Sources ledger 2026-05-21)"
 status: active
 ```
 
@@ -3596,6 +3921,9 @@ summary: Dedicated device or management path used to administer an HSM and parti
 domain:
   - hsm
   - key_management
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Installation and User Guide, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3631,6 +3959,10 @@ attributes:
     - emv_validation
     - remote_key_loading
     - secure_messaging
+references:
+  - "Internal normalization over vendor command sets"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3655,6 +3987,10 @@ attributes:
       - string
     notes:
       - string
+references:
+  - "Internal crosswalk model over vendor command sets"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3675,6 +4011,9 @@ attributes:
     - SafeNet
     - Thales
     - Futurex
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3692,6 +4031,8 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.payment-hsm
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3715,6 +4056,8 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.issuing-hsm
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — issuing use cases"
 status: active
 ```
 
@@ -3742,6 +4085,8 @@ attributes:
 relationships:
   - type: related_to
     target_id: concept.acquiring-hsm
+references:
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14 — acquiring use cases"
 status: active
 ```
 
@@ -3818,6 +4163,10 @@ attributes:
       command_name: vendor_specific_not_normalized_here
       command_code_request: null
       command_code_response: null
+references:
+  - "Internal crosswalk model"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3843,6 +4192,10 @@ attributes:
       command_name: Visa PIN Verification Value workflow
       command_code_request: null
       command_code_response: null
+references:
+  - "Internal crosswalk model"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3868,6 +4221,10 @@ attributes:
       command_name: GOFF
       command_code_request: GOFF
       command_code_response: null
+references:
+  - "Internal crosswalk model"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3894,6 +4251,10 @@ attributes:
       command_name: vendor_specific_not_normalized_here
       command_code_request: null
       command_code_response: null
+references:
+  - "Internal crosswalk model"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3918,6 +4279,10 @@ attributes:
       command_name: EMVM
       command_code_request: EMVM
       command_code_response: null
+references:
+  - "Internal crosswalk model"
+  - "Futurex General Payment HSM Integration Guide, Sources ledger 2026-05-14"
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3937,6 +4302,8 @@ attributes:
   vendor: Thales
   request_code: A0
   response_code: A1
+references:
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3954,6 +4321,8 @@ attributes:
   vendor: Thales
   request_code: A6
   response_code: A7
+references:
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3971,6 +4340,8 @@ attributes:
   vendor: Thales
   request_code: A8
   response_code: A9
+references:
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -3988,6 +4359,8 @@ attributes:
   vendor: Thales
   request_code: B8
   response_code: B9
+references:
+  - "Thales payShield 10K Core Host Commands PUGD0537-004 Rev A — 'TR-34 Key Export' (~p.194); verified against local PDF 2026-07-06. NOT in the Legacy Host Commands manual."
 status: active
 ```
 
@@ -4006,6 +4379,8 @@ attributes:
   vendor: Thales
   request_code: BA
   response_code: BB
+references:
+  - "Thales payShield 10K Core Host Commands PUGD0537-004 Rev A — 'Encrypt a Clear PIN' (p.247, clear-PIN facilities section); verified against local PDF 2026-07-06. NOT in the Legacy Host Commands manual."
 status: active
 ```
 
@@ -4024,6 +4399,8 @@ attributes:
   vendor: Thales
   request_code: BI
   response_code: BJ
+references:
+  - "Thales payShield 10K Legacy Host Commands V1 2019, Sources ledger 2026-05-14 — 'Generate a BDK', superseded by A0 (which does not support key scheme '0'); verified against local PDF 2026-07-06"
 status: active
 ```
 
@@ -4063,6 +4440,8 @@ attributes:
     - aid_reference
     - rid_reference
     - hsm_command_reference
+references:
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4333,6 +4712,8 @@ constraints:
   - "VisaPinVerification has no encrypted_pin_block field — pin block is at the outer call level"
   - "DukptAttributes has exactly two required fields: key_serial_number and dukpt_derivation_type"
   - "BDK ARN is passed via encryption_key_identifier (outer field), NOT inside DukptAttributes"
+references:
+  - "AWS SDK service models, Sources ledger 2026-07-06 — aws-sdk-rust paymentcryptographydata struct types"
 status: active
 ```
 
@@ -4351,6 +4732,9 @@ domain:
 constraints:
   - DUKPT governs derivation and key lifecycle, not the ciphertext format by itself.
   - Derived keys may be used for PIN encryption, data encryption, or MAC generation depending on the implementation.
+references:
+  - "ANSI X9.24 — DUKPT scope (key management, not cipher)"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -4429,6 +4813,9 @@ constraints:
   - Cardholder data includes PAN and may include cardholder name, expiration date, and service code.
   - Sensitive authentication data includes full track data, card verification codes, and PIN or PIN-block data.
   - Sensitive authentication data requires stricter storage controls than ordinary cardholder data.
+references:
+  - "PCI DSS — CHD/SAD classification (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4445,6 +4832,9 @@ domain:
 constraints:
   - PAN truncation is a standard protective pattern for display and receipts.
   - Tokenization and format-preserving encryption are common mitigation patterns for operational systems.
+references:
+  - "PCI DSS Req 3 — PAN masking and storage (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4462,6 +4852,9 @@ constraints:
   - Exposure of a transaction key should not reveal past or future transaction keys.
   - Exposure of one device state should not implicitly compromise other devices in the same fleet.
   - Exposure of the base derivation key can compromise all devices and transactions in that derivation domain.
+references:
+  - "ANSI X9.24 — DUKPT compromise scope"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -4479,6 +4872,9 @@ domain:
 constraints:
   - The KSN identifies the device context and transaction counter position used for derivation.
   - Receiver-side systems use the KSN counter position and device context to regenerate the same transaction key without receiving the derived key from the device.
+references:
+  - "ANSI X9.24 — KSN required for re-derivation"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -4497,6 +4893,9 @@ constraints:
   - The device transaction counter advances after each transaction and determines which transaction key is selected.
   - The receiver derives the same transaction key by interpreting the counter position carried in the KSN.
   - The consumed key material is invalidated and new future keys may be generated.
+references:
+  - "ANSI X9.24 — derivation state consumption"
+  - "Wikipedia enrichment, Sources ledger 2026-05-14"
 status: active
 ```
 
@@ -4530,6 +4929,9 @@ constraints:
   - Format 1 does not require PAN context.
   - Format 3 requires PAN context.
   - Format 4 requires PAN context.
+references:
+  - "ISO 9564-1 — format PAN dependencies (formats 0/3 vs 1)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4577,6 +4979,9 @@ service_code_as_cryptographic_input:
   apc_api_note:
     CardVerificationValue1: Requires ServiceCode field explicitly. Pass the actual Track 2 service code for CVV1; pass "999" for iCVV generation using this struct.
     CardVerificationValue2: Does not accept ServiceCode. The 000 substitution is applied by APC internally.
+references:
+  - "Scheme CVV algorithm input conventions via tool-family analysis"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4674,6 +5079,8 @@ relationships:
     target_id: algorithm.emv-key-derivation
   - type: related_to
     target_id: tool.cyberchef-payment-fork
+references:
+  - "EMV Book 2 Security and Key Management v4.3 §8 (application cryptograms) and §8.2.1-8.2.2 (ARPC) — ARPC Method 1 construction verified verbatim against held PDF 2026-07-06, Sources ledger 2026-07-06"
 status: active
 ```
 
@@ -4729,6 +5136,9 @@ attributes:
     - card_action_analysis
     - online_authorization_if_required
     - issuer_script_processing
+references:
+  - "EMV Book 3 — transaction flow (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4749,6 +5159,8 @@ attributes:
     - SDA
     - DDA
     - CDA
+references:
+  - "EMV Book 2 Security and Key Management v4.3 — Section 5 SDA (targeted read, Sources ledger 2026-05-22); Section 6 DDA/CDA definitional (section not in the targeted-read row)"
 status: active
 ```
 
@@ -4767,6 +5179,8 @@ domain:
 relationships:
   - type: related_to
     target_id: operation.emv-offline-data-authentication
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 5 SDA"
 status: active
 ```
 
@@ -4785,6 +5199,8 @@ domain:
 relationships:
   - type: related_to
     target_id: operation.emv-offline-data-authentication
+references:
+  - "EMV Book 2 Security and Key Management v4.3 — Section 6 DDA (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -4805,6 +5221,8 @@ relationships:
     target_id: operation.emv-offline-data-authentication
   - type: related_to
     target_id: artifact.arqc
+references:
+  - "EMV Book 2 Security and Key Management v4.3 — Section 6.6 CDA (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -4831,6 +5249,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: data_element.emv-tag-8e
+references:
+  - "EMV Book 3 — cardholder verification methods (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4848,6 +5269,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.cvm
+references:
+  - "EMV Book 3 — CVM processing (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4866,6 +5290,9 @@ relationships:
     target_id: artifact.arqc
   - type: related_to
     target_id: key-type.imk
+references:
+  - "EMV Book 3 — issuer script processing (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4892,6 +5319,8 @@ relationships:
     target_id: operation.offline-enciphered-pin
 constraints:
   - Offline PIN update is an issuer-side chip-management function rather than a normal acquirer PIN-translation flow.
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 9 secure messaging (PIN change scripts)"
 status: active
 ```
 
@@ -4909,6 +5338,8 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.cvm
+references:
+  - "EMV Book 2 Security and Key Management v4.3 — Section 7 PIN encipherment (definitional; section not in the 2026-05-22 targeted-read row)"
 status: active
 ```
 
@@ -4946,6 +5377,9 @@ domain:
 relationships:
   - type: related_to
     target_id: concept.cvm
+references:
+  - "EMV Book 3 — CVM processing (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4968,6 +5402,9 @@ attributes:
 relationships:
   - type: related_to
     target_id: data_element.emv-tag-95
+references:
+  - "EMV Book 3 — terminal risk management (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4984,6 +5421,9 @@ domain:
 relationships:
   - type: related_to
     target_id: data_element.emv-tag-95
+references:
+  - "EMV Book 3 — terminal action analysis (definitional)"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -4999,6 +5439,9 @@ domain:
 constraints:
   - Common EMV concepts should be modeled separately from network-specific implementations.
   - Certification and brand overlays should be represented as scheme variants rather than replacing canonical EMV records.
+references:
+  - "EMVCo specifications vs scheme implementations (VIS, M/Chip, AEIPS) — definitional"
+  - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
 
@@ -5037,6 +5480,8 @@ attributes:
 constraints:
   - Key attributes (algorithm, usage) cannot be changed after creation or import
   - Replica Region Keys (RRK) are read-only; all mutations target the Primary Region Key (PRK)
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — concepts, key lifecycle"
 status: active
 ```
 
@@ -5061,6 +5506,8 @@ attributes:
   use_cases: [disaster_recovery, multi-region active-active payment processing]
 constraints:
   - Replication, attribute changes, and deletion must be performed on the PRK
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — multi-region keys"
 status: active
 ```
 
@@ -5100,6 +5547,8 @@ relationships:
 constraints:
   - Wrapping KEK must be pre-imported; only the TR-31 payload is inline
   - Key usage and mode in the TR-31 header are enforced by APC
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — dynamic keys"
 status: active
 ```
 
@@ -5171,6 +5620,8 @@ relationships:
 constraints:
   - A given K3 key pair can only derive one type of output key (DeriveKeyUsage fixed at creation)
   - Cannot reuse an ECC key pair for a different DeriveKeyUsage purpose
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — physical key exchange / ECDH"
 status: active
 ```
 
@@ -5307,6 +5758,8 @@ relationships:
 constraints:
   - PB is always auto-calculated; manually setting it will corrupt the block
   - BI and IK/KS link an exported IPEK/IK back to its parent BDK for future re-derivation
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — key import/export, TR-31 headers"
 status: active
 ```
 
@@ -5358,6 +5811,9 @@ relationships:
     target_id: algorithm.emv-key-derivation
   - type: related_to
     target_id: reference_list.apc-tr31-key-usages
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — use-cases issuers/acquirers"
+  - "aws-samples payment-cryptography samples (Sources ledger 2026-07-05)"
 status: active
 ```
 
@@ -5449,6 +5905,9 @@ relationships:
     target_id: concept.apc-ecdh-key-agreement
   - type: related_to
     target_id: rule.apc-rsa-wrap-padding
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — keys-import/export wrapping strength"
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
 status: active
 ```
 
@@ -5475,6 +5934,8 @@ relationships:
     target_id: key-block.tr31
   - type: related_to
     target_id: key_type.kbpk
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — key export, TR-31 version behavior"
 status: active
 ```
 
@@ -5528,6 +5989,8 @@ relationships:
     target_id: key-type.bdk
   - type: related_to
     target_id: algorithm.dukpt
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — DUKPT key export behavior"
 status: active
 ```
 
@@ -5607,6 +6070,8 @@ constraints:
 relationships:
   - type: related_to
     target_id: concept.apc-key-lifecycle
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — concepts, key attributes"
 status: active
 ```
 
@@ -5634,6 +6099,9 @@ relationships:
     target_id: algorithm.ibm-3624
   - type: related_to
     target_id: reference_list.apc-tr31-key-usages
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — valid-attributes tables"
 status: active
 ```
 
@@ -5659,6 +6127,9 @@ relationships:
     target_id: artifact.kcv
   - type: related_to
     target_id: rule.kcv-validation-after-transfer
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — KCV computation"
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
 status: active
 ```
 
@@ -5681,6 +6152,9 @@ constraints:
 relationships:
   - type: related_to
     target_id: rule.apc-key-wrapping-strength
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19 — KEY_CRYPTOGRAM import findings"
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19"
 status: active
 ```
 
@@ -5708,6 +6182,9 @@ relationships:
     target_id: reference_list.apc-tr31-key-usages
   - type: related_to
     target_id: algorithm.emv-key-derivation
+references:
+  - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — valid-attributes tables"
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
 status: active
 ```
 
@@ -5983,6 +6460,8 @@ relationships:
     target_id: reference_list.apc-tr31-key-usages
   - type: related_to
     target_id: rule.apc-reencrypt-norestrictions-blocked
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19 — D0/E0/P0 NoRestrictions finding"
 status: active
 ```
 
@@ -6010,6 +6489,8 @@ relationships:
     target_id: rule.apc-d0-e0-p0-norestrictions
   - type: related_to
     target_id: reference_list.apc-tr31-key-usages
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19 — re-encrypt block finding"
 status: active
 ```
 
@@ -6081,6 +6562,8 @@ relationships:
     target_id: algorithm.ibm-3624
   - type: related_to
     target_id: rule.apc-pvk-tdes2key-only
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19 — IBM 3624 pad char finding"
 status: active
 ```
 
@@ -6110,6 +6593,8 @@ relationships:
     target_id: rule.apc-format4-aes-pin-requirement
   - type: related_to
     target_id: algorithm.visa-pin
+references:
+  - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
 status: active
 ```
 
@@ -8283,11 +8768,15 @@ with a strong salt are acceptable where retrieval is not required.
 ## EMV Tag Catalog
 
 Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification,
-v4.4, October 2022 (EMVCo), Annex A (Data Elements Dictionary). This supersedes the prior kabc.ca-sourced
-catalog; corrections include: tag 91 length (8–16 not 8), exponent tags (1 or 3 not 3), 9F3B length (2–8),
-9F41 length (2–4), added missing Book 3 tags (42, 4F, 73, 81, 83, 86–89, 9F0A, 9F0C, 9F19, 9F25), added
-biometric tags (7F60, A1, 9F30, 9F31, BF4A–BF4E, DF50–DF54, new in v4.4). Scheme-proprietary tags
-(Mastercard 9F51+, Visa, contactless kernel) are in a separate subsection below.
+v4.4, October 2022 (EMVCo), Annex A (Data Elements Dictionary). NOTE ON PROVENANCE: v4.4 is NOT held on
+disk — this catalog was built from a one-time read of v4.4 on 2026-05-22 (Sources ledger) and cannot be
+re-verified against a held file; v4.4 is gated by EMVCo. The v4.4-only content below (biometric tags 7F60,
+A1, 9F30, 9F31, BF4A–BF4E, DF50–DF54) does not exist in the held v4.3 Book 3, so it cannot be re-anchored
+to v4.3 either. Tags that also appear in v4.3 can be cross-checked against .tmp-emv-book3-v43.pdf. This
+supersedes the prior kabc.ca-sourced catalog; corrections include: tag 91 length (8–16 not 8), exponent
+tags (1 or 3 not 3), 9F3B length (2–8), 9F41 length (2–4), added missing Book 3 tags (42, 4F, 73, 81, 83,
+86–89, 9F0A, 9F0C, 9F19, 9F25). Scheme-proprietary tags (Mastercard 9F51+, Visa, contactless kernel) are
+in a separate subsection below.
 
 ### EMVCo Book 3 v4.4 — Authoritative Tags
 
@@ -8480,7 +8969,7 @@ Result tags: `9F26` (cryptogram value) · `9F27` (CID — type: ARQC/TC/AAC)
 
 ## EMV Issuer Cryptography
 
-Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management, v4.3 (November 2011) and v4.4 (November 2023) (EMVCo). Entries use v4.3 structure; v4.4 corrections applied to algorithm constraints (Bulletin 208, ECC additions).
+Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management. v4.3 (November 2011) is HELD (.tmp-emv-book2-v43.pdf) and re-verifiable; the v4.4 (November 2023) corrections below (Bulletin 208 RSA modulus, ECC additions) are from a one-time read on 2026-05-22 — v4.4 is NOT held and those specific corrections cannot be re-verified against a held file. Entries use v4.3 structure with v4.4 corrections annotated as such.
 
 ### EMV RSA Key Hierarchy
 
@@ -8539,6 +9028,8 @@ relationships:
     target_id: operation.emv-cda
   - type: related_to
     target_id: concept.emv-book2-algorithms
+references:
+  - "EMV Book 2 Security and Key Management v4.3 (targeted read), Sources ledger 2026-05-22 — Section 5 certificate chain"
 status: active
 ```
 
@@ -8890,6 +9381,8 @@ relationships:
     target_id: concept.emv-rsa-key-hierarchy
   - type: related_to
     target_id: operation.emv-arqc-generation
+references:
+  - "EMV Book 2 Annex B (Approved Algorithms) + Bulletin 208. v4.4-specific content (ECC XDA/ODE suites, Bulletin 208 RSA-modulus correction) from a one-time v4.4 read on 2026-05-22 (Sources ledger); v4.4 is NOT held on disk and this is not re-verifiable against a held file. The RSA/hash/TDES fundamentals also appear in the held EMV Book 2 v4.3 Annex B (.tmp-emv-book2-v43.pdf)."
 status: active
 ```
 
@@ -10479,11 +10972,20 @@ that publish annual revisions).
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
 | 2026-05-22 | PCI 3DS Core Security Standard v1.0 (targeted read: pp.1-20 overview/Part 1 baseline; pp.45-58 P2-5 Protect 3DS data, P2-6 Cryptography and Key Management, P2-7 Physical security; pp.59-65 appendices) | PCI Security Standards Council | v1.0, October 2017 | compliance, key_management, cryptography, hsm, 3ds |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
-| 2026-05-22 | EMV Book 2 — Security and Key Management v4.4 delta read (targeted: cover/revision log/ToC pp.1-10; Annex B Approved Algorithms pp.151-169 — Table 43 RSA modulus corrections per Bulletin 208, B2 ECC P-256/P-521 curve parameters, Table 47 hash algorithm indicators, Table 48 ECC signature suites, Table 49 ODE encryption suites; Bulletin 162 AES key derivation erratum noted) | EMVCo | v4.4, November 2023 | emv, cryptography, key_management |
-| 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 | emv, cryptography, key_management |
-| 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 | hsm, key_management, pin_processing, cryptography |
+| 2026-05-22 | EMV Book 2 — Security and Key Management v4.4 delta read (targeted: cover/revision log/ToC pp.1-10; Annex B Approved Algorithms pp.151-169 — Table 43 RSA modulus corrections per Bulletin 208, B2 ECC P-256/P-521 curve parameters, Table 47 hash algorithm indicators, Table 48 ECC signature suites, Table 49 ODE encryption suites; Bulletin 162 AES key derivation erratum noted) | EMVCo | v4.4, November 2023 — NOT HELD on disk (one-time read; not re-verifiable) | emv, cryptography, key_management |
+| 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 — NOT HELD on disk (one-time read; v4.3 Book 3 IS held for the tags common to both editions) | emv, cryptography, key_management |
+| 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 — NOT HELD on disk (one-time read 2026-05-25; ~30 KB/registry citations rely on it and are not re-verifiable against a held file; the Core PUGD0537-004 and Legacy PUGD0538-003 manuals ARE held) | hsm, key_management, pin_processing, cryptography |
 | 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
 | 2026-05-25 (corrected 2026-05-26) | KU/KY (EMV issuer script MAC) wire format verified against PUGD0537-004 pp.475-484 (authoritative, local PDF). 8 errors in initial inferred entry corrected: no Key Type (3H) field — wire is Mode→SchemeID→MK-SMI directly; full scheme tables (7 KU / 10 KY); MK-SMI is 32H or 'U'+32H only (LMK 28-29 variant 2); Integrity Session Key Data is scheme-dependent; Schemes 0/1/2 Mode 0 use ';'-terminated message data (no 4H length); Schemes 3-6 use 4H length prefix; Response MAC is 8B binary; KY Mode 0 has no Scheme ID but has IV-SMI (16B). Mode 0 → generate_mac (TR31_E2_EMV_MKEY_INTEGRITY); modes 1-4 → generate_mac_emv_pin_change (proxy unsupported). | Thales | PUGD0537-004 Core Host Commands V1, pp.475-484 — AUTHORITATIVE | hsm, emv, cryptography |
 | 2026-05-25 (corrected 2026-05-26) | LQ/LS (HMAC generate/verify) wire format verified against PUGD0537-004 pp.405-408 (authoritative, local PDF). 7 errors in initial inferred entry corrected: Hash Identifier is 2N not 1N; three missing fields added (HMAC Length 4N, HMAC Key Format 2N, HMAC Key Length 4N); HMAC Key is nB binary under LMK pair 34-35 variant 1 with NO key scheme prefix; Delimiter ';' is Variant LMK only; Data Length is 5N decimal not 4H hex; Message Data is nB binary not ASCII hex; LS field order: HMAC before key fields. SHA-224 ('05') maps to MacAlgorithm::HmacSha224 in APC (corrected 2026-05-29 — initial entry incorrectly stated no APC equivalent). Premium license required. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY. | Thales | PUGD0537-004 Core Host Commands V1, pp.405-408 — AUTHORITATIVE | hsm, cryptography |
 | 2026-05-25 | QY/PM (dCVV generate/verify) — prior inferred entry corrected against PUGD0537-004 pp.306-315 (AUTHORITATIVE, local PDF). Major corrections: (1) Master Key uses parse_legacy_key, NOT fixed 32H; (2) Scheme ID (1N) precedes the key; (3) Key Derivation Method (1A) follows the key; (4) PAN is variable-length nN with ';' delimiter, NOT fixed 16N; (5) ATC is 6N decimal (zero-padded), NOT 4H hex; (6) Service Code must be '998' for Scheme 0 (Visa dCVV); (7) PM has Version field; (8) dCVV in PM is at END of scheme fields, not before PAN. PM supports 8 schemes with sub-versions. Entry now scope-documented for Scheme '0' Version '0' (Visa dCVV). | Thales | PUGD0537-004 Core Host Commands V1, pp.306-315 — AUTHORITATIVE | hsm, card_validation, emv |
 | 2026-05-22 | EMV Tag Catalog — kabc.ca/emv/tags | https://www.kabc.ca/emv/tags (public reference) | n/a | emv, tlv, tags |
+| 2026-05-30 | AWS.Magnus.KeyCeremonyTool HsmKeyCeremonyClient.cs — Futurex KMAP/GPKR/VKTE wire formats. Single working implementation; layouts NOT corroborated by the Futurex Integration Guide — registry entries carry medium confidence | AWS (internal tooling) | accessed 2026-05-30 | hsm, key_management |
+| 2026-07-05 | aws-samples/samples-for-payment-cryptography-service — migration_guidance/payshield-command-mapping.md (verified against source), key_exchange/utils/apc.py, key_exchange/hsm/futurex/commands.py (single source, not TRM-verified) | AWS | accessed 2026-07-05 | hsm, key_management, emv, cryptography |
+| 2026-07-03 | apc-hsm-proxy live differentials vs APC us-east-1: issuer-script MAC JU/KU 15/15 (EmvMac session-key derivation + SessionKeyDerivationValue union rule), KS/K2 ARQC verify, GenerateAuthRequestCryptogram probes (TDES-only rejection of all AES E0, DeriveKey required, method-2 pre-padding) | Live API testing (apc-hsm-proxy / apc-crossval) | live 2026-07 | emv, cryptography, key_management |
+| 2026-07-06 | AWS SDK service models — botocore payment-cryptography-data (operation existence, required members, endpoints; mechanically enforced by tests/test_use_cases_grounding.py); aws-sdk-rust paymentcryptographydata v1.x struct types | AWS | installed SDK version, re-checked every CI run | key_management, cryptography, emv |
+| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs cached locally as .tmp-emv-book2-v43.pdf / .tmp-emv-book3-v43.pdf, from Internet Archive captures of the original EMVCo files). Now HELD sources — usable for direct content verification. VERSION CURRENCY: v4.4 (October 2022) is the current edition and is the one that SHOULD be cited; it is gated behind EMVCo login and only appears on copyright-infringing re-hosts, so it is NOT held. Entries verified here against v4.3 note the edition; the fundamentals checked (ARPC Method 1/2, session-key derivation Annex A1, cryptogram types) are stable across the v4.3→v4.4 boundary, but clause/table numbers can shift — prefer a v4.4 citation whenever v4.4 becomes obtainable | EMVCo (via Internet Archive) | held: v4.3 Nov 2011; LATEST: v4.4 Oct 2022 (gated); cached 2026-07-06 | emv, cryptography, key_management |
+| 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally, each the CURRENT edition: FIPS 197 (AES, 2001 w/ update 2023-05-09), FIPS 198-1 (HMAC, 2008), SP 800-38G (FF1/FF3-1 FPE, 2016 — no finalized revision), SP 800-67r2 (TDEA, 2017), SP 800-56A r3 (ECDH/key agreement, 2018), ITU-T X.690 (= ISO/IEC 8825 BER/DER, 02/2021), RFC 2104 (HMAC, 1997). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | latest editions as noted; cached 2026-07-06 | cryptography, key_management |
+| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
+| 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
+| 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |

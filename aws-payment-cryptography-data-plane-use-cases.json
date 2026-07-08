@@ -33,12 +33,15 @@
       "supported_operations": [
         "DecryptData",
         "EncryptData",
+        "GeneratePinData",
         "ReEncryptData",
-        "TranslatePinData"
+        "TranslatePinData",
+        "VerifyPinData"
       ],
       "notes": [
         "Dynamic keys are passed as TR-31 wrapped key blocks.",
-        "For symmetric data encryption operations, the key ARN refers to the key encryption key that protects the wrapped working key."
+        "For symmetric data encryption operations, the key ARN refers to the key encryption key that protects the wrapped working key.",
+        "Member names differ by operation: WrappedKey (Encrypt/DecryptData), IncomingWrappedKey/OutgoingWrappedKey (ReEncryptData, TranslatePinData), EncryptionWrappedKey (GeneratePinData, VerifyPinData). GeneratePinData and VerifyPinData support postdates the 2026-05-14 PDF snapshot — found in the SDK service model 2026-07-06."
       ]
     },
     "ecdh_key_exchange": {
