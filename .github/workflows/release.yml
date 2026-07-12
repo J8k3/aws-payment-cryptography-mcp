@@ -51,3 +51,42 @@ jobs:
             "aws-payment-cryptography-mcp-${{ steps.version.outputs.version }}.mcpb" \
             --title "AWS Payment Cryptography MCP ${{ github.ref_name }}" \
             --generate-notes
+
+  publish-mcp-registry:
+    needs: pack-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC auth to the MCP registry (no secret needed)
+      contents: write   # commit the synced server.json back to master
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+      - name: Pin server.json to this release (version, .mcpb URL, sha256)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSET="aws-payment-cryptography-mcp-${VERSION}.mcpb"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${ASSET}"
+          gh release download "${GITHUB_REF_NAME}" -p "${ASSET}" -O "/tmp/${ASSET}"
+          SHA="$(sha256sum "/tmp/${ASSET}" | cut -d' ' -f1)"
+          jq --arg v "$VERSION" --arg url "$URL" --arg sha "$SHA" \
+            '.version=$v | .packages[0].version=$v | .packages[0].identifier=$url | .packages[0].fileSha256=$sha' \
+            server.json > server.tmp && mv server.tmp server.json
+          echo "--- patched server.json:"; cat server.json
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+      - name: Authenticate to MCP registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to MCP registry
+        run: ./mcp-publisher publish
+      - name: Commit synced server.json back to master
+        run: |
+          if git diff --quiet -- server.json; then echo "server.json already current"; exit 0; fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.json
+          git commit -m "chore: sync server.json to ${GITHUB_REF_NAME} [skip ci]"
+          git push origin HEAD:master

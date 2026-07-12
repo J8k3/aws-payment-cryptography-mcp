@@ -5,45 +5,47 @@ under the namespace **`io.github.J8k3/aws-payment-cryptography-mcp`**, distribut
 `.mcpb` bundle attached to each GitHub release. The registry entry is described by
 [`server.json`](../server.json) in the repo root.
 
-## One-time setup
+## Automated (default) — the release workflow does it
 
-Install the publisher CLI (see the [registry docs](https://github.com/modelcontextprotocol/registry)):
+`.github/workflows/release.yml` publishes to the registry on every `v*.*.*` tag. The
+`publish-mcp-registry` job (after the `.mcpb` is built and the release is created):
+
+1. Downloads the release's `.mcpb`, computes its SHA-256, and **pins `server.json`** for that
+   release — `version`, `packages[].version`, `packages[].identifier` (the `.mcpb` download URL),
+   and `packages[].fileSha256`.
+2. Authenticates with **GitHub OIDC** (`mcp-publisher login github-oidc`) — no secret required,
+   just the job's `id-token: write` permission; the `io.github.J8k3` namespace is authorized by
+   the repo owner.
+3. Runs `mcp-publisher publish`.
+4. Commits the pinned `server.json` back to `master` so the repo reflects the last-published state.
+
+So the normal flow is just: **`chore: bump version` → tag `vX.Y.Z` → push tag.** The registry
+entry updates itself. Verify with:
 
 ```bash
-# via Go, or download a release binary for your platform
-go install github.com/modelcontextprotocol/registry/cmd/mcp-publisher@latest
+curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=aws-payment-cryptography" | jq .
 ```
 
-## Publish / update (run after each release)
+> Namespace note: if OIDC ever rejects `io.github.J8k3` on capitalization, lowercase it to
+> `io.github.j8k3/...` in `server.json` (GitHub logins are case-insensitive for auth).
 
-The `.mcpb` download URL, `version`, and `fileSha256` in `server.json` are **pinned to a
-specific release tag** — they must be updated every time a new version ships.
+## Manual fallback (first-time bootstrap / troubleshooting)
 
-1. Cut the release first (tag `vX.Y.Z` → the release workflow builds and attaches
-   `aws-payment-cryptography-mcp-X.Y.Z.mcpb`).
-2. Update `server.json`:
-   - `version` and each `packages[].version` → `X.Y.Z`
-   - `packages[].identifier` → the new release's `.mcpb` download URL
-   - `packages[].fileSha256` → the new bundle's SHA-256:
-     ```bash
-     curl -sL -o /tmp/b.mcpb \
-       https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/vX.Y.Z/aws-payment-cryptography-mcp-X.Y.Z.mcpb
-     sha256sum /tmp/b.mcpb
-     ```
-3. Authenticate with the GitHub namespace (browser OAuth; only the repo owner can do this):
-   ```bash
-   mcp-publisher login github
-   ```
-   The `io.github.J8k3/...` namespace is authorized by your GitHub login. If the CLI rejects
-   the case, try the lowercase form `io.github.j8k3/...`.
-4. Publish:
-   ```bash
-   mcp-publisher publish     # reads ./server.json
-   ```
-5. Verify:
-   ```bash
-   curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=aws-payment-cryptography" | jq .
-   ```
+If you need to publish by hand:
+
+```bash
+# 1. download the mcp-publisher CLI (or `go install github.com/modelcontextprotocol/registry/cmd/mcp-publisher@latest`)
+curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+# 2. pin server.json to the target release (version, .mcpb URL, sha256)
+VERSION=X.Y.Z
+curl -sL -o /tmp/b.mcpb "https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/v${VERSION}/aws-payment-cryptography-mcp-${VERSION}.mcpb"
+sha256sum /tmp/b.mcpb   # paste into packages[0].fileSha256; also update version + identifier URL
+
+# 3. authenticate (browser OAuth) and publish
+./mcp-publisher login github     # or: login github-oidc inside CI
+./mcp-publisher publish          # reads ./server.json
+```
 
 ## Human-browsable directories (optional, secondary)
 
