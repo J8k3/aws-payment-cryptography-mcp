@@ -201,6 +201,17 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "EMV offline PIN change operation.",
                "generate_mac_emv_pin_change",
                "TR31_E2_EMV_MKEY_INTEGRITY + TR31_E1_EMV_MKEY_CONFIDENTIALITY"),
+    # CVV Generation (Issuing)
+    HsmCommand("Futurex", "Excrypt", "GCVV", "Generate CVV or CVC Value", "CVV",
+               "Generates a card verification value (CVV/CVC/iCVV) from PAN, expiry, and service code "
+               "under a card-verification key pair (CVK-A/CVK-B).",
+               "generate_card_validation_data", "TR31_C0_CARD_VERIFICATION_KEY",
+               "Command-scoped Excrypt tags observed in a single real jPOS integration "
+               "(github.com/kakubila/jpos-excrypt-interface), MEDIUM confidence, not verified against the "
+               "Futurex TRM: AV=PAN, CA=CVK-A, CB=CVK-B, FA=expiry date, FB=service code, FC=generated "
+               "CVV/CVC (response). Verify direction is VCVV/VCVC. Authoritative name corroborated by "
+               "docs.futurex.com ('Generate CVV/CVC Value').",
+               confidence="medium"),
     # CVV Validation (Acquiring)
     HsmCommand("Futurex", "Excrypt", "VCVV", "Verify CVV/CVC Value", "CVV",
                "Verifies a CVV or CVC value for card-not-present transaction validation.",
@@ -374,12 +385,15 @@ FUTUREX_EXCRYPT_COMMANDS: list[HsmCommand] = [
                "Proposed APC correspondence: get_parameters_for_import (import token plus wrapping "
                "key certificate). Observed in RSA and CloudHSM import flows; verify against the guide.",
                confidence="directory"),
-    HsmCommand("Futurex", "Excrypt", "RSAR", "Import Key Under RSA", "KEY_MGMT",
-               "Imports a symmetric key that was wrapped under the HSM's RSA public key.",
+    HsmCommand("Futurex", "Excrypt", "RSAR", "Generate PKCS #10 Certificate Request", "KEY_MGMT",
+               "Generates a PKCS #10 certificate signing request (CSR) from an RSA key held on the HSM.",
                None, None,
-               "Proposed APC correspondence: import_key with RSA key-wrap (RSA_OAEP) material. "
-               "Observed in RSA key-transport flows; verify against the Futurex Integration Guide.",
-               confidence="directory"),
+               "CORRECTED 2026-07-12: previously mislabeled 'Import Key Under RSA' (an inferred/directory "
+               "guess). Authoritative name from docs.futurex.com Host API command tables (via /llms-full.txt) — "
+               "see reference_list.futurex-excrypt-sourcing-and-ground-truth. No direct APC analog: APC "
+               "generates its own key material and CSRs internally; get_parameters_for_import returns the "
+               "APC-side wrapping key/cert for the equivalent enrollment role.",
+               confidence="medium"),
     HsmCommand("Futurex", "Excrypt", "AVPC", "Add/Trust Public Certificate", "KEY_MGMT",
                "Loads and trusts an external public-key certificate (counterparty CA or leaf) so "
                "keys signed or wrapped under it can be validated during key exchange.",
