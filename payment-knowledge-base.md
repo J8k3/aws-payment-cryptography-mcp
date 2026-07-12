@@ -4333,6 +4333,101 @@ relationships:
 status: active
 ```
 
+### Futurex Standard (Numeric) Command Family
+
+```yaml
+id: reference_list.futurex-standard-numeric-commands
+entity_type: reference_list
+canonical_name: Futurex Standard (Numeric) Host-Command Family
+summary: >
+  The Futurex STANDARD (legacy/numeric) host-command family — hex code to description — from the
+  public Futurex General Payment HSM Integration Guide PDF. These are the "Standard Cmd:NN" entries
+  in device Permissions lists, a separate command family from the 4-char AO-prefixed Excrypt commands
+  (different wire format), so they are preserved here as a reference list rather than as Excrypt
+  registry entries. The Standard and International families are Thales payShield / Atalla-COMPATIBLE
+  (numeric codes mirror Thales/Atalla verbatim — 31=Translate PIN Block, 350=EMV ARQC Validation,
+  5D/5E=Generate/Verify CVV), so the public Thales Host Programmer's Manual supplies field-level
+  syntax for this subset; that bridge does NOT extend to the proprietary AO Excrypt commands.
+domain:
+  - hsm
+  - pin_processing
+  - card_validation
+  - emv
+attributes:
+  source: "Futurex General Payment HSM Integration Guide (public PDF)"
+  confidence: medium
+  thales_atalla_compatibility: >
+    Standard/International numeric codes are Thales/Atalla-compatible; for field syntax use the public
+    Thales payShield Host Programmer's Manual (e.g. eftlab command index; payShield 9000 HPM 1270A542;
+    payShield 10K PUGD0535). All 4-char PAYMENT Excrypt codes in this same PDF were already catalogued
+    (0 new); the value here is the numeric family plus the mode variants below.
+  numeric_commands: |
+    31  = Translate PIN Block
+    32  = Verify PIN  (~10 method variants — ANSI/Visa/IBM 3624/Diebold/IBM 4736-NCR + DUKPT; selected by request fields)
+    33  = Extended PIN Translation
+    34  = Generate Clear PIN and Offset
+    35  = Translate PIN Block using Double Encryption
+    36  = Verify PIN Block using Double Encryption  (~10 method variants)
+    3D  = Generate IBM 3624 Offset
+    52  = Data Translate
+    56  = Generate MAC
+    57  = Generate MAC
+    5A  = Verify MAC
+    5B  = Verify MAC
+    5C  = Verify and Generate MAC
+    5D  = Generate Card Verification Value
+    5E  = Verify Card Verification Value
+    98  = Generate MAC value based on MAC key and data
+    99  = Verify MAC value based on MAC key and data
+    BC  = Verify a Terminal PIN using the Comparison method
+    BE  = Compare PIN to Encrypted PIN Block
+    C2  = Generate a MAC
+    C4  = Verify a MAC
+    CA  = Translate PIN Block from TPK to PEK Encryption
+    CC  = Translate PIN Block from one PEK to another PEK
+    DA  = Verify Terminal PIN Block
+    DC  = Verify Terminal PIN Block
+    DE  = Generate IBM PIN Offset
+    EA  = Verify PIN
+    EC  = Verify PIN
+    EE  = Derive PIN using the IBM Method
+    11D = Generate MAC and DEK keyblocks
+    304 = Verify CMAC using TDES
+    305 = Generate CMAC using TDES
+    324 = Verify APACS 40 request MAC
+    335 = Translate PIN Block
+    346 = DUKPT PIN Translate
+    348 = Verify MAC using DUKPT key derived using the BDK and KSN
+    350 = EMV ARQC Validation
+    352 = EMV Message Authentication Code
+    354 = Generate Smart Card Master Key
+    357 = Dynamic CVV Validation
+    359 = Dynamic CVC3 Validation
+    35A = Verify American Express
+    35B = Generate American Express
+    365 = Verify Visa Cloud
+    368 = Create Limited Use Key
+    386 = Generate MAC  (2 method variants)
+    388 = 3DES DUKPT Encrypt/Decrypt Data
+    38C = Derive DUKPT Initial PIN Encryption Key
+    3FA = Generate PIN and PVV
+  payment_excrypt_mode_variants: |
+    Mode variants worth recording for the 4-char PAYMENT Excrypt commands (from the same PDF):
+    XPIN = 7 translation modes (ANSI-to-ANSI / PIN-Pad, IBM 3624/4736, etc.)
+    PEDK = Key Request V3 Modes 1/2/3 (incl. One-Pass TR-34 and TR-34-with-AES)
+    VMAP = Verify MAC and PIN (Diebold / IBM 3624 / Visa)
+constraints:
+  - Separate command family (Standard/numeric) with a different wire format from the AO Excrypt
+    frames — kept as a reference list, not promoted to Excrypt registry entries.
+  - Field-level syntax for this subset comes from the public Thales payShield manuals, not Futurex.
+relationships:
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+status: active
+```
+
 ### Futurex Excrypt Transaction-Command Tag Maps (EMVA, GCVV)
 
 ```yaml
