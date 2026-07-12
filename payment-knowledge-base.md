@@ -4118,10 +4118,28 @@ attributes:
     AE: KCV
     AP: KEK
     CT: "symmetric algorithm enum — 2=TDES2, 3=TDES3, 4=AES128, 5=AES192, 6=AES256"
+  enum_tokens:
+    note: "Enum tables from the aws-samples key-exchange sample; tokens are command-scoped (RA and KM mean different things per command)."
+    CT: "symmetric algorithm — 2=TDES-2key, 3=TDES-3key, 4=AES-128, 5=AES-192, 6=AES-256"
+    RA_in_GECC: "ECC curve — 2=NIST P-256, 3=P-384, 4=P-521"
+    RA_in_GRSA: "RSA public exponent (hex) — command-scoped, NOT a curve"
+    RB: "RSA key length — 2048 / 3072 / 4096"
+    CZ: "asymmetric key usage/mode — X=key agreement, V=verify, G=sign"
+    RG: "KDF hash — 4=SHA-256, 5=SHA-384, 6=SHA-512"
+    KM_kdf: "KDF selector — 0=NIST SP800-56C, 1=ANSI X9.63 (note: distinct from the EMVA KM key-derivation-method tag)"
+    FS6: "using the PMK (protection master key)"
   commands:
-    GPGS: wraps a key under the master key; returns BG + AE
-    TWKA: wraps a key under a KEK
-    TRTP: builds a TR-34 export payload
+    GPGS: "wraps a key under the master key; returns BG + AE"
+    TWKA: "wraps a key under a KEK"
+    TRTP_basic: "builds a TR-34 export payload"
+    GECC: "generate ECC key pair — req RA(curve),CZ(usage) -> RC=wrapped priv, SD=trusted pub, RD=clear pub"
+    GRSA: "generate RSA key pair — req RB(len),RA(exponent),CZ(usage) -> RC/SD/RD"
+    SDDH: "ECDH derive — req CT(alg),RG(hash),KM(kdf),AK(shared info),RC(priv),RD(trusted pub) -> BG=derived key"
+    AVPC: "trust/validate cert — req CZ(X=validate vs CA / V=verify only),SA(CA TPK),RV(cert DER) -> RD=cert TPK"
+    ASGC: "self-signed CA cert — req BF(YYYYMMDD),KU(X.509 usages),BC(basic constraints),RC(wrapped priv) -> RV=cert DER"
+    ASYR: "generate CSR — req KU(usages),RC(wrapped priv) -> RU=CSR (PKCS#10)"
+    ASSR: "sign CSR/issue cert — req BF(date),KU(usages),RU(CSR),RH(CA cert DER),RC(CA wrapped priv) -> RV=signed cert"
+    TRTP_enriched: "req CT,RV=KDH cert,RC=KDH priv,SJ=KRD cert/TR-34 payload,SA=KRD CA TPK -> BG=transport key,BJ=nonce"
 constraints:
   - Scope — these are key EXCHANGE/EXPORT commands. This entry does NOT cover the
     wrapped-key parameter as it appears inside a transaction (PIN/MAC) command — that
@@ -4131,6 +4149,11 @@ constraints:
     observed, semantics unverified against the Integration Guide); the command semantics
     above come from the AWS sample only and carry this entry's medium confidence, not
     the registry's authoritative grade.
+  - The asymmetric key-exchange commands (GECC/GRSA/SDDH/AVPC/ASGC/ASYR/ASSR) and their enum
+    tables are SINGLE-SOURCE (the aws-samples key_exchange/hsm/futurex/commands.py), medium
+    confidence, not verified against the Futurex TRM. All are CODE-confirmed real by the
+    272-code device ground-truth. Opaque cert-construction constants (RY/XE/AL/AD/SG/KB/KF/
+    SP/ZA/AS/RT/LA) are intentionally omitted — bound to no named param/enum.
 relationships:
   - type: related_to
     target_id: concept.futurex-payment-hsm
