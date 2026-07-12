@@ -4136,6 +4136,177 @@ relationships:
     target_id: concept.futurex-payment-hsm
   - type: related_to
     target_id: tool.apc-hsm-proxy
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+status: active
+```
+
+### Futurex Excrypt Sourcing Landscape and Command Ground-Truth
+
+```yaml
+id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+entity_type: reference_list
+canonical_name: Futurex Excrypt Sourcing Landscape and Command Ground-Truth
+summary: >
+  Consolidated sourcing map plus command CODE/NAME ground-truth for Futurex Excrypt, so a
+  future session does not re-run the source hunt and so valid command names/codes are
+  preserved even when they are not given full registry entries. Grades — authoritative NAMES
+  come from docs.futurex.com Host API tables; CODE EXISTENCE from a real device config report;
+  tag SYNTAX only from a few public integrations, never the Futurex TRM. Do not invent names
+  for uncatalogued codes.
+domain:
+  - hsm
+  - key_management
+attributes:
+  sourcing_landscape: >
+    Authoritative command NAMES and tag syntax live in Futurex's own docs. CORRECTION to the
+    earlier "docs.futurex.com is a JS SPA, not crawlable" claim (now superseded): docs.futurex.com
+    is a Mintlify site, so https://docs.futurex.com/llms-full.txt returns ~7.5 MB of the whole docs
+    as markdown (each page preceded by "Source: <url>"), including the Host API command-reference
+    tables as HTML cells; /llms.txt is an index of integration guides only; /sitemap.xml lists 1731
+    URLs. General rule — for any Mintlify/GitBook/Docusaurus site, try /llms-full.txt and /llms.txt
+    before concluding an SPA is un-crawlable. LIMITS — the per-command TAG-SYNTAX pages under
+    /Excrypt_HSM/<firmware>/{excrypt,international,standard}_commands/ are CIAM-gated (Microsoft Entra
+    External ID) across all firmware; llms-full.txt gives command NAMES but not those per-command tag
+    pages; client binaries (fxpkcs11/fxtools/FXCLI/Excrypt Manager) are Futurex-Portal-gated and absent
+    from all public source control; no public Excrypt simulator/dissector exists. The docs also span
+    multiple products (KMES Series 3 RK*/RA*, log-severity labels), so filter table cells to real HSM
+    Excrypt codes using the device ground-truth below. Occasional doc typos exist (EMVA rendered
+    "Verify QRQC" for ARQC) — do not adopt blindly.
+  open_code_sources: >
+    The complete set of public open-code sources is only three GitHub repos (nothing on
+    npm/PyPI/Maven/crates, Stack Overflow, GitLab, Bitbucket, SourceForge): (1)
+    github.com/kakubila/jpos-excrypt-interface — EMVA/GCVV/TPIN tags, PROTECTED_TAGS, ERRO/GF;
+    (2) github.com/RicardoVercetti/RandomCodeScraps .../emva_command.py — live EMVA request;
+    (3) the aws-samples public key-exchange sample (key_exchange/hsm/futurex/commands.py) —
+    GPGS/TWKA/TRTP/GECC/GRSA/AVPC/SDDH/ASGC/ASYR/ASSR + enum token tables. All three are
+    EMVA/ARQC-heavy. Real deployment footprint is North America + Latin America (VirtuCrypt strong
+    in Brazil/Spanish LATAM); the productive non-English corpus is Portuguese/Spanish, not Chinese
+    (Futurex does not sell to China). A Thales/Atalla compatibility bridge exists for the Standard
+    (numeric) and International families — those mirror Thales payShield / Atalla verbatim, so the
+    public Thales Host Programmer's Manual supplies field syntax for that subset; it does NOT cover
+    the proprietary AO-prefixed Excrypt commands. See reference_list.futurex-standard-numeric-commands.
+  firmware_versioning: >
+    Per Futurex, EVEN minor versions (7.2, 7.4, 7.6) are PCI-validated releases; ODD minors are
+    development builds. Docs are versioned per firmware (7.2.0.x, 7.4.1.x/741x, 7.6.1.x/761x).
+  command_reference_categories: >
+    19 categories (from a Wayback nav capture), split across excrypt/international/standard families:
+    Authentication, Card Verification, Data Encryption, Diebold Table, ECC, EMV, Format Preserving
+    Encryption, General Purpose, Key Management, Master Key Distribution, Message Authentication Code,
+    Mobile Payment Processing, Permission and Utility, PIN Offset, Point-to-Point Encryption,
+    RSA/Remote Key, TR-34 Remote Key Loading, VRF.
+  device_ground_truth_272_codes: |
+    Ground-truth CODE EXISTENCE from a real Futurex HSM device Configuration Report (Excrypt Touch,
+    FW 7.4.1) role Permissions list. Authoritative for existence only (not names, not tag syntax).
+    General-purpose profile — PAYMENT/EMV codes (EMVA/EMVG/EMVM/GCAV/GDCV/VEMI) are ABSENT only
+    because the payment application was not enabled; absence is NOT evidence a code is unreal. Any
+    registry Futurex code not in this list and not a known payment-profile command deserves a second
+    look. 272 codes:
+    ADMN,ADPK,AEPK,AKCN,APDE,APDI,APDK,APDO,APDT,APFP,APIL,APIT,ASGC,ASSR,ASYD,ASYE,ASYL,ASYR,ASYS,
+    ASYV,AVPC,BACK,CAAV,CATC,CBCD,CBCE,CCDL,CCRL,CDTR,CHLC,CKTA,CPKD,CPTY,CRND,CRSA,CWKS,DAPT,DATP,
+    DATT,DCID,DDAT,DDTE,DENV,DEPK,DGPT,DIAG,DKBK,DKBR,DKTE,DMAC,DRKC,DRKI,DRSA,DSPT,DTRA,DUKK,DXAC,
+    DXSC,ECDD,ECDE,ECHO,ECID,EDAT,EDNT,EDPK,ENVD,EPIN,FPTY,GACM,GBCR,GBSC,GCEK,GCKD,GCRT,GCSC,GCVC,
+    GCVV,GDIK,GECC,GHDK,GHTD,GKBH,GKBL,GLKS,GLMK,GMAC,GMDK,GNOF,GOFC,GOFF,GPAD,GPAE,GPDA,GPDE,GPEA,
+    GPED,GPEK,GPGC,GPGS,GPIN,GPKA,GPKB,GPKD,GPKI,GPKM,GPKR,GPKS,GPKT,GPKU,GPKW,GPMC,GPRU,GPRW,GPSD,
+    GPSE,GPSR,GPSU,GPSV,GPSW,GPUK,GPWK,GRSA,GSKE,GUFP,GUKM,GUPB,GVAK,GVWK,GWKS,GZSK,HASH,HENC,HEXD,
+    HEXE,HMAC,HMCG,HMCV,HMKE,HMKG,HMKI,HOTP,IMAC,JOSE,JOVD,KBAT,KCAR,KCBC,KCBD,KCCR,KDER,KMAP,LATM,
+    LCDT,LENT,LKST,LKYC,LRSA,OBKE,OFPC,PGKE,PGKI,PGPD,PGPE,PGPT,PING,PKCS,PKEY,PLEN,PRMD,PWRQ,RAND,
+    RASY,RCCN,RCRT,RCXP,RDPK,REPK,REST,RGCI,RGPK,RGXI,RKCN,RKEY,RMMQ,RPFP,RPIN,RRSA,RSAC,RSAD,RSAE,
+    RSAP,RSAR,RSAS,RSAV,RSAW,RSDD,RSDE,RSGC,RSRE,RSSK,RSSR,RSTE,RSVR,RUPT,RVPC,RVPD,SCRT,SDDH,SKCE,
+    SKCI,SKEY,SMFK,STAT,SWKY,TCRT,TDAA,TDAB,TDAD,TDAS,TDDA,TDPK,TDSA,TEPK,TIME,TKBH,TKBL,TLSS,TPDD,
+    TPIN,TPKC,TPKD,TPKS,TRBI,TROD,TROL,TROP,TRPN,TRRE,TRTD,TRTP,TRUN,TSAK,TSPN,TVWK,TWKA,TWKB,TWKD,
+    TWKL,TWKM,TWKN,TWKS,VAAV,VACM,VARA,VCRL,VCRT,VCSC,VCVC,VCVV,VDTE,VKBL,VKTE,VMAC,VMAP,VMDK,VPIN,
+    VRSA,VUFP,VUPB,WBIN,WINS,XPIN
+  authoritative_names_61: |
+    Authoritative Futurex NAMES (verbatim from docs.futurex.com Host API tables) for the 61 codes
+    that are BOTH documented AND present in the device ground-truth above — high-confidence name +
+    confirmed-real code. Use to name/validate the registry; the ~211 other device codes have no name
+    in the integration-guide tables and must be sourced from the Host API per-command pages, never
+    guessed.
+    ADPK = PKI Decrypt Trusted Public Key
+    APFP = Generate PKI Public Key from Private Key
+    ASYL = Load asymmetric key into key table
+    ASYS = Generate signature using PKI private key
+    ASYV = Verify a Signature Using a Public Key
+    CAAV = Calculate Account holder Authentication Value
+    DAPT = Decrypt Apple Pay Token
+    DGPT = Decrypt Google Pay Token
+    DRKI = Identification Request (Mode 1)
+    DSPT = Decrypt Samsung Pay Token
+    ECHO = Communication Test / Retrieve Version
+    GCVC = Generate CVC and CVC2
+    GCVV = Generate CVV/CVC Value
+    GECC = Generate an ECC Key Pair
+    GNOF = Generate New Offset
+    GOFC = Generate Offset of Clear PIN
+    GOFF = Generate PIN offset value
+    GPED = General Purpose Encryption and Decryption
+    GPGC = General-purpose generate cryptogram from key slot
+    GPGS = General-purpose generate symmetric key
+    GPIN = Generate PIN (Diebold Method)
+    GPKA = General-purpose key add
+    GPKD = General-purpose key slot delete/clear
+    GPKM = Retrieve key table information
+    GPKR = General-purpose key settings get (read-only)
+    GPKS = General-purpose key settings get/change
+    GPKU = General-purpose key unwrap (unrestricted)
+    GPKW = General-purpose key wrap (unrestricted)
+    GPMC = General-purpose MAC (Message Authentication Code)
+    GPSD = General-purpose Symmetric Decrypt
+    GPSE = General-purpose Symmetric Encrypt
+    GPSR = General-purpose RSA encrypt/decrypt or sign/verify with recovery
+    GPSV = General-purpose data sign and verify
+    GPUK = General-purpose key unwrap (preserves key usage)
+    GPWK = General-purpose key wrap (preserves key usage)
+    GRSA = Generate RSA Private and Public Key
+    HASH = Retrieve device serial
+    HMAC = Generate a hash-based message authentication code
+    LRSA = Load key into RSA Key Table
+    OFPC = Perform EMV PIN Change Using Offset
+    PRMD = Retrieve HSM restrictions
+    RAND = Generate random data
+    RDPK = Get Clear Public Key from Cryptogram
+    RPFP = Get public components from RSA private key
+    RPIN = PIN Change & Optional PIN Verification (IBM 3624)
+    RSAC = Convert clear DER-encoded RSA key to major-key cryptogram (general-purpose)
+    RSAR = Generate PKCS #10 Certificate Request
+    RSAS = Generate a Signature Using a RSA Private Key
+    STAT = HSM statistics
+    TIME = Set time
+    TPDD = Translate an encrypted ANSI PIN block
+    TPIN = Translate PIN blocks
+    TRPN = Translate PIN from RSA to Symmetric PIN Block
+    TSPN = Translate PIN from PIN block to RSA encryption
+    VAAV = Verify Account Holder Authentication Value
+    VCSC = Verify American Express (Amex) CSC Value
+    VCVC = Verify CVC and CVC2
+    VCVV = Verify CVV
+    VMAP = Verify MAC and PIN (Diebold Method)
+    VPIN = Verify PIN
+    XPIN = ANSI-to-ANSI PIN translation (Futurex Integration Guide documents 7 modes; the registry
+      name "Extended PIN Translation" is retained as the broader command label)
+  pending_unconfirmed: |
+    Device-confirmed CODES whose FUNCTION is not yet authoritatively confirmed — recorded so the
+    names are not lost, but deliberately NOT promoted to full registry entries until verified
+    against the Futurex TRM:
+    CPIN = request [AOCPIN;AX<PEK>;AL<PIN block>;AW<mode>;AK<PAN>;], returns GFY/GFN; function
+      inferred (verify/check PIN), candidate apc_operation verify_pin_data — UNCONFIRMED.
+    EPIN = request [AOEPIN;AX<PEK>;AF<encrypted PIN field>;AW<mode>;AK<PAN>;]; function inferred
+      (encrypt PIN) — UNCONFIRMED. AF = encrypted PIN field (command-scoped).
+    Both from a single VirtuCrypt integration (github.com/HoracioME/testms). Promote only after
+    TRM confirmation.
+constraints:
+  - Authoritative NAMES (docs.futurex.com) are high-confidence; CODE existence (device report) is
+    high-confidence; tag SYNTAX (public integrations) is MEDIUM and must not be promoted without the
+    Futurex TRM or a live HSM/VirtuCrypt session.
+  - Never invent a name for an uncatalogued device code; source it from the Host API per-command page.
+relationships:
+  - type: related_to
+    target_id: format.futurex-excrypt-key-exchange-wire
+  - type: related_to
+    target_id: reference_list.futurex-standard-numeric-commands
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
 status: active
 ```
 
