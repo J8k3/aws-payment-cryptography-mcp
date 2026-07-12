@@ -101,6 +101,14 @@ Do not defer knowledge updates. If the session ends without the relevant file be
 
 **Cross-repo:** If a gap or finding also affects the CyberChef payments fork, file a GitHub issue at `J8k3/CyberChef` capturing what was learned and what needs to change there.
 
+## Reference Source Documents (`../payment-reference-sources`)
+
+The physical documents behind the `payment-knowledge-base.md` Sources ledger — Thales payShield manuals, EMV Books, ISO/ITU/NIST/IETF specs, Visa/Mastercard rules, the AWS APC API reference, and PCI-for-APC attestations — live in a **shared, durable, private sibling repo**: `../payment-reference-sources` (also used by `apc-hsm-proxy`). Consult it to verify a claim against its source before adding or correcting KB/registry content — content verification against these documents is the grounding mechanism.
+
+- Cite by identifier (e.g. "PUGD0537-004 p.488", "EMV Book 2 v4.3 §8.2.1"), matching a Sources-ledger row. When a claim is verified against a held document, say so; when the source is **not held** (EMV v4.4, PUGD0541, paywalled ISO/X9), say that instead — never imply a version we don't have.
+- That repo is **private / local-only** — its documents are licensed and must not be redistributed, committed into this repo, or pushed to a public remote. See its README.
+- If you obtain a not-held source, add it there and promote the affected ledger citations from "not held" to "verified against held source".
+
 ## After Every Code Change
 
 Run both before reporting work done:
