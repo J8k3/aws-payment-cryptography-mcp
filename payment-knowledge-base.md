@@ -4310,6 +4310,72 @@ relationships:
 status: active
 ```
 
+### Futurex Excrypt Transaction-Command Tag Maps (EMVA, GCVV)
+
+```yaml
+id: format.futurex-excrypt-transaction-tag-maps
+entity_type: format
+canonical_name: Futurex Excrypt Transaction-Command Tag Maps — EMVA, GCVV
+summary: >
+  Command-scoped Excrypt request/response tag maps for the EMVA (ARQC verify / ARPC generate)
+  and GCVV (generate CVV/CVC) transaction commands, plus the sensitive-tag list and status/error
+  conventions. MEDIUM confidence — from public real integrations, NOT the Futurex TRM. EMVA rests
+  on TWO independent public integrations (jPOS github.com/kakubila/jpos-excrypt-interface, and a
+  live EMVA request script github.com/RicardoVercetti/RandomCodeScraps .../emva_command.py); GCVV
+  on one (jPOS). Excrypt tags are COMMAND-scoped — the same 2-char tag means different things per
+  command, so these maps are not portable across commands.
+domain:
+  - emv
+  - card_validation
+  - hsm
+attributes:
+  confidence: medium
+  emva_verify_arqc:
+    FS: "mode (0/1/3)"
+    KM: "key-derivation method — enum (jPOS showed 3 = Mastercard M/Chip SKD; a second integration showed 1, exact method for 1 unconfirmed)"
+    CH: "ICC master-key derivation mode (1 = EMV Book 2 Annex A1.4 Option A — Annex A1.4 'Master Key Derivation' confirmed against held Book 2 v4.3)"
+    KP: "IMK-AC (app-cryptogram master key; wrapped in production, may be clear in test tooling)"
+    KQ: "PAN"
+    KR: "PAN sequence number"
+    KS: "ATC"
+    KT: "transaction data (CDOL concat — amount|amount_other|term_country|TVR|txn_currency|txn_date|txn_type|UN|AIP|ATC|IAD)"
+    BO: "ARQC (cryptogram under verification)"
+    BJ: "ARC (present when FS=1)"
+    KU: "Unpredictable Number (omitted when the UN is carried inside the CDOL/KT, consistent with FS0)"
+    NP: "appears in one request (NP0) — meaning UNCONFIRMED, not in any documented map; left flagged, do not assert"
+    response: "BB status field — 'BBY' = success"
+  gcvv_generate_cvv:
+    AV: "PAN"
+    CA: "CVK-A"
+    CB: "CVK-B"
+    FA: "expiry date"
+    FB: "service code"
+    FC: "generated CVV/CVC (response)"
+  sensitive_tags_protected: >
+    Message.java PROTECTED_TAGS (masked in logs) — AX BT AL AK AI AF CA CB BZ KP BG BH AV AP GK FC
+    FT FA KQ BX FD. These carry key material, PAN, PIN blocks, CVKs, or expiry; treat as sensitive
+    regardless of command.
+  status_and_error_conventions:
+    BB: "status field — Y = success, otherwise an error code (proxy convention)"
+    GF: "status field — GFY = success, GFN = failure (VirtuCrypt/jPOS convention); some responses key success off GF rather than BB; firmware/command-scoped"
+    ERRO: "error response frame — AM = error code, BB = error description"
+constraints:
+  - Tags are command-scoped; do not reuse an EMVA tag meaning for another command.
+  - KM is an enum whose value 1 method is unconfirmed; NP is unknown — both flagged, not asserted.
+  - MEDIUM confidence — not verified against the Futurex TRM; source repos are unlicensed and used
+    only as factual protocol observation (no code copied).
+references:
+  - "github.com/kakubila/jpos-excrypt-interface (jPOS Message.java) and github.com/RicardoVercetti/RandomCodeScraps emva_command.py — two independent public integrations; EMVA Annex A1.4 claim verified against held EMV Book 2 v4.3, Sources ledger 2026-07-12"
+relationships:
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+status: active
+```
+
 ### Generic Vendor Command Crosswalk Examples
 
 ```yaml
@@ -11160,3 +11226,5 @@ that publish annual revisions).
 | 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
 | 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
+| 2026-07-11 | Futurex Excrypt public-source sweep (CyberChef-Payments): docs.futurex.com Host API command NAMES mined from /llms-full.txt (Mintlify export, ~7.5MB); 272-code CODE-existence ground-truth from a real device Configuration Report (Excrypt Touch FW 7.4.1 Permissions list); tag SYNTAX from three public integrations (jPOS kakubila, RicardoVercetti EMVA script, aws-samples key-exchange sample). Per-command tag pages remain CIAM-gated; only NAMES + CODES are authoritative, tag syntax stays MEDIUM. RSAR name corrected (Import Key Under RSA → Generate PKCS #10 Certificate Request); GCVV added | Futurex docs / device report / public integrations (via CyberChef-Payments) | accessed 2026-07-11 | hsm, key_management, emv, card_validation |
+| 2026-07-12 | EMVA CH-tag claim (CH=1 = EMV Book 2 Annex A1.4 Option A ICC master-key derivation) verified against held EMV Book 2 v4.3 (.tmp-emv-book2-v43.pdf): Annex A1.4 confirmed as 'Master Key Derivation' with Option A/B. EMVA/GCVV tag maps otherwise remain MEDIUM (public integrations, not the Futurex TRM) | Local document verification | verified 2026-07-12 | emv, card_validation, hsm |
