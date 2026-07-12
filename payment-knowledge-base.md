@@ -1058,7 +1058,7 @@ summary: Identifying element of an EMV TLV object that names the type of encoded
 domain:
   - emv
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
   - "Open payment tooling analysis, Sources ledger 2026-05-14 (definitional ingest)"
 status: active
 ```
@@ -1079,7 +1079,7 @@ attributes:
   tag: "82"
   bitmapped: true
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1099,7 +1099,7 @@ attributes:
   tag: "95"
   bitmapped: true
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1119,7 +1119,7 @@ attributes:
   tag: "9B"
   bitmapped: true
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1138,7 +1138,7 @@ domain:
 attributes:
   tag: "8E"
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1157,7 +1157,7 @@ attributes:
   tag: "9F33"
   bitmapped: true
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1176,7 +1176,7 @@ attributes:
   tag: "9F40"
   bitmapped: true
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1242,7 +1242,7 @@ attributes:
     - ARQC
     - AAC
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
 status: active
 ```
 
@@ -1266,7 +1266,7 @@ attributes:
     "82": Application Interchange Profile
     "95": Terminal Verification Results
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
   - "EMV Tag Catalog kabc.ca (public reference), Sources ledger 2026-05-22"
 status: active
 ```
@@ -1489,7 +1489,7 @@ attributes:
       category: contactless
       typical_meaning: Contactless card-side qualifier map.
 references:
-  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (.tmp-emv-book3-v43.pdf), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
+  - "EMV Book 3 Application Specification v4.3 Annex A — held PDF (EMV Book 3 v4.3; see AGENTS.md → Reference Source Documents), these tags verified present 2026-07-06; Sources ledger 2026-07-06. (v4.4 is the current edition but is not held; these tag definitions are edition-stable.)"
   - "EMV Tag Catalog kabc.ca (public reference), Sources ledger 2026-05-22"
 status: active
 ```
@@ -9127,7 +9127,7 @@ v4.4, October 2022 (EMVCo), Annex A (Data Elements Dictionary). NOTE ON PROVENAN
 disk — this catalog was built from a one-time read of v4.4 on 2026-05-22 (Sources ledger) and cannot be
 re-verified against a held file; v4.4 is gated by EMVCo. The v4.4-only content below (biometric tags 7F60,
 A1, 9F30, 9F31, BF4A–BF4E, DF50–DF54) does not exist in the held v4.3 Book 3, so it cannot be re-anchored
-to v4.3 either. Tags that also appear in v4.3 can be cross-checked against .tmp-emv-book3-v43.pdf. This
+to v4.3 either. Tags that also appear in v4.3 can be cross-checked against the held EMV Book 3 v4.3. This
 supersedes the prior kabc.ca-sourced catalog; corrections include: tag 91 length (8–16 not 8), exponent
 tags (1 or 3 not 3), 9F3B length (2–8), 9F41 length (2–4), added missing Book 3 tags (42, 4F, 73, 81, 83,
 86–89, 9F0A, 9F0C, 9F19, 9F25). Scheme-proprietary tags (Mastercard 9F51+, Visa, contactless kernel) are
@@ -9324,7 +9324,7 @@ Result tags: `9F26` (cryptogram value) · `9F27` (CID — type: ARQC/TC/AAC)
 
 ## EMV Issuer Cryptography
 
-Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management. v4.3 (November 2011) is HELD (.tmp-emv-book2-v43.pdf) and re-verifiable; the v4.4 (November 2023) corrections below (Bulletin 208 RSA modulus, ECC additions) are from a one-time read on 2026-05-22 — v4.4 is NOT held and those specific corrections cannot be re-verified against a held file. Entries use v4.3 structure with v4.4 corrections annotated as such.
+Source: EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management. v4.3 (November 2011) is HELD (see AGENTS.md → Reference Source Documents) and re-verifiable; the v4.4 (November 2023) corrections below (Bulletin 208 RSA modulus, ECC additions) are from a one-time read on 2026-05-22 — v4.4 is NOT held and those specific corrections cannot be re-verified against a held file. Entries use v4.3 structure with v4.4 corrections annotated as such.
 
 ### EMV RSA Key Hierarchy
 
@@ -9737,7 +9737,7 @@ relationships:
   - type: related_to
     target_id: operation.emv-arqc-generation
 references:
-  - "EMV Book 2 Annex B (Approved Algorithms) + Bulletin 208. v4.4-specific content (ECC XDA/ODE suites, Bulletin 208 RSA-modulus correction) from a one-time v4.4 read on 2026-05-22 (Sources ledger); v4.4 is NOT held on disk and this is not re-verifiable against a held file. The RSA/hash/TDES fundamentals also appear in the held EMV Book 2 v4.3 Annex B (.tmp-emv-book2-v43.pdf)."
+  - "EMV Book 2 Annex B (Approved Algorithms) + Bulletin 208. v4.4-specific content (ECC XDA/ODE suites, Bulletin 208 RSA-modulus correction) from a one-time v4.4 read on 2026-05-22 (Sources ledger); v4.4 is NOT held on disk and this is not re-verifiable against a held file. The RSA/hash/TDES fundamentals also appear in the held EMV Book 2 v4.3 Annex B (see AGENTS.md → Reference Source Documents)."
 status: active
 ```
 
@@ -11339,10 +11339,11 @@ that publish annual revisions).
 | 2026-07-05 | aws-samples/samples-for-payment-cryptography-service — migration_guidance/payshield-command-mapping.md (verified against source), key_exchange/utils/apc.py, key_exchange/hsm/futurex/commands.py (single source, not TRM-verified) | AWS | accessed 2026-07-05 | hsm, key_management, emv, cryptography |
 | 2026-07-03 | apc-hsm-proxy live differentials vs APC us-east-1: issuer-script MAC JU/KU 15/15 (EmvMac session-key derivation + SessionKeyDerivationValue union rule), KS/K2 ARQC verify, GenerateAuthRequestCryptogram probes (TDES-only rejection of all AES E0, DeriveKey required, method-2 pre-padding) | Live API testing (apc-hsm-proxy / apc-crossval) | live 2026-07 | emv, cryptography, key_management |
 | 2026-07-06 | AWS SDK service models — botocore payment-cryptography-data (operation existence, required members, endpoints; mechanically enforced by tests/test_use_cases_grounding.py); aws-sdk-rust paymentcryptographydata v1.x struct types | AWS | installed SDK version, re-checked every CI run | key_management, cryptography, emv |
-| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs cached locally as .tmp-emv-book2-v43.pdf / .tmp-emv-book3-v43.pdf, from Internet Archive captures of the original EMVCo files). Now HELD sources — usable for direct content verification. VERSION CURRENCY: v4.4 (October 2022) is the current edition and is the one that SHOULD be cited; it is gated behind EMVCo login and only appears on copyright-infringing re-hosts, so it is NOT held. Entries verified here against v4.3 note the edition; the fundamentals checked (ARPC Method 1/2, session-key derivation Annex A1, cryptogram types) are stable across the v4.3→v4.4 boundary, but clause/table numbers can shift — prefer a v4.4 citation whenever v4.4 becomes obtainable | EMVCo (via Internet Archive) | held: v4.3 Nov 2011; LATEST: v4.4 Oct 2022 (gated); cached 2026-07-06 | emv, cryptography, key_management |
+| 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs, from Internet Archive captures of the original EMVCo files; now in the shared reference store, see AGENTS.md → Reference Source Documents). Now HELD sources — usable for direct content verification. VERSION CURRENCY: v4.4 (October 2022) is the current edition and is the one that SHOULD be cited; it is gated behind EMVCo login and only appears on copyright-infringing re-hosts, so it is NOT held. Entries verified here against v4.3 note the edition; the fundamentals checked (ARPC Method 1/2, session-key derivation Annex A1, cryptogram types) are stable across the v4.3→v4.4 boundary, but clause/table numbers can shift — prefer a v4.4 citation whenever v4.4 becomes obtainable | EMVCo (via Internet Archive) | held: v4.3 Nov 2011; LATEST: v4.4 Oct 2022 (gated); cached 2026-07-06 | emv, cryptography, key_management |
 | 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally, each the CURRENT edition: FIPS 197 (AES, 2001 w/ update 2023-05-09), FIPS 198-1 (HMAC, 2008), SP 800-38G (FF1/FF3-1 FPE, 2016 — no finalized revision), SP 800-67r2 (TDEA, 2017), SP 800-56A r3 (ECDH/key agreement, 2018), ITU-T X.690 (= ISO/IEC 8825 BER/DER, 02/2021), RFC 2104 (HMAC, 1997). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | latest editions as noted; cached 2026-07-06 | cryptography, key_management |
-| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
+| 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 held (public mirror; see AGENTS.md → Reference Source Documents): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
 | 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
 | 2026-07-11 | Futurex Excrypt public-source sweep (CyberChef-Payments): docs.futurex.com Host API command NAMES mined from /llms-full.txt (Mintlify export, ~7.5MB); 272-code CODE-existence ground-truth from a real device Configuration Report (Excrypt Touch FW 7.4.1 Permissions list); tag SYNTAX from three public integrations (jPOS kakubila, RicardoVercetti EMVA script, aws-samples key-exchange sample). Per-command tag pages remain CIAM-gated; only NAMES + CODES are authoritative, tag syntax stays MEDIUM. RSAR name corrected (Import Key Under RSA → Generate PKCS #10 Certificate Request); GCVV added | Futurex docs / device report / public integrations (via CyberChef-Payments) | accessed 2026-07-11 | hsm, key_management, emv, card_validation |
 | 2026-07-12 | EMVA CH-tag claim (CH=1 = EMV Book 2 Annex A1.4 Option A ICC master-key derivation) verified against held EMV Book 2 v4.3 (.tmp-emv-book2-v43.pdf): Annex A1.4 confirmed as 'Master Key Derivation' with Option A/B. EMVA/GCVV tag maps otherwise remain MEDIUM (public integrations, not the Futurex TRM) | Local document verification | verified 2026-07-12 | emv, card_validation, hsm |
+| 2026-07-12 | All held source documents CONSOLIDATED out of this repo's gitignored .tmp-* cache into a shared, durable, private local reference store — see AGENTS.md → Reference Source Documents for its location (Thales payShield manuals, EMV Books 2/3 v4.3, ISO 7816, ITU X.690, NIST FIPS/SP, Visa/Mastercard rules, AWS APC API reference, PCI-for-APC). Both this project and apc-hsm-proxy reference that store. Citations in earlier ledger rows that name ".tmp-<x>" or a store path refer to these same files. The store is local-only/not-for-redistribution; NOT held there either: EMV v4.4, PUGD0541, paywalled ISO/X9 texts | Repo reorganization | consolidated 2026-07-12 | hsm, emv, key_management, cryptography, pin_processing |
