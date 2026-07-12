@@ -4118,10 +4118,28 @@ attributes:
     AE: KCV
     AP: KEK
     CT: "symmetric algorithm enum — 2=TDES2, 3=TDES3, 4=AES128, 5=AES192, 6=AES256"
+  enum_tokens:
+    note: "Enum tables from the aws-samples key-exchange sample; tokens are command-scoped (RA and KM mean different things per command)."
+    CT: "symmetric algorithm — 2=TDES-2key, 3=TDES-3key, 4=AES-128, 5=AES-192, 6=AES-256"
+    RA_in_GECC: "ECC curve — 2=NIST P-256, 3=P-384, 4=P-521"
+    RA_in_GRSA: "RSA public exponent (hex) — command-scoped, NOT a curve"
+    RB: "RSA key length — 2048 / 3072 / 4096"
+    CZ: "asymmetric key usage/mode — X=key agreement, V=verify, G=sign"
+    RG: "KDF hash — 4=SHA-256, 5=SHA-384, 6=SHA-512"
+    KM_kdf: "KDF selector — 0=NIST SP800-56C, 1=ANSI X9.63 (note: distinct from the EMVA KM key-derivation-method tag)"
+    FS6: "using the PMK (protection master key)"
   commands:
-    GPGS: wraps a key under the master key; returns BG + AE
-    TWKA: wraps a key under a KEK
-    TRTP: builds a TR-34 export payload
+    GPGS: "wraps a key under the master key; returns BG + AE"
+    TWKA: "wraps a key under a KEK"
+    TRTP_basic: "builds a TR-34 export payload"
+    GECC: "generate ECC key pair — req RA(curve),CZ(usage) -> RC=wrapped priv, SD=trusted pub, RD=clear pub"
+    GRSA: "generate RSA key pair — req RB(len),RA(exponent),CZ(usage) -> RC/SD/RD"
+    SDDH: "ECDH derive — req CT(alg),RG(hash),KM(kdf),AK(shared info),RC(priv),RD(trusted pub) -> BG=derived key"
+    AVPC: "trust/validate cert — req CZ(X=validate vs CA / V=verify only),SA(CA TPK),RV(cert DER) -> RD=cert TPK"
+    ASGC: "self-signed CA cert — req BF(YYYYMMDD),KU(X.509 usages),BC(basic constraints),RC(wrapped priv) -> RV=cert DER"
+    ASYR: "generate CSR — req KU(usages),RC(wrapped priv) -> RU=CSR (PKCS#10)"
+    ASSR: "sign CSR/issue cert — req BF(date),KU(usages),RU(CSR),RH(CA cert DER),RC(CA wrapped priv) -> RV=signed cert"
+    TRTP_enriched: "req CT,RV=KDH cert,RC=KDH priv,SJ=KRD cert/TR-34 payload,SA=KRD CA TPK -> BG=transport key,BJ=nonce"
 constraints:
   - Scope — these are key EXCHANGE/EXPORT commands. This entry does NOT cover the
     wrapped-key parameter as it appears inside a transaction (PIN/MAC) command — that
@@ -4131,11 +4149,348 @@ constraints:
     observed, semantics unverified against the Integration Guide); the command semantics
     above come from the AWS sample only and carry this entry's medium confidence, not
     the registry's authoritative grade.
+  - The asymmetric key-exchange commands (GECC/GRSA/SDDH/AVPC/ASGC/ASYR/ASSR) and their enum
+    tables are SINGLE-SOURCE (the aws-samples key_exchange/hsm/futurex/commands.py), medium
+    confidence, not verified against the Futurex TRM. All are CODE-confirmed real by the
+    272-code device ground-truth. Opaque cert-construction constants (RY/XE/AL/AD/SG/KB/KF/
+    SP/ZA/AS/RT/LA) are intentionally omitted — bound to no named param/enum.
 relationships:
   - type: related_to
     target_id: concept.futurex-payment-hsm
   - type: related_to
     target_id: tool.apc-hsm-proxy
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+status: active
+```
+
+### Futurex Excrypt Sourcing Landscape and Command Ground-Truth
+
+```yaml
+id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+entity_type: reference_list
+canonical_name: Futurex Excrypt Sourcing Landscape and Command Ground-Truth
+summary: >
+  Consolidated sourcing map plus command CODE/NAME ground-truth for Futurex Excrypt, so a
+  future session does not re-run the source hunt and so valid command names/codes are
+  preserved even when they are not given full registry entries. Grades — authoritative NAMES
+  come from docs.futurex.com Host API tables; CODE EXISTENCE from a real device config report;
+  tag SYNTAX only from a few public integrations, never the Futurex TRM. Do not invent names
+  for uncatalogued codes.
+domain:
+  - hsm
+  - key_management
+attributes:
+  sourcing_landscape: >
+    Authoritative command NAMES and tag syntax live in Futurex's own docs. CORRECTION to the
+    earlier "docs.futurex.com is a JS SPA, not crawlable" claim (now superseded): docs.futurex.com
+    is a Mintlify site, so https://docs.futurex.com/llms-full.txt returns ~7.5 MB of the whole docs
+    as markdown (each page preceded by "Source: <url>"), including the Host API command-reference
+    tables as HTML cells; /llms.txt is an index of integration guides only; /sitemap.xml lists 1731
+    URLs. General rule — for any Mintlify/GitBook/Docusaurus site, try /llms-full.txt and /llms.txt
+    before concluding an SPA is un-crawlable. LIMITS — the per-command TAG-SYNTAX pages under
+    /Excrypt_HSM/<firmware>/{excrypt,international,standard}_commands/ are CIAM-gated (Microsoft Entra
+    External ID) across all firmware; llms-full.txt gives command NAMES but not those per-command tag
+    pages; client binaries (fxpkcs11/fxtools/FXCLI/Excrypt Manager) are Futurex-Portal-gated and absent
+    from all public source control; no public Excrypt simulator/dissector exists. The docs also span
+    multiple products (KMES Series 3 RK*/RA*, log-severity labels), so filter table cells to real HSM
+    Excrypt codes using the device ground-truth below. Occasional doc typos exist (EMVA rendered
+    "Verify QRQC" for ARQC) — do not adopt blindly.
+  open_code_sources: >
+    The complete set of public open-code sources is only three GitHub repos (nothing on
+    npm/PyPI/Maven/crates, Stack Overflow, GitLab, Bitbucket, SourceForge): (1)
+    github.com/kakubila/jpos-excrypt-interface — EMVA/GCVV/TPIN tags, PROTECTED_TAGS, ERRO/GF;
+    (2) github.com/RicardoVercetti/RandomCodeScraps .../emva_command.py — live EMVA request;
+    (3) the aws-samples public key-exchange sample (key_exchange/hsm/futurex/commands.py) —
+    GPGS/TWKA/TRTP/GECC/GRSA/AVPC/SDDH/ASGC/ASYR/ASSR + enum token tables. All three are
+    EMVA/ARQC-heavy. Real deployment footprint is North America + Latin America (VirtuCrypt strong
+    in Brazil/Spanish LATAM); the productive non-English corpus is Portuguese/Spanish, not Chinese
+    (Futurex does not sell to China). A Thales/Atalla compatibility bridge exists for the Standard
+    (numeric) and International families — those mirror Thales payShield / Atalla verbatim, so the
+    public Thales Host Programmer's Manual supplies field syntax for that subset; it does NOT cover
+    the proprietary AO-prefixed Excrypt commands. See reference_list.futurex-standard-numeric-commands.
+  firmware_versioning: >
+    Per Futurex, EVEN minor versions (7.2, 7.4, 7.6) are PCI-validated releases; ODD minors are
+    development builds. Docs are versioned per firmware (7.2.0.x, 7.4.1.x/741x, 7.6.1.x/761x).
+  command_reference_categories: >
+    19 categories (from a Wayback nav capture), split across excrypt/international/standard families:
+    Authentication, Card Verification, Data Encryption, Diebold Table, ECC, EMV, Format Preserving
+    Encryption, General Purpose, Key Management, Master Key Distribution, Message Authentication Code,
+    Mobile Payment Processing, Permission and Utility, PIN Offset, Point-to-Point Encryption,
+    RSA/Remote Key, TR-34 Remote Key Loading, VRF.
+  device_ground_truth_272_codes: |
+    Ground-truth CODE EXISTENCE from a real Futurex HSM device Configuration Report (Excrypt Touch,
+    FW 7.4.1) role Permissions list. Authoritative for existence only (not names, not tag syntax).
+    General-purpose profile — PAYMENT/EMV codes (EMVA/EMVG/EMVM/GCAV/GDCV/VEMI) are ABSENT only
+    because the payment application was not enabled; absence is NOT evidence a code is unreal. Any
+    registry Futurex code not in this list and not a known payment-profile command deserves a second
+    look. 272 codes:
+    ADMN,ADPK,AEPK,AKCN,APDE,APDI,APDK,APDO,APDT,APFP,APIL,APIT,ASGC,ASSR,ASYD,ASYE,ASYL,ASYR,ASYS,
+    ASYV,AVPC,BACK,CAAV,CATC,CBCD,CBCE,CCDL,CCRL,CDTR,CHLC,CKTA,CPKD,CPTY,CRND,CRSA,CWKS,DAPT,DATP,
+    DATT,DCID,DDAT,DDTE,DENV,DEPK,DGPT,DIAG,DKBK,DKBR,DKTE,DMAC,DRKC,DRKI,DRSA,DSPT,DTRA,DUKK,DXAC,
+    DXSC,ECDD,ECDE,ECHO,ECID,EDAT,EDNT,EDPK,ENVD,EPIN,FPTY,GACM,GBCR,GBSC,GCEK,GCKD,GCRT,GCSC,GCVC,
+    GCVV,GDIK,GECC,GHDK,GHTD,GKBH,GKBL,GLKS,GLMK,GMAC,GMDK,GNOF,GOFC,GOFF,GPAD,GPAE,GPDA,GPDE,GPEA,
+    GPED,GPEK,GPGC,GPGS,GPIN,GPKA,GPKB,GPKD,GPKI,GPKM,GPKR,GPKS,GPKT,GPKU,GPKW,GPMC,GPRU,GPRW,GPSD,
+    GPSE,GPSR,GPSU,GPSV,GPSW,GPUK,GPWK,GRSA,GSKE,GUFP,GUKM,GUPB,GVAK,GVWK,GWKS,GZSK,HASH,HENC,HEXD,
+    HEXE,HMAC,HMCG,HMCV,HMKE,HMKG,HMKI,HOTP,IMAC,JOSE,JOVD,KBAT,KCAR,KCBC,KCBD,KCCR,KDER,KMAP,LATM,
+    LCDT,LENT,LKST,LKYC,LRSA,OBKE,OFPC,PGKE,PGKI,PGPD,PGPE,PGPT,PING,PKCS,PKEY,PLEN,PRMD,PWRQ,RAND,
+    RASY,RCCN,RCRT,RCXP,RDPK,REPK,REST,RGCI,RGPK,RGXI,RKCN,RKEY,RMMQ,RPFP,RPIN,RRSA,RSAC,RSAD,RSAE,
+    RSAP,RSAR,RSAS,RSAV,RSAW,RSDD,RSDE,RSGC,RSRE,RSSK,RSSR,RSTE,RSVR,RUPT,RVPC,RVPD,SCRT,SDDH,SKCE,
+    SKCI,SKEY,SMFK,STAT,SWKY,TCRT,TDAA,TDAB,TDAD,TDAS,TDDA,TDPK,TDSA,TEPK,TIME,TKBH,TKBL,TLSS,TPDD,
+    TPIN,TPKC,TPKD,TPKS,TRBI,TROD,TROL,TROP,TRPN,TRRE,TRTD,TRTP,TRUN,TSAK,TSPN,TVWK,TWKA,TWKB,TWKD,
+    TWKL,TWKM,TWKN,TWKS,VAAV,VACM,VARA,VCRL,VCRT,VCSC,VCVC,VCVV,VDTE,VKBL,VKTE,VMAC,VMAP,VMDK,VPIN,
+    VRSA,VUFP,VUPB,WBIN,WINS,XPIN
+  authoritative_names_61: |
+    Authoritative Futurex NAMES (verbatim from docs.futurex.com Host API tables) for the 61 codes
+    that are BOTH documented AND present in the device ground-truth above — high-confidence name +
+    confirmed-real code. Use to name/validate the registry; the ~211 other device codes have no name
+    in the integration-guide tables and must be sourced from the Host API per-command pages, never
+    guessed.
+    ADPK = PKI Decrypt Trusted Public Key
+    APFP = Generate PKI Public Key from Private Key
+    ASYL = Load asymmetric key into key table
+    ASYS = Generate signature using PKI private key
+    ASYV = Verify a Signature Using a Public Key
+    CAAV = Calculate Account holder Authentication Value
+    DAPT = Decrypt Apple Pay Token
+    DGPT = Decrypt Google Pay Token
+    DRKI = Identification Request (Mode 1)
+    DSPT = Decrypt Samsung Pay Token
+    ECHO = Communication Test / Retrieve Version
+    GCVC = Generate CVC and CVC2
+    GCVV = Generate CVV/CVC Value
+    GECC = Generate an ECC Key Pair
+    GNOF = Generate New Offset
+    GOFC = Generate Offset of Clear PIN
+    GOFF = Generate PIN offset value
+    GPED = General Purpose Encryption and Decryption
+    GPGC = General-purpose generate cryptogram from key slot
+    GPGS = General-purpose generate symmetric key
+    GPIN = Generate PIN (Diebold Method)
+    GPKA = General-purpose key add
+    GPKD = General-purpose key slot delete/clear
+    GPKM = Retrieve key table information
+    GPKR = General-purpose key settings get (read-only)
+    GPKS = General-purpose key settings get/change
+    GPKU = General-purpose key unwrap (unrestricted)
+    GPKW = General-purpose key wrap (unrestricted)
+    GPMC = General-purpose MAC (Message Authentication Code)
+    GPSD = General-purpose Symmetric Decrypt
+    GPSE = General-purpose Symmetric Encrypt
+    GPSR = General-purpose RSA encrypt/decrypt or sign/verify with recovery
+    GPSV = General-purpose data sign and verify
+    GPUK = General-purpose key unwrap (preserves key usage)
+    GPWK = General-purpose key wrap (preserves key usage)
+    GRSA = Generate RSA Private and Public Key
+    HASH = Retrieve device serial
+    HMAC = Generate a hash-based message authentication code
+    LRSA = Load key into RSA Key Table
+    OFPC = Perform EMV PIN Change Using Offset
+    PRMD = Retrieve HSM restrictions
+    RAND = Generate random data
+    RDPK = Get Clear Public Key from Cryptogram
+    RPFP = Get public components from RSA private key
+    RPIN = PIN Change & Optional PIN Verification (IBM 3624)
+    RSAC = Convert clear DER-encoded RSA key to major-key cryptogram (general-purpose)
+    RSAR = Generate PKCS #10 Certificate Request
+    RSAS = Generate a Signature Using a RSA Private Key
+    STAT = HSM statistics
+    TIME = Set time
+    TPDD = Translate an encrypted ANSI PIN block
+    TPIN = Translate PIN blocks
+    TRPN = Translate PIN from RSA to Symmetric PIN Block
+    TSPN = Translate PIN from PIN block to RSA encryption
+    VAAV = Verify Account Holder Authentication Value
+    VCSC = Verify American Express (Amex) CSC Value
+    VCVC = Verify CVC and CVC2
+    VCVV = Verify CVV
+    VMAP = Verify MAC and PIN (Diebold Method)
+    VPIN = Verify PIN
+    XPIN = ANSI-to-ANSI PIN translation (Futurex Integration Guide documents 7 modes; the registry
+      name "Extended PIN Translation" is retained as the broader command label)
+  pending_unconfirmed: |
+    Device-confirmed CODES whose FUNCTION is not yet authoritatively confirmed — recorded so the
+    names are not lost, but deliberately NOT promoted to full registry entries until verified
+    against the Futurex TRM:
+    CPIN = request [AOCPIN;AX<PEK>;AL<PIN block>;AW<mode>;AK<PAN>;], returns GFY/GFN; function
+      inferred (verify/check PIN), candidate apc_operation verify_pin_data — UNCONFIRMED.
+    EPIN = request [AOEPIN;AX<PEK>;AF<encrypted PIN field>;AW<mode>;AK<PAN>;]; function inferred
+      (encrypt PIN) — UNCONFIRMED. AF = encrypted PIN field (command-scoped).
+    Both from a single VirtuCrypt integration (github.com/HoracioME/testms). Promote only after
+    TRM confirmation.
+constraints:
+  - Authoritative NAMES (docs.futurex.com) are high-confidence; CODE existence (device report) is
+    high-confidence; tag SYNTAX (public integrations) is MEDIUM and must not be promoted without the
+    Futurex TRM or a live HSM/VirtuCrypt session.
+  - Never invent a name for an uncatalogued device code; source it from the Host API per-command page.
+relationships:
+  - type: related_to
+    target_id: format.futurex-excrypt-key-exchange-wire
+  - type: related_to
+    target_id: reference_list.futurex-standard-numeric-commands
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+status: active
+```
+
+### Futurex Standard (Numeric) Command Family
+
+```yaml
+id: reference_list.futurex-standard-numeric-commands
+entity_type: reference_list
+canonical_name: Futurex Standard (Numeric) Host-Command Family
+summary: >
+  The Futurex STANDARD (legacy/numeric) host-command family — hex code to description — from the
+  public Futurex General Payment HSM Integration Guide PDF. These are the "Standard Cmd:NN" entries
+  in device Permissions lists, a separate command family from the 4-char AO-prefixed Excrypt commands
+  (different wire format), so they are preserved here as a reference list rather than as Excrypt
+  registry entries. The Standard and International families are Thales payShield / Atalla-COMPATIBLE
+  (numeric codes mirror Thales/Atalla verbatim — 31=Translate PIN Block, 350=EMV ARQC Validation,
+  5D/5E=Generate/Verify CVV), so the public Thales Host Programmer's Manual supplies field-level
+  syntax for this subset; that bridge does NOT extend to the proprietary AO Excrypt commands.
+domain:
+  - hsm
+  - pin_processing
+  - card_validation
+  - emv
+attributes:
+  source: "Futurex General Payment HSM Integration Guide (public PDF)"
+  confidence: medium
+  thales_atalla_compatibility: >
+    Standard/International numeric codes are Thales/Atalla-compatible; for field syntax use the public
+    Thales payShield Host Programmer's Manual (e.g. eftlab command index; payShield 9000 HPM 1270A542;
+    payShield 10K PUGD0535). All 4-char PAYMENT Excrypt codes in this same PDF were already catalogued
+    (0 new); the value here is the numeric family plus the mode variants below.
+  numeric_commands: |
+    31  = Translate PIN Block
+    32  = Verify PIN  (~10 method variants — ANSI/Visa/IBM 3624/Diebold/IBM 4736-NCR + DUKPT; selected by request fields)
+    33  = Extended PIN Translation
+    34  = Generate Clear PIN and Offset
+    35  = Translate PIN Block using Double Encryption
+    36  = Verify PIN Block using Double Encryption  (~10 method variants)
+    3D  = Generate IBM 3624 Offset
+    52  = Data Translate
+    56  = Generate MAC
+    57  = Generate MAC
+    5A  = Verify MAC
+    5B  = Verify MAC
+    5C  = Verify and Generate MAC
+    5D  = Generate Card Verification Value
+    5E  = Verify Card Verification Value
+    98  = Generate MAC value based on MAC key and data
+    99  = Verify MAC value based on MAC key and data
+    BC  = Verify a Terminal PIN using the Comparison method
+    BE  = Compare PIN to Encrypted PIN Block
+    C2  = Generate a MAC
+    C4  = Verify a MAC
+    CA  = Translate PIN Block from TPK to PEK Encryption
+    CC  = Translate PIN Block from one PEK to another PEK
+    DA  = Verify Terminal PIN Block
+    DC  = Verify Terminal PIN Block
+    DE  = Generate IBM PIN Offset
+    EA  = Verify PIN
+    EC  = Verify PIN
+    EE  = Derive PIN using the IBM Method
+    11D = Generate MAC and DEK keyblocks
+    304 = Verify CMAC using TDES
+    305 = Generate CMAC using TDES
+    324 = Verify APACS 40 request MAC
+    335 = Translate PIN Block
+    346 = DUKPT PIN Translate
+    348 = Verify MAC using DUKPT key derived using the BDK and KSN
+    350 = EMV ARQC Validation
+    352 = EMV Message Authentication Code
+    354 = Generate Smart Card Master Key
+    357 = Dynamic CVV Validation
+    359 = Dynamic CVC3 Validation
+    35A = Verify American Express
+    35B = Generate American Express
+    365 = Verify Visa Cloud
+    368 = Create Limited Use Key
+    386 = Generate MAC  (2 method variants)
+    388 = 3DES DUKPT Encrypt/Decrypt Data
+    38C = Derive DUKPT Initial PIN Encryption Key
+    3FA = Generate PIN and PVV
+  payment_excrypt_mode_variants: |
+    Mode variants worth recording for the 4-char PAYMENT Excrypt commands (from the same PDF):
+    XPIN = 7 translation modes (ANSI-to-ANSI / PIN-Pad, IBM 3624/4736, etc.)
+    PEDK = Key Request V3 Modes 1/2/3 (incl. One-Pass TR-34 and TR-34-with-AES)
+    VMAP = Verify MAC and PIN (Diebold / IBM 3624 / Visa)
+constraints:
+  - Separate command family (Standard/numeric) with a different wire format from the AO Excrypt
+    frames — kept as a reference list, not promoted to Excrypt registry entries.
+  - Field-level syntax for this subset comes from the public Thales payShield manuals, not Futurex.
+relationships:
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
+status: active
+```
+
+### Futurex Excrypt Transaction-Command Tag Maps (EMVA, GCVV)
+
+```yaml
+id: format.futurex-excrypt-transaction-tag-maps
+entity_type: format
+canonical_name: Futurex Excrypt Transaction-Command Tag Maps — EMVA, GCVV
+summary: >
+  Command-scoped Excrypt request/response tag maps for the EMVA (ARQC verify / ARPC generate)
+  and GCVV (generate CVV/CVC) transaction commands, plus the sensitive-tag list and status/error
+  conventions. MEDIUM confidence — from public real integrations, NOT the Futurex TRM. EMVA rests
+  on TWO independent public integrations (jPOS github.com/kakubila/jpos-excrypt-interface, and a
+  live EMVA request script github.com/RicardoVercetti/RandomCodeScraps .../emva_command.py); GCVV
+  on one (jPOS). Excrypt tags are COMMAND-scoped — the same 2-char tag means different things per
+  command, so these maps are not portable across commands.
+domain:
+  - emv
+  - card_validation
+  - hsm
+attributes:
+  confidence: medium
+  emva_verify_arqc:
+    FS: "mode (0/1/3)"
+    KM: "key-derivation method — enum (jPOS showed 3 = Mastercard M/Chip SKD; a second integration showed 1, exact method for 1 unconfirmed)"
+    CH: "ICC master-key derivation mode (1 = EMV Book 2 Annex A1.4 Option A — Annex A1.4 'Master Key Derivation' confirmed against held Book 2 v4.3)"
+    KP: "IMK-AC (app-cryptogram master key; wrapped in production, may be clear in test tooling)"
+    KQ: "PAN"
+    KR: "PAN sequence number"
+    KS: "ATC"
+    KT: "transaction data (CDOL concat — amount|amount_other|term_country|TVR|txn_currency|txn_date|txn_type|UN|AIP|ATC|IAD)"
+    BO: "ARQC (cryptogram under verification)"
+    BJ: "ARC (present when FS=1)"
+    KU: "Unpredictable Number (omitted when the UN is carried inside the CDOL/KT, consistent with FS0)"
+    NP: "appears in one request (NP0) — meaning UNCONFIRMED, not in any documented map; left flagged, do not assert"
+    response: "BB status field — 'BBY' = success"
+  gcvv_generate_cvv:
+    AV: "PAN"
+    CA: "CVK-A"
+    CB: "CVK-B"
+    FA: "expiry date"
+    FB: "service code"
+    FC: "generated CVV/CVC (response)"
+  sensitive_tags_protected: >
+    Message.java PROTECTED_TAGS (masked in logs) — AX BT AL AK AI AF CA CB BZ KP BG BH AV AP GK FC
+    FT FA KQ BX FD. These carry key material, PAN, PIN blocks, CVKs, or expiry; treat as sensitive
+    regardless of command.
+  status_and_error_conventions:
+    BB: "status field — Y = success, otherwise an error code (proxy convention)"
+    GF: "status field — GFY = success, GFN = failure (VirtuCrypt/jPOS convention); some responses key success off GF rather than BB; firmware/command-scoped"
+    ERRO: "error response frame — AM = error code, BB = error description"
+constraints:
+  - Tags are command-scoped; do not reuse an EMVA tag meaning for another command.
+  - KM is an enum whose value 1 method is unconfirmed; NP is unknown — both flagged, not asserted.
+  - MEDIUM confidence — not verified against the Futurex TRM; source repos are unlicensed and used
+    only as factual protocol observation (no code copied).
+references:
+  - "github.com/kakubila/jpos-excrypt-interface (jPOS Message.java) and github.com/RicardoVercetti/RandomCodeScraps emva_command.py — two independent public integrations; EMVA Annex A1.4 claim verified against held EMV Book 2 v4.3, Sources ledger 2026-07-12"
+relationships:
+  - type: related_to
+    target_id: reference_list.futurex-excrypt-sourcing-and-ground-truth
+  - type: related_to
+    target_id: artifact.arqc
+  - type: related_to
+    target_id: concept.futurex-payment-hsm
 status: active
 ```
 
@@ -10989,3 +11344,5 @@ that publish annual revisions).
 | 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 cached locally (.tmp-iso7816-*.pdf, public mirror): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
 | 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
+| 2026-07-11 | Futurex Excrypt public-source sweep (CyberChef-Payments): docs.futurex.com Host API command NAMES mined from /llms-full.txt (Mintlify export, ~7.5MB); 272-code CODE-existence ground-truth from a real device Configuration Report (Excrypt Touch FW 7.4.1 Permissions list); tag SYNTAX from three public integrations (jPOS kakubila, RicardoVercetti EMVA script, aws-samples key-exchange sample). Per-command tag pages remain CIAM-gated; only NAMES + CODES are authoritative, tag syntax stays MEDIUM. RSAR name corrected (Import Key Under RSA → Generate PKCS #10 Certificate Request); GCVV added | Futurex docs / device report / public integrations (via CyberChef-Payments) | accessed 2026-07-11 | hsm, key_management, emv, card_validation |
+| 2026-07-12 | EMVA CH-tag claim (CH=1 = EMV Book 2 Annex A1.4 Option A ICC master-key derivation) verified against held EMV Book 2 v4.3 (.tmp-emv-book2-v43.pdf): Annex A1.4 confirmed as 'Master Key Derivation' with Option A/B. EMVA/GCVV tag maps otherwise remain MEDIUM (public integrations, not the Futurex TRM) | Local document verification | verified 2026-07-12 | emv, card_validation, hsm |
