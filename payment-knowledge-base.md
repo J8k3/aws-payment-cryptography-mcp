@@ -7891,16 +7891,16 @@ status: active
 
 ---
 
-## PCI P2PE Standard v3.2 — Acquirer-Relevant Rules
+## PCI P2PE Standard v3.1 — Acquirer-Relevant Rules
 
 ### PCI P2PE: Solution Architecture and APC Applicability
 
 ```yaml
 id: concept.pci-p2pe-architecture
 entity_type: compliance_rule
-canonical_name: PCI P2PE v3.2 — Solution Architecture, Domain Structure, and APC Applicability
+canonical_name: PCI P2PE v3.1 — Solution Architecture, Domain Structure, and APC Applicability
 summary: >
-  PCI P2PE v3.2 (June 2025) governs point-to-point encryption of account data from the moment
+  PCI P2PE v3.1 (September 2021) governs point-to-point encryption of account data from the moment
   of card capture at a POI through decryption at a secure decryption environment.  The standard
   defines 5 Domains plus Appendix A (merchant-managed).  Domain 4 covers decryption environments
   (HSMs); Domain 5 mirrors PCI PIN's 7 Control Objectives but scoped to account-data encryption
@@ -7915,7 +7915,7 @@ domain:
   - key_management
   - cryptography
 attributes:
-  standard: "PCI Point-to-Point Encryption (P2PE) Standard v3.2, June 2025"
+  standard: "PCI Point-to-Point Encryption (P2PE) Standard v3.1, September 2021"
   domains:
     domain_1: "P2PE encryption environment (POI device, SRED, account-data capture)"
     domain_2: "P2PE applications (POI and decryption)"
@@ -7942,7 +7942,7 @@ constraints:
   - SRED is required for all P2PE account-data capture at POI
   - P2PE solution providers must be listed on PCI SSC website; merchant-managed solutions are not listed
 references:
-  - "PCI P2PE Standard v3.2 §Domain structure overview, §Domain 4, §Domain 5, §Appendix A"
+  - "PCI P2PE Standard v3.1 §Domain structure overview, §Domain 4, §Domain 5, §Appendix A"
 relationships:
   - type: related_to
     target_id: concept.pci-p2pe-hybrid-ddk-controls
@@ -7958,7 +7958,7 @@ status: active
 ```yaml
 id: concept.pci-p2pe-account-data-algorithms
 entity_type: compliance_rule
-canonical_name: PCI P2PE v3.2 Normative Annex C — Mandatory Algorithms and Minimum Key Sizes
+canonical_name: PCI P2PE v3.1 Normative Annex C — Mandatory Algorithms and Minimum Key Sizes
 summary: >
   PCI P2PE Normative Annex C defines the minimum key sizes and approved algorithm families for
   all P2PE cryptographic keys.  The equivalence table is identical to PCI PIN Annex C.  AES ≥128
@@ -8004,7 +8004,7 @@ constraints:
   - SHA-1 prohibited for digital signatures on POI v3+ devices
   - Cryptoperiods must be defined and enforced for all keys (NIST SP800-57)
 references:
-  - "PCI P2PE Standard v3.2 Normative Annex C (pages 244-246), June 2025"
+  - "PCI P2PE Standard v3.1 Normative Annex C (pages 244-246), September 2021"
   - "NIST SP800-57 Part 1 Rev 5 — Recommendation for Key Management"
 relationships:
   - type: related_to
@@ -8057,7 +8057,7 @@ constraints:
   - Separate BDKs required when terminal IDs can collide across terminal types
   - Firmware authentication keys are in scope for per-device uniqueness (same as transaction keys)
 references:
-  - "PCI P2PE Standard v3.2 §Req 20-1, §Req 20-3, §Req 20-5 (pages 171-176)"
+  - "PCI P2PE Standard v3.1 §Req 20-1, §Req 20-3, §Req 20-5 (pages 171-176)"
 relationships:
   - type: related_to
     target_id: concept.pci-p2pe-bdk-segmentation
@@ -8105,7 +8105,7 @@ constraints:
   - Separate key aliases, policies, and audit trails per institution in APC
   - Applies even when institutions share the same physical terminal infrastructure
 references:
-  - "PCI P2PE Standard v3.2 §Req 20-4 (pages 173-174)"
+  - "PCI P2PE Standard v3.1 §Req 20-4 (pages 173-174)"
   - "PCI PIN Security Requirements v3.1 §Req 7-4 (mirror requirement)"
 relationships:
   - type: related_to
@@ -8178,8 +8178,8 @@ constraints:
   - Transport key: unique per Host System, single purpose, defined cryptoperiod
   - Hybrid mode prohibited for merchant-managed solutions (Appendix A)
 references:
-  - "PCI P2PE Standard v3.2 §Req 5H (pages 240-242)"
-  - "PCI P2PE Standard v3.2 §Appendix A (page 248)"
+  - "PCI P2PE Standard v3.1 §Req 5H (pages 240-242)"
+  - "PCI P2PE Standard v3.1 §Appendix A (page 248)"
 relationships:
   - type: related_to
     target_id: concept.pci-p2pe-architecture
@@ -8232,7 +8232,7 @@ constraints:
   - Master keys used for DEK derivation must be dedicated (single-purpose)
   - One-way KDF required for any cross-level key derivation
 references:
-  - "PCI P2PE Standard v3.2 §Req 23 (pages 190-193)"
+  - "PCI P2PE Standard v3.1 §Req 23 (pages 190-193)"
 relationships:
   - type: related_to
     target_id: concept.pci-p2pe-hybrid-ddk-controls
@@ -8291,8 +8291,8 @@ constraints:
   - RSA-2048 may only wrap AES-128 for remote key distribution (footnote 6); not AES-192/256
   - APC default import path (RSA-3072/4096 wrapping key) satisfies this requirement natively
 references:
-  - "PCI P2PE Standard v3.2 §Req 10-1 (pages 139-140)"
-  - "PCI P2PE Standard v3.2 Normative Annex C Footnote 6 (page 245)"
+  - "PCI P2PE Standard v3.1 §Req 10-1 (pages 139-140)"
+  - "PCI P2PE Standard v3.1 Normative Annex C Footnote 6 (page 245)"
 relationships:
   - type: related_to
     target_id: concept.pci-pin-tdes-aes-wrap-cleartext
@@ -8349,8 +8349,8 @@ constraints:
   - Destruction affidavit retained ≥2 years
   - Audit logs retained ≥2 years
 references:
-  - "PCI P2PE Standard v3.2 §Req 24-2 and §Req 24-2.2 (pages 195-198)"
-  - "PCI P2PE Standard v3.2 §Req 25-6.1 (pages 200-201)"
+  - "PCI P2PE Standard v3.1 §Req 24-2 and §Req 24-2.2 (pages 195-198)"
+  - "PCI P2PE Standard v3.1 §Req 25-6.1 (pages 200-201)"
 relationships:
   - type: related_to
     target_id: concept.pci-pin-key-compromise-response
@@ -11321,7 +11321,7 @@ that publish annual revisions).
 | 2026-05-19 | PCI Information Supplement: Implementing ISO Format 4 PIN Blocks | PCI Security Standards Council | September 2021 (v1.01) | compliance, pin_processing, cryptography |
 | 2026-05-19 | PCI Information Supplement: PIN Security Requirement 18-3 – Key Blocks | PCI Security Standards Council | June 2019 | compliance, key_management |
 | 2026-05-19 | Use of triple length TDES in ep2 v7.x with regard to PCI SSC requirements (expert opinion letter) | SRC Security Research & Consulting GmbH / Technical Cooperation ep2 | October 30, 2020 | compliance, cryptography, pin_processing |
-| 2026-05-21 | PCI Point-to-Point Encryption (P2PE) Standard v3.2 — Domains 1–5, Appendix A, Normative Annex C (full standard read; pages 1-251) | PCI Security Standards Council | v3.2, June 2025 | compliance, key_management, cryptography, pin_processing, hsm |
+| 2026-05-21 | PCI Point-to-Point Encryption (P2PE) Standard v3.1 — Domains 1–5, Appendix A, Normative Annex C (full standard read; pages 1-251) | PCI Security Standards Council | v3.1, September 2021 | compliance, key_management, cryptography, pin_processing, hsm |
 | 2026-05-21 / 2026-05-25 | PCI PIN Security Requirements and Testing Procedures v3.1 (normative standard — all 7 Control Objectives, Req 1-33, Annex A TR-34, Annex B KIF/secure-room, Annex C key equivalence, Glossary). Second pass 2026-05-25: added Dual Control/Split Knowledge (Req 6-1.2/21-2), Email Prohibition (Req 8-3), Component Channel Separation (Req 8-1 Note), and confirmed Annex C minimum key size table (DEA 112-bit, RSA 2048, ECC 224, AES 128). | PCI Security Standards Council | v3.1 March 2021 | compliance, key_management, pin_processing, hsm, cryptography |
 | 2026-05-21 | PCI Mobile Payments on COTS (MPoC) Standard v1.1 (targeted read: overview/scope pp.15-35, Req 1A-3 crypto pp.56-58, Req 1A-4 key mgmt pp.60-68, Req 4A-2 back-end ops pp.168-170, Req 4A-4 compliance stack p.180, Appendix C pp.237-239) | PCI Security Standards Council | v1.1, November 2024 | compliance, key_management, cryptography, pin_processing, hsm |
 | 2026-05-21 | PCI Contactless Payments on COTS (CPoC) Standard v1.0 (full targeted read: overview pp.5-20, Section 1.3 crypto pp.32-36, Section 1.4 key mgmt pp.36-42, Section 1.5 secure channels pp.43-44, Section 2.9 account data encryption pp.86-87, Module 3 attestation pp.88-109, Module 4 back-end processing p.117, Module 5 contactless kernel pp.118-121, Appendix C pp.146-148) | PCI Security Standards Council | v1.0, December 2019 | compliance, key_management, cryptography, hsm, emv |
@@ -11329,7 +11329,7 @@ that publish annual revisions).
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 2 — Security and Key Management (targeted read: ToC; Section 5 SDA certificate chain; Section 8 ARQC/ARPC — Table 26 minimum dataset, Method 1 and Method 2 ARPC; Section 9 Secure Messaging — MAC/encipherment session keys, MAC chaining, Format 1/2; Annex A1.3 session key derivation, A1.4 ICC master key derivation Options A/B/C; Annex B approved algorithms) | EMVCo | v4.3, November 2011 | emv, cryptography, key_management |
 | 2026-05-22 | EMV Book 2 — Security and Key Management v4.4 delta read (targeted: cover/revision log/ToC pp.1-10; Annex B Approved Algorithms pp.151-169 — Table 43 RSA modulus corrections per Bulletin 208, B2 ECC P-256/P-521 curve parameters, Table 47 hash algorithm indicators, Table 48 ECC signature suites, Table 49 ODE encryption suites; Bulletin 162 AES key derivation erratum noted) | EMVCo | v4.4, November 2023 — NOT HELD on disk (one-time read; not re-verifiable) | emv, cryptography, key_management |
 | 2026-05-22 | EMV Integrated Circuit Card Specifications for Payment Systems, Book 3 — Application Specification, Annex A full read (A1 Data Elements by Name pp.135-161, A2 Data Elements by Tag pp.162-167); replaces prior kabc.ca-sourced tag catalog with authoritative definitions including tag 91 length correction, exponent corrections, missing tags (42, 4F, 73, 81, 83, 86-89, 9F0A, 9F0C, 9F19, 9F25), and new biometric tags from v4.4 (7F60, A1, 9F30, 9F31, BF4A-BF4E, DF50-DF54) | EMVCo | v4.4, October 2022 — NOT HELD on disk (one-time read; v4.3 Book 3 IS held for the tags common to both editions) | emv, cryptography, key_management |
-| 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | PUGD0541-003, Revision A, 04 August 2020 — NOT HELD on disk (one-time read 2026-05-25; ~30 KB/registry citations rely on it and are not re-verifiable against a held file; the Core PUGD0537-004 and Legacy PUGD0538-003 manuals ARE held) | hsm, key_management, pin_processing, cryptography |
+| 2026-05-25 | payShield 10K Host Programmer's Manual (targeted read: Ch.3 TCP/IP wire protocol; Ch.4 RTKS and Australian AS2805 TKS command disambiguation; Ch.5 RSA command set; pages 97-116 Key Block and Variant Comparison Table, Variant key type code full list pp.113-114, BDK type taxonomy, AES DUKPT; DUKPT KSN descriptor encoding). Records added: KSN descriptor, key type cross-reference table, BDK-1 through BDK-5 taxonomy, LMK migration guide, AES DUKPT migration, wire protocol framing, RTKS/AS2805 command disambiguation. | Thales | Cited as PUGD0541-003 (Revision A, 04 August 2020). NOW HELD as the newer edition Host Programmer's Manual 007-001518-023 v2.3a (August 2025) — the ~30 KB/registry citations verify against it, though section/page numbers may differ from rev -003. (Updated 2026-07-13; was previously not held.) | hsm, key_management, pin_processing, cryptography |
 | 2026-05-25 | payShield 10K Legacy Host Commands §7 pp.121-126 (full read: Legacy UnionPay Commands section — JS command wire format pp.122-123, JU command wire format pp.124-126). JS record added: complete field-by-field wire format, 7 confirmed proxy bugs with field-level detail, key differences vs KQ, APC mapping, Mode 2 limitation, CUP padding rule. | Thales | PUGD0538-003, Revision A, 04 August 2020 | hsm, emv, cryptography, key_management |
 | 2026-05-25 (corrected 2026-05-26) | KU/KY (EMV issuer script MAC) wire format verified against PUGD0537-004 pp.475-484 (authoritative, local PDF). 8 errors in initial inferred entry corrected: no Key Type (3H) field — wire is Mode→SchemeID→MK-SMI directly; full scheme tables (7 KU / 10 KY); MK-SMI is 32H or 'U'+32H only (LMK 28-29 variant 2); Integrity Session Key Data is scheme-dependent; Schemes 0/1/2 Mode 0 use ';'-terminated message data (no 4H length); Schemes 3-6 use 4H length prefix; Response MAC is 8B binary; KY Mode 0 has no Scheme ID but has IV-SMI (16B). Mode 0 → generate_mac (TR31_E2_EMV_MKEY_INTEGRITY); modes 1-4 → generate_mac_emv_pin_change (proxy unsupported). | Thales | PUGD0537-004 Core Host Commands V1, pp.475-484 — AUTHORITATIVE | hsm, emv, cryptography |
 | 2026-05-25 (corrected 2026-05-26) | LQ/LS (HMAC generate/verify) wire format verified against PUGD0537-004 pp.405-408 (authoritative, local PDF). 7 errors in initial inferred entry corrected: Hash Identifier is 2N not 1N; three missing fields added (HMAC Length 4N, HMAC Key Format 2N, HMAC Key Length 4N); HMAC Key is nB binary under LMK pair 34-35 variant 1 with NO key scheme prefix; Delimiter ';' is Variant LMK only; Data Length is 5N decimal not 4H hex; Message Data is nB binary not ASCII hex; LS field order: HMAC before key fields. SHA-224 ('05') maps to MacAlgorithm::HmacSha224 in APC (corrected 2026-05-29 — initial entry incorrectly stated no APC equivalent). Premium license required. APC: generate_mac/verify_mac with TR31_M7_HMAC_KEY. | Thales | PUGD0537-004 Core Host Commands V1, pp.405-408 — AUTHORITATIVE | hsm, cryptography |
@@ -11342,8 +11342,9 @@ that publish annual revisions).
 | 2026-07-06 | EMV Book 2 Security and Key Management v4.3 + EMV Book 3 Application Specification v4.3 (full PDFs, from Internet Archive captures of the original EMVCo files; now in the shared reference store, see AGENTS.md → Reference Source Documents). Now HELD sources — usable for direct content verification. VERSION CURRENCY: v4.4 (October 2022) is the current edition and is the one that SHOULD be cited; it is gated behind EMVCo login and only appears on copyright-infringing re-hosts, so it is NOT held. Entries verified here against v4.3 note the edition; the fundamentals checked (ARPC Method 1/2, session-key derivation Annex A1, cryptogram types) are stable across the v4.3→v4.4 boundary, but clause/table numbers can shift — prefer a v4.4 citation whenever v4.4 becomes obtainable | EMVCo (via Internet Archive) | held: v4.3 Nov 2011; LATEST: v4.4 Oct 2022 (gated); cached 2026-07-06 | emv, cryptography, key_management |
 | 2026-07-06 | NIST/ITU/IETF crypto-primitive anchors cached locally, each the CURRENT edition: FIPS 197 (AES, 2001 w/ update 2023-05-09), FIPS 198-1 (HMAC, 2008), SP 800-38G (FF1/FF3-1 FPE, 2016 — no finalized revision), SP 800-67r2 (TDEA, 2017), SP 800-56A r3 (ECDH/key agreement, 2018), ITU-T X.690 (= ISO/IEC 8825 BER/DER, 02/2021), RFC 2104 (HMAC, 1997). Public-domain / free-to-redistribute; the free authoritative equivalents for the paywalled ISO/X9 primitives. HELD sources | NIST / ITU-T / IETF | latest editions as noted; cached 2026-07-06 | cryptography, key_management |
 | 2026-07-06 | ISO 9564-1:2017 PIN block formats verified against openemv/pinblock reference implementation (github.com/openemv/pinblock — clause-cited C implementation). :2017 IS the current edition of ISO 9564-1. Formats 0-4 confirmed (F0 XOR 12 PAN digits ex check; F1 nonce; F2 standalone; F3 random fill; F4 128-bit separate fields). ISO/IEC 7816-3/-4 held (public mirror; see AGENTS.md → Reference Source Documents): 7816-3:2006 is current; 7816-4 held is the 2005 2nd edition but the CURRENT edition is 7816-4:2020 (paywalled, not held) — 7816-4 citations should say :2020 and treat the held 2005 text as definitional-only for APDU/ATR. The paywalled ISO texts themselves (9564, 7812/7813, 9797-1) and ASC X9 (X9.24, X9.143) are NOT held — those entries are anchored to open-source reference implementations and the free NIST/ITU equivalents, not to the standards' copyrighted text | openemv project / ISO (public mirror) | ISO 9564-1:2017 (latest) via impl; 7816-4 latest :2020 not held; cached 2026-07-06 | pin_processing, emv, cryptography |
-| 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
+| 2026-07-06 | Content-vs-citation validation pass (claims checked against held sources): 75 PUGD0537-004 page citations verified (65 exact ±1, 9 section-start drift +2..+4, C4 corrected 583→586); 133 Thales command/response-code pairs confirmed in the manuals (9 remainder cite non-held sources consistently with their confidence grades); BU entry verified field-by-field incl. KCV method table, FF/F/'S'/FFF reserved forms, 6-vs-16-digit authorization, ';00'+KCV-type trailer, KA supersession at PUGD0538-003 p.72-73; all 8 LQ/LS field-format claims verified verbatim pp.405-408; EmvMac derivation-mode enums, SessionKeyDerivationValue union, MacLength min=4, GenerateMacEmvPinChange required members, and wrapped-key support verified against the botocore service model — surfacing that GeneratePinData/VerifyPinData now accept EncryptionWrappedKey (dynamic-keys list updated). (Written before the same-day caching below: EMV v4.3 Books 2/3 and the NIST/ITU/RFC anchors were cached LATER on 2026-07-06 and ARE now held — see rows below. Still NOT held: EMV v4.4, PCI standards, the ISO/X9 texts themselves, and PUGD0541; entries citing those remain ledger-backed only — NOTE: all of these except the ISO/X9 texts were obtained later; see the 2026-07-13 row.) | Local document + SDK-model verification | verified 2026-07-06 | hsm, emv, key_management, cryptography |
 | 2026-07-06 | Citation-validation pass over the references backfill, against local PDFs: Thales A0/A6/A8/BI confirmed in Legacy Host Commands; B8 (TR-34 Key Export ~p.194) and BA (Encrypt a Clear PIN p.247) found ONLY in Core Host Commands PUGD0537-004 — two citations corrected; Full-Chip Data / Magnetic-Stripe Image / Visa Chip Authenticate / DKI confirmed in Visa Core Rules text; EMV Book 2 §6/§6.6/§7 citations downgraded to definitional (sections outside the 2026-05-22 targeted read) | Local document verification (this repo's .tmp-* source PDFs) | verified 2026-07-06 | hsm, emv, key_management |
 | 2026-07-11 | Futurex Excrypt public-source sweep (CyberChef-Payments): docs.futurex.com Host API command NAMES mined from /llms-full.txt (Mintlify export, ~7.5MB); 272-code CODE-existence ground-truth from a real device Configuration Report (Excrypt Touch FW 7.4.1 Permissions list); tag SYNTAX from three public integrations (jPOS kakubila, RicardoVercetti EMVA script, aws-samples key-exchange sample). Per-command tag pages remain CIAM-gated; only NAMES + CODES are authoritative, tag syntax stays MEDIUM. RSAR name corrected (Import Key Under RSA → Generate PKCS #10 Certificate Request); GCVV added | Futurex docs / device report / public integrations (via CyberChef-Payments) | accessed 2026-07-11 | hsm, key_management, emv, card_validation |
 | 2026-07-12 | EMVA CH-tag claim (CH=1 = EMV Book 2 Annex A1.4 Option A ICC master-key derivation) verified against held EMV Book 2 v4.3 (.tmp-emv-book2-v43.pdf): Annex A1.4 confirmed as 'Master Key Derivation' with Option A/B. EMVA/GCVV tag maps otherwise remain MEDIUM (public integrations, not the Futurex TRM) | Local document verification | verified 2026-07-12 | emv, card_validation, hsm |
-| 2026-07-12 | All held source documents CONSOLIDATED out of this repo's gitignored .tmp-* cache into a shared, durable, private local reference store — see AGENTS.md → Reference Source Documents for its location (Thales payShield manuals, EMV Books 2/3 v4.3, ISO 7816, ITU X.690, NIST FIPS/SP, Visa/Mastercard rules, AWS APC API reference, PCI-for-APC). Both this project and apc-hsm-proxy reference that store. Citations in earlier ledger rows that name ".tmp-<x>" or a store path refer to these same files. The store is local-only/not-for-redistribution; NOT held there either: EMV v4.4, PUGD0541, paywalled ISO/X9 texts | Repo reorganization | consolidated 2026-07-12 | hsm, emv, key_management, cryptography, pin_processing |
+| 2026-07-12 | All held source documents CONSOLIDATED out of this repo's gitignored .tmp-* cache into a shared, durable, private local reference store — see AGENTS.md → Reference Source Documents for its location (Thales payShield manuals, EMV Books 2/3 v4.3, ISO 7816, ITU X.690, NIST FIPS/SP, Visa/Mastercard rules, AWS APC API reference, PCI-for-APC). Both this project and apc-hsm-proxy reference that store. Citations in earlier ledger rows that name ".tmp-<x>" or a store path refer to these same files. The store is local-only/not-for-redistribution; NOT held there at the time: EMV v4.4, PUGD0541, paywalled ISO/X9 texts (EMV v4.4 and the Host Programmer's Manual were obtained shortly after — see the 2026-07-13 row) | Repo reorganization | consolidated 2026-07-12 | hsm, emv, key_management, cryptography, pin_processing |
+| 2026-07-13 | Reference store completed + two ledger-accuracy corrections. NEWLY HELD (in the shared reference store): payShield 10K Host Programmer's Manual 007-001518-023 v2.3a Aug 2025 (newer edition of the cited PUGD0541-003 — page numbers may differ); EMV Books 2 & 3 v4.4; the full PCI standards set (PIN Security Requirements v3.1 main doc, P2PE v3.1, PTS HSM v4, PTS POI v3.1, PTS PIN FAQs v3, DSS v4.0.1, MPoC v1.1, CPoC v1.0, 3DS Core v1.0, ISO-Format-4 and 18-3 Key-Blocks supplements); ten more NIST/FIPS anchors (SP 800-38A/38B/38D/108/131A/57/90A, FIPS 180-4/186-5/140-3); AWS APC control-plane API reference + User Guide. CORRECTIONS: PCI P2PE was mis-cited throughout as "v3.2, June 2025" — the actual current/held edition is v3.1, September 2021 (verified against the held standard's title page); all P2PE citations corrected. Still NOT held (irreducible): the paywalled ISO/X9 texts (anchored to open-source impls + NIST/ITU) and the CIAM-gated Futurex command reference. | Reference-store completion + local verification | verified 2026-07-13 | hsm, emv, key_management, cryptography, pin_processing, card_validation |
