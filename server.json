@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.J8k3/aws-payment-cryptography-mcp",
+  "title": "AWS Payment Cryptography",
+  "description": "AWS Payment Cryptography via MCP — keys, PIN/MAC/CVV/ARQC, PCI guards, HSM migration analysis.",
+  "version": "1.1.0",
+  "websiteUrl": "https://github.com/J8k3/aws-payment-cryptography-mcp",
+  "repository": {
+    "url": "https://github.com/J8k3/aws-payment-cryptography-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/v1.1.0/aws-payment-cryptography-mcp-1.1.0.mcpb",
+      "version": "1.1.0",
+      "fileSha256": "b772a7ee7f73aa09c85d332122a099bb61238d2f87780deaba2fd1345bd046da",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "AWS_REGION",
+          "description": "AWS region where your APC resources live (e.g. us-east-1). Live cryptographic tools also need AWS credentials via the standard AWS credential chain; the knowledge-base and HSM-analysis tools need no account.",
+          "isRequired": false,
+          "default": "us-east-1"
+        }
+      ]
+    }
+  ]
+}
