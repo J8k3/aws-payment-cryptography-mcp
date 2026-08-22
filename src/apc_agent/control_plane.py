@@ -416,10 +416,19 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         enabled: bool = True,
         tags: list[dict] | None = None,
         replication_regions: list[str] | None = None,
+        requester_comment: str | None = None,
     ) -> dict:
         """
         Call this to bring an externally generated key into APC via TR-31 key block or TR-34.
         The key_material dict structure depends on the import method.
+
+        IMPORTANT — this call does not always mean the key is imported. If the account has
+        Multi-Party Approval associated with the import operation (see
+        get_mpa_team_association), the response carries an MpaStatus with Status PENDING
+        and the key is NOT yet usable. Approval by the MPA team has to land first. Treat a
+        successful response as "submitted", not "done": check MpaStatus before using the
+        key or reporting the import as complete, and poll get_key until the status clears.
+        A response with no MpaStatus is an ordinary immediate import.
 
         For TR-31 (wrapping an existing key):
           key_material = {
@@ -448,6 +457,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             tags: Optional list of {Key, Value} tag dicts
             replication_regions: Optional list of regions to replicate the imported key into.
                 Omit to use the account default (see get_default_key_replication_regions).
+            requester_comment: Optional reason for the import, max 200 characters. Shown to
+                Multi-Party Approval reviewers when the import is gated. Appears in
+                CloudTrail in plaintext — no personal or sensitive data.
         """
         params: dict = {
             "KeyMaterial": key_material,
@@ -459,6 +471,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["Tags"] = tags
         if replication_regions:
             params["ReplicationRegions"] = replication_regions
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
         return _call(client().import_key, **params)
 
     @mcp.tool()
@@ -619,6 +633,83 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             resource_arn: Key ARN
         """
         return _call(client().delete_resource_policy, ResourceArn=resource_arn)
+
+    # ── Multi-Party Approval ──────────────────────────────────────────────────
+
+    @mcp.tool()
+    def associate_mpa_team(
+        action: str,
+        mpa_team_arn: str,
+        requester_comment: str | None = None,
+    ) -> dict:
+        """
+        Call this to put a sensitive key-management operation behind Multi-Party Approval,
+        so it requires sign-off from an AWS MPA approval team before it takes effect.
+
+        This is the APC equivalent of the dual-control requirement PCI PIN places on key
+        management: no single custodian can complete the operation alone. Associating a
+        team does not itself need approval; it changes how the named operation behaves
+        from then on.
+
+        Once associated, calls to the covered operation return with an MpaStatus of
+        PENDING rather than completing. See import_key for what that means in practice.
+
+        Args:
+            action: The operation to protect. Currently only
+                IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE is supported by APC.
+            mpa_team_arn: ARN of the AWS Multi-Party Approval team, of the form
+                arn:aws:mpa:<region>:<account>:approval-team/<name>
+            requester_comment: Optional reason for the change, max 200 characters.
+                Appears in CloudTrail in plaintext — no sensitive data.
+        """
+        params: dict = {"Action": action, "MpaTeamArn": mpa_team_arn}
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
+        return _call(client().associate_mpa_team, **params)
+
+    @mcp.tool()
+    def disassociate_mpa_team(action: str, requester_comment: str | None = None) -> dict:
+        """
+        Call this to remove Multi-Party Approval from an operation, returning it to
+        single-principal control.
+
+        This weakens a dual-control boundary, so it is worth confirming intent before
+        calling — under PCI PIN, removing dual control from key management is a
+        compliance-relevant change, not a routine configuration tweak.
+
+        The association moves to DELETE_PENDING and may itself require approval from the
+        currently associated team before it clears.
+
+        Args:
+            action: The operation to stop protecting, e.g.
+                IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE
+            requester_comment: Optional reason, max 200 characters. Plaintext in CloudTrail.
+        """
+        params: dict = {"Action": action}
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
+        return _call(client().disassociate_mpa_team, **params)
+
+    @mcp.tool()
+    def get_mpa_team_association(action: str) -> dict:
+        """
+        Call this to check whether an operation is under Multi-Party Approval, which team
+        approves it, and whether a change to that association is still settling.
+
+        Use it before an import that may be gated, and when auditing dual control.
+
+        Returns MpaTeamAssociation with:
+          Action           — the protected operation
+          MpaTeamArn       — the approving team
+          AssociationState — ACTIVE, UPDATE_PENDING, or DELETE_PENDING
+          MpaStatus        — present when an approval session is in flight, carrying
+                             MpaSessionArn, Status (PENDING / APPROVED / FAILED /
+                             CANCELLED) and InitiationDate
+
+        Args:
+            action: The operation to inspect, e.g. IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE
+        """
+        return _call(client().get_mpa_team_association, Action=action)
 
     # ── Compliance Helper ─────────────────────────────────────────────────────
 
