@@ -55,7 +55,11 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_class: SYMMETRIC_KEY, ASYMMETRIC_KEY_PAIR, or PRIVATE_KEY
             exportable: Whether the key can be exported via TR-31 or TR-34
             enabled: Whether the key is immediately active (default true)
-            key_check_value_algorithm: CMAC (required for AES) or ANSI_X9_24 (TDES only)
+            key_check_value_algorithm: CMAC, ANSI_X9_24, HMAC, or SHA_1. AES keys must use
+                CMAC (ANSI_X9_24 is rejected here per PCI PIN Annex C); TDES may use either.
+                HMAC keys use HMAC — the construction is fixed but the hash is the one bound
+                to the key at creation, over a zero-length message, so reproducing the KCV
+                outside APC requires knowing that hash. Asymmetric keys use SHA_1.
             tags: Optional list of {Key, Value} tag dicts
             replication_regions: Optional list of regions to replicate this key into, e.g.
                 ["us-west-2", "eu-west-1"]. Omit to use the account default (see
@@ -452,7 +456,11 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
         Args:
             key_material: Import method and wrapped key material
-            key_check_value_algorithm: CMAC (required for AES) or ANSI_X9_24 (TDES only)
+            key_check_value_algorithm: CMAC, ANSI_X9_24, HMAC, or SHA_1. AES keys must use
+                CMAC (ANSI_X9_24 is rejected here per PCI PIN Annex C); TDES may use either.
+                HMAC keys use HMAC — the construction is fixed but the hash is the one bound
+                to the key at creation, over a zero-length message, so reproducing the KCV
+                outside APC requires knowing that hash. Asymmetric keys use SHA_1.
             enabled: Activate key immediately after import
             tags: Optional list of {Key, Value} tag dicts
             replication_regions: Optional list of regions to replicate the imported key into.
