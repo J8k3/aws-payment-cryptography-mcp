@@ -6500,7 +6500,7 @@ relationships:
 references:
   - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — KCV computation"
   - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
-  - "AWS payment-cryptography service model, KeyCheckValueAlgorithm documentation, 2026-06-05 — HMAC KCV method (Sources ledger 2026-08-22)"
+  - "AWS payment-cryptography service model (botocore/data/payment-cryptography/2021-09-14/service-2.json), KeyCheckValueAlgorithm documentation updated 2026-06-05 — HMAC KCV method; read 2026-08-22"
 status: active
 ```
 
