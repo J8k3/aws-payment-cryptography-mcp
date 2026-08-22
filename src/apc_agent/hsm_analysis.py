@@ -1016,11 +1016,14 @@ INTERNATIONAL_COMMANDS: list[HsmCommand] = [
                "VALIDATED 2026-06-16 against live APC: the Scheme ID (not the Derivation Method byte) "
                "selects BOTH the major mode and the session method — '0'=Option A + EMV2000, "
                "'1'=Option B + EMV2000, '2'=Option A + EMV Common, '3'=Option B + EMV Common, "
-               "'5'=Mastercard cloud (Option A + EMV Common). EMV Option C ('9'), JCB ('A'/'B'), "
-               "UnionPay ('C'), and the Visa/Amex cloud-LUK and Discover variants have no APC "
+               "'5'=Mastercard cloud (Option A + EMV Common). UnionPay ('C') maps to APC "
+               "SessionKeyDerivationMode UNION_PAY (PAN + PSN + ATC, no UnpredictableNumber) — added "
+               "to APC 2026-07-15, requires boto3 >= 1.43.49; before that release it had no APC "
+               "equivalent. EMV Option C ('9'), JCB ('A'/'B'), and the Visa/Amex cloud-LUK and "
+               "Discover variants still have no APC "
                "SessionKeyDerivation equivalent -> return unsupported (68). Map to APC "
                "SessionKeyDerivationMode: EMV2000, EMV_COMMON_SESSION_KEY, MASTERCARD_SESSION_KEY "
-               "(needs UnpredictableNumber), AMEX, or VISA. APC enforces PAN length > 16 digits for "
+               "(needs UnpredictableNumber), AMEX, VISA, or UNION_PAY. APC enforces PAN length > 16 digits for "
                "Option B (Option A for <= 16) and does NOT EMV-pad TransactionData (caller pads, "
                "ISO 9797-1 method 2)."),
     HsmCommand("Thales/Futurex", "International", "KU",
@@ -2056,7 +2059,12 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                "KB entry: payment://knowledge-base concept.thales-js-command has full field table.",
                "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
                "In APC: verify_auth_request_cryptogram with TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS. "
-               "Session key derivation: SessionKeyDerivation::Emv2000 (CUP/PBOC is EMV-2000 based). "
+               "Session key derivation: SessionKeyDerivation::UnionPay (PAN + PSN + ATC). APC added a "
+               "native UNION_PAY mode on 2026-07-15 (requires boto3 >= 1.43.49); prefer it over the "
+               "previous Emv2000 stand-in, which was chosen only because CUP/PBOC is EMV-2000 based. "
+               "Both take the same three inputs, so whether Emv2000 ever produced correct CUP "
+               "cryptograms is UNVERIFIED — confirm UNION_PAY against live APC or a known CUP test "
+               "vector before relying on either. "
                "MajorKeyDerivationMode: EmvOptionA (CUP uses Option A-style IMK diversification). "
                "ARPC: CryptogramVerificationArpcMethod1 with auth_response_code from 2B binary ARC field."),
     HsmCommand("Thales", "Legacy", "JU",
