@@ -2060,11 +2060,14 @@ THALES_LEGACY_COMMANDS: list[HsmCommand] = [
                "verify_auth_request_cryptogram", "TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS",
                "In APC: verify_auth_request_cryptogram with TR31_E0_EMV_MKEY_APP_CRYPTOGRAMS. "
                "Session key derivation: SessionKeyDerivation::UnionPay (PAN + PSN + ATC). APC added a "
-               "native UNION_PAY mode on 2026-07-15 (requires boto3 >= 1.43.49); prefer it over the "
-               "previous Emv2000 stand-in, which was chosen only because CUP/PBOC is EMV-2000 based. "
-               "Both take the same three inputs, so whether Emv2000 ever produced correct CUP "
-               "cryptograms is UNVERIFIED — confirm UNION_PAY against live APC or a known CUP test "
-               "vector before relying on either. "
+               "native UNION_PAY mode on 2026-07-15 (requires boto3 >= 1.43.49); use it. The earlier "
+               "Emv2000 stand-in was NOT wrong: VERIFIED live against APC (us-east-1) by "
+               "apc-hsm-proxy's arqc_verify_js_differential — minting under EMV2000 and verifying "
+               "under UNION_PAY accepts 32/32 across randomized PAN/PSN/ATC/txn length, while a "
+               "one-bit-corrupted ARQC is still rejected. APC's UnionPay derivation is functionally "
+               "identical to EMV2000 over PAN + PSN + ATC, so switching is for faithfulness to the "
+               "scheme, not a behaviour change — existing EMV2000-based CUP integrations are correct "
+               "and need not be treated as suspect. "
                "MajorKeyDerivationMode: EmvOptionA (CUP uses Option A-style IMK diversification). "
                "ARPC: CryptogramVerificationArpcMethod1 with auth_response_code from 2B binary ARC field."),
     HsmCommand("Thales", "Legacy", "JU",
