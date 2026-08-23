@@ -41,6 +41,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         key_check_value_algorithm: str | None = None,
         tags: list[dict] | None = None,
         replication_regions: list[str] | None = None,
+        derive_key_usage: str | None = None,
     ) -> dict:
         """
         Call this when creating a new cryptographic key — BDK, ZPK, CVK, MAC key, KEK, etc.
@@ -61,6 +62,9 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
                 to the key at creation, over a zero-length message, so reproducing the KCV
                 outside APC requires knowing that hash. Asymmetric keys use SHA_1.
             tags: Optional list of {Key, Value} tag dicts
+            derive_key_usage: For a BDK (B0) only — the TR-31 usage the derived DUKPT
+                working keys will carry, e.g. TR31_P0_PIN_ENCRYPTION_KEY. APC binds this at
+                creation, so a BDK created without it cannot later derive keys of that usage.
             replication_regions: Optional list of regions to replicate this key into, e.g.
                 ["us-west-2", "eu-west-1"]. Omit to use the account default (see
                 get_default_key_replication_regions). Replication is a property of the key,
@@ -108,6 +112,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["Tags"] = tags
         if replication_regions:
             params["ReplicationRegions"] = replication_regions
+        if derive_key_usage:
+            params["DeriveKeyUsage"] = derive_key_usage
 
         return _call(client().create_key, **params)
 
@@ -368,6 +374,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     def get_parameters_for_import(
         key_material_type: str,
         wrapping_key_algorithm: str,
+        reuse_last_generated_token: bool = False,
     ) -> dict:
         """
         Call this before import_key when using TR-34 or KeyCryptogram — you need APC's
@@ -389,16 +396,25 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
                                RootCertificatePublicKey, or TrustedCertificatePublicKey
             wrapping_key_algorithm: RSA_2048, RSA_3072, RSA_4096, or ECC_NIST_P521 (required for AES-256)
+            reuse_last_generated_token: Reuse the existing import token and wrapping key
+                certificate when one is still valid for the same key material type and
+                algorithm, with at least 7 days of validity left. Default false, which mints
+                a new token on every call. Set true when retrying, or when building an import
+                payload across several steps, so the token does not change underneath you.
         """
-        return _call(client().get_parameters_for_import,
-            KeyMaterialType=key_material_type,
-            WrappingKeyAlgorithm=wrapping_key_algorithm,
-        )
+        params: dict = {
+            "KeyMaterialType": key_material_type,
+            "WrappingKeyAlgorithm": wrapping_key_algorithm,
+        }
+        if reuse_last_generated_token:
+            params["ReuseLastGeneratedToken"] = reuse_last_generated_token
+        return _call(client().get_parameters_for_import, **params)
 
     @mcp.tool()
     def get_parameters_for_export(
         key_material_type: str,
         signing_key_algorithm: str,
+        reuse_last_generated_token: bool = False,
     ) -> dict:
         """
         Call this before export_key when using TR-34 — you need APC's signing certificate
@@ -407,11 +423,19 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_material_type: Tr31KeyBlock or Tr34KeyBlock
             signing_key_algorithm: RSA_2048, RSA_3072, RSA_4096
+            reuse_last_generated_token: Reuse the existing export token and signing key
+                certificate when one is still valid for the same key material type and
+                algorithm, with at least 7 days of validity left. Default false, which mints
+                a new token on every call. Set true when retrying, or when building an export
+                payload across several steps, so the token does not change underneath you.
         """
-        return _call(client().get_parameters_for_export,
-            KeyMaterialType=key_material_type,
-            SigningKeyAlgorithm=signing_key_algorithm,
-        )
+        params: dict = {
+            "KeyMaterialType": key_material_type,
+            "SigningKeyAlgorithm": signing_key_algorithm,
+        }
+        if reuse_last_generated_token:
+            params["ReuseLastGeneratedToken"] = reuse_last_generated_token
+        return _call(client().get_parameters_for_export, **params)
 
     @mcp.tool()
     def import_key(
@@ -485,22 +509,41 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def export_key(
-        key_identifier: str,
-        key_material_type: str,
+        export_key_identifier: str,
+        key_material: dict,
         export_attributes: dict | None = None,
     ) -> dict:
         """
         Call this when distributing an APC-generated key to an external HSM or system,
-        wrapped in a TR-31 key block or TR-34 structure.
+        wrapped in a TR-31 key block, a TR-34 structure, an RSA cryptogram, an ECDH-derived
+        key block, or an AS2805 cryptogram.
+
+        key_material is a single-member union naming the export method. The wrapping
+        material lives inside it — unlike import_key, there is no separate "type" argument:
+
+          {"Tr31KeyBlock": {"WrappingKeyIdentifier": "<ARN or alias of KBPK>"}}
+
+          {"Tr34KeyBlock": {"CertificateAuthorityPublicKeyIdentifier": "<CA key ARN>",
+                            "WrappingKeyCertificate": "<base64 cert>",
+                            "KeyBlockFormat": "X9_TR34_2012",
+                            "ExportToken": "<token from get_parameters_for_export>"}}
+
+          {"KeyCryptogram": {"CertificateAuthorityPublicKeyIdentifier": "<CA key ARN>",
+                             "WrappingKeyCertificate": "<base64 cert>",
+                             "WrappingSpec": "RSA_OAEP_SHA_256"}}
+
+          {"DiffieHellmanTr31KeyBlock": {...}}   ECDH-derived; needed for AES-192/256
+          {"As2805KeyCryptogram": {...}}         AS2805 (Australian standard)
 
         Args:
-            key_identifier: ARN or alias of the key to export
-            key_material_type: Tr31KeyBlock or Tr34KeyBlock
-            export_attributes: Export-method-specific parameters (wrapping key, etc.)
+            export_key_identifier: ARN or alias of the key to export
+            key_material: Single-member union selecting the export method, see above
+            export_attributes: Optional. ExportDukptInitialKey (for IPEK export) and/or
+                KeyCheckValueAlgorithm.
         """
         params: dict = {
-            "KeyIdentifier": key_identifier,
-            "KeyMaterialType": key_material_type,
+            "ExportKeyIdentifier": export_key_identifier,
+            "KeyMaterial": key_material,
         }
         if export_attributes:
             params["ExportAttributes"] = export_attributes

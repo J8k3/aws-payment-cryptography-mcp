@@ -103,3 +103,114 @@ def test_known_unimplemented_are_not_actually_implemented(service, module):
         f"These are implemented in {module} but still listed as unimplemented: "
         f"{sorted(contradictions)}. Remove them from KNOWN_UNIMPLEMENTED."
     )
+
+
+# Input members we knowingly do not expose on a tool, and why.
+#
+# Everything else must be passed. A missing entry here means either a new AWS parameter
+# went unnoticed, or a parameter name is wrong — the failure mode that left export_key
+# broken from the service launch in 2023 until 2026-08-23. MagicMock-based tests cannot
+# catch a wrong parameter name, because a mock accepts any keyword argument.
+UNEXPOSED_PARAMETERS = {
+    "payment-cryptography": {
+        # Alias management is exposed through the dedicated alias tools.
+        "CreateKey": set(),
+        "ExportKey": set(),
+        "GetParametersForImport": set(),
+        "GetParametersForExport": set(),
+    },
+    "payment-cryptography-data": {},
+}
+
+
+
+def _passes_member(body: str, member: str) -> bool:
+    """
+    True if the tool body sends `member` to boto3.
+
+    Both call styles in this codebase count: a quoted dict key (params["Member"] = ...)
+    and a direct keyword argument (Member=value).
+    """
+    return bool(
+        re.search(rf'"{re.escape(member)}"', body)
+        or re.search(rf'\b{re.escape(member)}\s*=', body)
+    )
+
+
+def _tool_body(module: str, operation: str) -> str:
+    """Source of the tool that calls `operation`, from its def down to the boto3 call."""
+    source = (SRC / module).read_text()
+    call = f"client().{_pascal_to_snake(operation)}"
+    at = source.find(call)
+    assert at != -1, f"{operation} is not called in {module}"
+    start = source.rfind("    @mcp.tool()", 0, at)
+    # Params may be built before the call (params dict) or passed after it as inline
+    # kwargs, so the body runs to the start of the next tool.
+    nxt = source.find("    @mcp.tool()", at)
+    return source[start:nxt if nxt != -1 else len(source)]
+
+
+@pytest.mark.parametrize("service,module", CASES)
+def test_every_input_member_is_passed_or_explicitly_unexposed(service, module):
+    """
+    Catch parameter-level drift: new members added to operations we already implement.
+
+    The operation-level tests above cannot see this. AWS added ReuseLastGeneratedToken to
+    GetParametersForImport/Export on 2026-04-03 without adding any operation, so nothing
+    flagged it.
+    """
+    model = botocore.session.get_session().get_service_model(service)
+    problems = []
+    for operation in sorted(model.operation_names):
+        method = _pascal_to_snake(operation)
+        if method not in _called_methods(module):
+            continue
+        shape = model.operation_model(operation).input_shape
+        if shape is None:
+            continue
+        body = _tool_body(module, operation)
+        allowed = UNEXPOSED_PARAMETERS.get(service, {}).get(operation, set())
+        missing = {m for m in shape.members if not _passes_member(body, m)} - allowed
+        if missing:
+            required = set(shape.required_members) & missing
+            problems.append(
+                f"{operation}: {sorted(missing)}"
+                + (f"  <-- REQUIRED: {sorted(required)}" if required else "")
+            )
+    assert not problems, (
+        "Input members neither passed nor listed in UNEXPOSED_PARAMETERS:\n  "
+        + "\n  ".join(problems)
+        + "\n\nIf AWS added a parameter, expose it or record why not. If a name looks "
+          "wrong, check it against the service model — a wrong name fails at runtime but "
+          "passes every MagicMock test."
+    )
+
+
+def assert_params_valid(service: str, operation: str, params: dict) -> None:
+    """
+    Validate real call kwargs against the real service model.
+
+    This is what a MagicMock cannot do. Use it in tool tests that capture call_args so the
+    assertion is against AWS's contract rather than against the code's own behaviour.
+    """
+    from botocore.validate import ParamValidator
+
+    model = botocore.session.get_session().get_service_model(service)
+    report = ParamValidator().validate(params, model.operation_model(operation).input_shape)
+    assert not report.has_errors(), f"{operation} params rejected by the service model:\n{report.generate_report()}"
+
+
+@pytest.mark.parametrize("service,module", CASES)
+def test_unexposed_parameter_entries_still_exist(service, module):
+    """Stop UNEXPOSED_PARAMETERS from rotting."""
+    model = botocore.session.get_session().get_service_model(service)
+    stale = []
+    for operation, members in UNEXPOSED_PARAMETERS.get(service, {}).items():
+        if operation not in model.operation_names:
+            stale.append(f"{operation} (operation gone)")
+            continue
+        shape = model.operation_model(operation).input_shape
+        gone = members - set(shape.members or {})
+        if gone:
+            stale.append(f"{operation}: {sorted(gone)}")
+    assert not stale, f"UNEXPOSED_PARAMETERS lists things that no longer exist: {stale}"
