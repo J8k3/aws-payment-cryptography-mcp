@@ -6475,16 +6475,32 @@ domain:
 constraints:
   - TDES keys → ANSI_X9_24 (encrypt 8 zero bytes; top 3 bytes = KCV)
   - AES keys → CMAC (AES-CMAC over 16 zero bytes; top 3 bytes = KCV)
+  - HMAC keys → the hash selected AT KEY CREATION, over a ZERO-LENGTH message; leftmost 3 bytes = KCV
   - Asymmetric keys (RSA, ECC) → SHA_1 of public key; top 3 bytes = KCV
   - APC returns the KCV method identifier alongside every KCV value in key management responses
+attributes:
+  kcv_algorithm_enum: "KeyCheckValueAlgorithm accepts CMAC, ANSI_X9_24, HMAC, and SHA_1"
+  hmac_note: >
+    Selecting HMAC fixes the construction but NOT the hash: the specific hash is the one
+    bound to the key at creation, so a KCV cannot be reproduced without knowing which hash
+    that was. The input is a ZERO-LENGTH message, not a zero-filled block — this differs from
+    both the TDES (8 zero bytes) and AES (16 zero bytes) methods, and computing it over a
+    zero block yields the wrong value.
+  documented: >
+    AWS documented this on 2026-06-05 as a documentation-only change to the control-plane
+    service model — no API shape changed. Prior to that the service documented KCV
+    computation for TDES and AES only.
 relationships:
   - type: related_to
     target_id: artifact.kcv
   - type: related_to
     target_id: rule.kcv-validation-after-transfer
+  - type: related_to
+    target_id: rule.pci-pin-kcv-method
 references:
   - "AWS Payment Cryptography User Guide (full site tree), Sources ledger 2026-05-19 — KCV computation"
   - "Direct APC API testing (CyberChef Payments vs APC, 20 ops cross-validated), Sources ledger 2026-05-19"
+  - "AWS payment-cryptography service model (botocore/data/payment-cryptography/2021-09-14/service-2.json), KeyCheckValueAlgorithm documentation updated 2026-06-05 — HMAC KCV method; read 2026-08-22"
 status: active
 ```
 
