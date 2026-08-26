@@ -71,7 +71,8 @@ credentials and a configured APC environment:
                   add_key_replication_regions, remove_key_replication_regions,
                   get_default_key_replication_regions,
                   enable_default_key_replication_regions,
-                  disable_default_key_replication_regions
+                  disable_default_key_replication_regions,
+                  associate_mpa_team, disassociate_mpa_team, get_mpa_team_association
 
 ═══════════════════════════════════════════════════════
 APC SERVICE OVERVIEW

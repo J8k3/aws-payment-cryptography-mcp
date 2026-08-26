@@ -29,13 +29,7 @@ SRC = Path(__file__).parent.parent / "src" / "apc_agent"
 
 # Operations we knowingly do not expose, and why.
 KNOWN_UNIMPLEMENTED = {
-    "payment-cryptography": {
-        # Multi-Party Approval (added 2026-04-30). Governance workflow for root
-        # certificate import; tracked separately from the key-management surface.
-        "AssociateMpaTeam",
-        "DisassociateMpaTeam",
-        "GetMpaTeamAssociation",
-    },
+    "payment-cryptography": set(),
     "payment-cryptography-data": set(),
 }
 

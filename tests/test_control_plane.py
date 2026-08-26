@@ -310,3 +310,115 @@ class TestCertificates:
             KeyIdentifier="alias/tr34-signing"
         )
         assert result["KeyCertificate"] == "cert"
+
+
+# ── multi-party approval ──────────────────────────────────────────────────────
+
+class TestMultiPartyApproval:
+    def test_associate_passes_action_and_team(self, tools):
+        mock_client = MagicMock()
+        mock_client.associate_mpa_team.return_value = {"MpaTeamAssociation": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["associate_mpa_team"](
+                action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE",
+                mpa_team_arn="arn:aws:mpa:us-east-1:123456789012:approval-team/key-custodians",
+            )
+        mock_client.associate_mpa_team.assert_called_once_with(
+            Action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE",
+            MpaTeamArn="arn:aws:mpa:us-east-1:123456789012:approval-team/key-custodians",
+        )
+
+    def test_associate_omits_comment_when_unset(self, tools):
+        mock_client = MagicMock()
+        mock_client.associate_mpa_team.return_value = {"MpaTeamAssociation": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["associate_mpa_team"](
+                action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE",
+                mpa_team_arn="arn:aws:mpa:us-east-1:123456789012:approval-team/kc",
+            )
+        assert "RequesterComment" not in mock_client.associate_mpa_team.call_args.kwargs
+
+    def test_associate_forwards_comment(self, tools):
+        mock_client = MagicMock()
+        mock_client.associate_mpa_team.return_value = {"MpaTeamAssociation": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["associate_mpa_team"](
+                action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE",
+                mpa_team_arn="arn:aws:mpa:us-east-1:123456789012:approval-team/kc",
+                requester_comment="PCI PIN dual control for root CA import",
+            )
+        kwargs = mock_client.associate_mpa_team.call_args.kwargs
+        assert kwargs["RequesterComment"] == "PCI PIN dual control for root CA import"
+
+    def test_disassociate_passes_action_only(self, tools):
+        mock_client = MagicMock()
+        mock_client.disassociate_mpa_team.return_value = {"MpaTeamAssociation": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["disassociate_mpa_team"](action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE")
+        mock_client.disassociate_mpa_team.assert_called_once_with(
+            Action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE"
+        )
+
+    def test_get_association_passes_action(self, tools):
+        mock_client = MagicMock()
+        mock_client.get_mpa_team_association.return_value = {
+            "MpaTeamAssociation": {"AssociationState": "ACTIVE"}
+        }
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            result = tools["get_mpa_team_association"](
+                action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE"
+            )
+        mock_client.get_mpa_team_association.assert_called_once_with(
+            Action="IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE"
+        )
+        assert result["MpaTeamAssociation"]["AssociationState"] == "ACTIVE"
+
+    def test_import_key_forwards_requester_comment(self, tools):
+        mock_client = MagicMock()
+        mock_client.import_key.return_value = {"Key": {"KeyArn": "arn:..."}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["import_key"](
+                key_material={"Tr31KeyBlock": {"WrappingKeyIdentifier": "arn:...",
+                                               "WrappedKeyBlock": "AAAA"}},
+                requester_comment="quarterly BDK rotation",
+            )
+        kwargs = mock_client.import_key.call_args.kwargs
+        assert kwargs["RequesterComment"] == "quarterly BDK rotation"
+
+    def test_import_key_omits_requester_comment_when_unset(self, tools):
+        mock_client = MagicMock()
+        mock_client.import_key.return_value = {"Key": {"KeyArn": "arn:..."}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["import_key"](
+                key_material={"Tr31KeyBlock": {"WrappingKeyIdentifier": "arn:...",
+                                               "WrappedKeyBlock": "AAAA"}},
+            )
+        assert "RequesterComment" not in mock_client.import_key.call_args.kwargs
+
+    def test_pending_mpa_status_is_passed_through_not_swallowed(self, tools):
+        """A gated import returns PENDING — the caller must be able to see it."""
+        mock_client = MagicMock()
+        mock_client.import_key.return_value = {
+            "Key": {
+                "KeyArn": "arn:...",
+                "MpaStatus": {
+                    "MpaSessionArn": "arn:aws:mpa:us-east-1:123456789012:session/t/s",
+                    "Status": "PENDING",
+                    "InitiationDate": "2026-08-22T12:00:00Z",
+                },
+            }
+        }
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            result = tools["import_key"](
+                key_material={"Tr31KeyBlock": {"WrappingKeyIdentifier": "arn:...",
+                                               "WrappedKeyBlock": "AAAA"}},
+            )
+        assert result["Key"]["MpaStatus"]["Status"] == "PENDING"
