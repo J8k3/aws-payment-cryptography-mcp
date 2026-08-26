@@ -12,9 +12,9 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/v1.1.0/aws-payment-cryptography-mcp-1.1.0.mcpb",
+      "identifier": "https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/v1.2.0/aws-payment-cryptography-mcp-1.2.0.mcpb",
       "version": "1.2.0",
-      "fileSha256": "b772a7ee7f73aa09c85d332122a099bb61238d2f87780deaba2fd1345bd046da",
+      "fileSha256": "28e8e4e171d636309b36f9ba817d4c0e2cbe784fbaf0fc1afdeedd6e633d39ab",
       "transport": {
         "type": "stdio"
       },
