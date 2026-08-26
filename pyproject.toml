@@ -8,7 +8,11 @@ version = "1.1.0"
 description = "MCP server for AWS Payment Cryptography — works with Claude Code, Codex CLI, and other MCP clients"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0",
+    # Upper bound is load-bearing: mcp 2.0.0 (2026-07-28) removed mcp.server.fastmcp,
+    # which server.py imports. Lifting it requires migrating every @mcp.tool() call site.
+    "mcp>=1.0.0,<2",
+    # UnionPay session key derivation (SessionKeyUnionPay / UNION_PAY) needs 1.43.49;
+    # the floor stays at 1.34.0 so older installs still work for everything else.
     "boto3>=1.34.0",
 ]
 
