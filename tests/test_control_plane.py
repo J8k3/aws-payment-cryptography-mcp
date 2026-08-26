@@ -12,6 +12,8 @@ import pytest
 
 from apc_agent.control_plane import register_control_plane_tools
 
+from .test_api_surface import assert_params_valid
+
 
 class _CaptureMCP:
     def __init__(self):
@@ -422,3 +424,124 @@ class TestMultiPartyApproval:
                                                "WrappedKeyBlock": "AAAA"}},
             )
         assert result["Key"]["MpaStatus"]["Status"] == "PENDING"
+
+
+# ── export_key ────────────────────────────────────────────────────────────────
+
+class TestExportKey:
+    """
+    These assert against the real service model, not just against captured kwargs.
+
+    export_key previously sent KeyIdentifier and KeyMaterialType — neither of which is a
+    member of ExportKey — so every call failed client-side with ParamValidationError before
+    reaching AWS. It had been wrong since the service launched and no test caught it,
+    because a MagicMock accepts any keyword argument.
+    """
+
+    def test_tr31_export_params_are_accepted_by_the_service_model(self, tools):
+        mock_client = MagicMock()
+        mock_client.export_key.return_value = {"WrappedKey": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["export_key"](
+                export_key_identifier="alias/bdk-2026",
+                key_material={"Tr31KeyBlock": {"WrappingKeyIdentifier": "alias/kbpk"}},
+            )
+        params = mock_client.export_key.call_args.kwargs
+        assert params["ExportKeyIdentifier"] == "alias/bdk-2026"
+        assert "KeyMaterial" in params
+        assert_params_valid("payment-cryptography", "ExportKey", params)
+
+    def test_tr34_export_params_are_accepted_by_the_service_model(self, tools):
+        mock_client = MagicMock()
+        mock_client.export_key.return_value = {"WrappedKey": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["export_key"](
+                export_key_identifier="arn:aws:payment-cryptography:us-east-1:1:key/abc",
+                key_material={
+                    "Tr34KeyBlock": {
+                        "CertificateAuthorityPublicKeyIdentifier": "alias/ca",
+                        "WrappingKeyCertificate": "Zm9v",
+                        "KeyBlockFormat": "X9_TR34_2012",
+                    }
+                },
+            )
+        assert_params_valid(
+            "payment-cryptography", "ExportKey", mock_client.export_key.call_args.kwargs
+        )
+
+    def test_export_attributes_are_forwarded_and_valid(self, tools):
+        mock_client = MagicMock()
+        mock_client.export_key.return_value = {"WrappedKey": {}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["export_key"](
+                export_key_identifier="alias/bdk-2026",
+                key_material={"Tr31KeyBlock": {"WrappingKeyIdentifier": "alias/kbpk"}},
+                export_attributes={"KeyCheckValueAlgorithm": "CMAC"},
+            )
+        params = mock_client.export_key.call_args.kwargs
+        assert params["ExportAttributes"] == {"KeyCheckValueAlgorithm": "CMAC"}
+        assert_params_valid("payment-cryptography", "ExportKey", params)
+
+
+# ── import/export token reuse ─────────────────────────────────────────────────
+
+class TestTokenReuse:
+    def test_import_params_omit_reuse_flag_by_default(self, tools):
+        mock_client = MagicMock()
+        mock_client.get_parameters_for_import.return_value = {"ImportToken": "t"}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["get_parameters_for_import"](
+                key_material_type="KEY_CRYPTOGRAM", wrapping_key_algorithm="RSA_4096"
+            )
+        params = mock_client.get_parameters_for_import.call_args.kwargs
+        assert "ReuseLastGeneratedToken" not in params
+        assert_params_valid("payment-cryptography", "GetParametersForImport", params)
+
+    def test_import_params_forward_reuse_flag(self, tools):
+        mock_client = MagicMock()
+        mock_client.get_parameters_for_import.return_value = {"ImportToken": "t"}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["get_parameters_for_import"](
+                key_material_type="KEY_CRYPTOGRAM",
+                wrapping_key_algorithm="RSA_4096",
+                reuse_last_generated_token=True,
+            )
+        params = mock_client.get_parameters_for_import.call_args.kwargs
+        assert params["ReuseLastGeneratedToken"] is True
+        assert_params_valid("payment-cryptography", "GetParametersForImport", params)
+
+    def test_export_params_forward_reuse_flag(self, tools):
+        mock_client = MagicMock()
+        mock_client.get_parameters_for_export.return_value = {"ExportToken": "t"}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["get_parameters_for_export"](
+                key_material_type="Tr34KeyBlock",
+                signing_key_algorithm="RSA_4096",
+                reuse_last_generated_token=True,
+            )
+        params = mock_client.get_parameters_for_export.call_args.kwargs
+        assert params["ReuseLastGeneratedToken"] is True
+        assert_params_valid("payment-cryptography", "GetParametersForExport", params)
+
+    def test_create_key_forwards_derive_key_usage(self, tools):
+        mock_client = MagicMock()
+        mock_client.create_key.return_value = {"Key": {"KeyArn": "arn:..."}}
+        with patch("apc_agent.control_plane.boto3") as mock_boto3:
+            mock_boto3.client.return_value = mock_client
+            tools["create_key"](
+                key_algorithm="AES_128",
+                key_usage="TR31_B0_BASE_DERIVATION_KEY",
+                key_class="SYMMETRIC_KEY",
+                exportable=True,
+                key_check_value_algorithm="CMAC",
+                derive_key_usage="TR31_P0_PIN_ENCRYPTION_KEY",
+            )
+        params = mock_client.create_key.call_args.kwargs
+        assert params["DeriveKeyUsage"] == "TR31_P0_PIN_ENCRYPTION_KEY"
+        assert_params_valid("payment-cryptography", "CreateKey", params)
