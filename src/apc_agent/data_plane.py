@@ -646,6 +646,11 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
           {"EmvCommon": {..., "ApplicationTransactionCounter": "0001"}}
           {"Mastercard": {..., "ApplicationTransactionCounter": "0001",
                           "UnpredictableNumber": "12345678"}}
+          {"UnionPay": {..., "ApplicationTransactionCounter": "0001"}}
+
+        UnionPay (CUP / PBOC) takes PAN + PSN + ATC and no UnpredictableNumber. It was
+        added to APC on 2026-07-15 and needs boto3 >= 1.43.49 — on older boto3 the member
+        is not in the service model and the call fails client-side with ParamValidationError.
 
         Args:
             key_identifier: ARN or alias of TDES E0 key (DeriveKey mode)
@@ -685,10 +690,17 @@ def register_data_plane_tools(mcp: FastMCP) -> None:
           EMV_OPTION_A — Visa/Amex ARQC derivation
           EMV_OPTION_B — Mastercard ARQC derivation
 
-        session_key_derivation_attributes:
+        session_key_derivation_attributes — exactly one member, same union as
+        generate_auth_request_cryptogram (Visa, Amex, Emv2000, EmvCommon, Mastercard, UnionPay):
           {"EmvCommon": {"ApplicationTransactionCounter": "0001",
                           "PanSequenceNumber": "01",
                           "ApplicationCryptogram": "<ARQC hex>"}}
+          {"UnionPay": {"PrimaryAccountNumber": "...", "PanSequenceNumber": "01",
+                          "ApplicationTransactionCounter": "0001"}}
+
+        UnionPay (CUP / PBOC) was added to APC on 2026-07-15 and needs boto3 >= 1.43.49 —
+        on older boto3 the call fails client-side with ParamValidationError. This is the
+        APC target for the payShield JS command and for KW Scheme ID 'C'.
 
         auth_response_attributes (to generate ARPC in same call):
           {"ArpcMethod1": {"AuthResponseCode": "0010"}}
