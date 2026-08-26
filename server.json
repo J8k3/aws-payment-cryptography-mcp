@@ -3,7 +3,7 @@
   "name": "io.github.J8k3/aws-payment-cryptography-mcp",
   "title": "AWS Payment Cryptography",
   "description": "AWS Payment Cryptography via MCP — keys, PIN/MAC/CVV/ARQC, PCI guards, HSM migration analysis.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "websiteUrl": "https://github.com/J8k3/aws-payment-cryptography-mcp",
   "repository": {
     "url": "https://github.com/J8k3/aws-payment-cryptography-mcp",
@@ -13,7 +13,7 @@
     {
       "registryType": "mcpb",
       "identifier": "https://github.com/J8k3/aws-payment-cryptography-mcp/releases/download/v1.1.0/aws-payment-cryptography-mcp-1.1.0.mcpb",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "fileSha256": "b772a7ee7f73aa09c85d332122a099bb61238d2f87780deaba2fd1345bd046da",
       "transport": {
         "type": "stdio"
