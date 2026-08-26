@@ -40,6 +40,8 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         enabled: bool = True,
         key_check_value_algorithm: str | None = None,
         tags: list[dict] | None = None,
+        replication_regions: list[str] | None = None,
+        derive_key_usage: str | None = None,
     ) -> dict:
         """
         Call this when creating a new cryptographic key — BDK, ZPK, CVK, MAC key, KEK, etc.
@@ -54,8 +56,19 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_class: SYMMETRIC_KEY, ASYMMETRIC_KEY_PAIR, or PRIVATE_KEY
             exportable: Whether the key can be exported via TR-31 or TR-34
             enabled: Whether the key is immediately active (default true)
-            key_check_value_algorithm: CMAC (required for AES) or ANSI_X9_24 (TDES only)
+            key_check_value_algorithm: CMAC, ANSI_X9_24, HMAC, or SHA_1. AES keys must use
+                CMAC (ANSI_X9_24 is rejected here per PCI PIN Annex C); TDES may use either.
+                HMAC keys use HMAC — the construction is fixed but the hash is the one bound
+                to the key at creation, over a zero-length message, so reproducing the KCV
+                outside APC requires knowing that hash. Asymmetric keys use SHA_1.
             tags: Optional list of {Key, Value} tag dicts
+            derive_key_usage: For a BDK (B0) only — the TR-31 usage the derived DUKPT
+                working keys will carry, e.g. TR31_P0_PIN_ENCRYPTION_KEY. APC binds this at
+                creation, so a BDK created without it cannot later derive keys of that usage.
+            replication_regions: Optional list of regions to replicate this key into, e.g.
+                ["us-west-2", "eu-west-1"]. Omit to use the account default (see
+                get_default_key_replication_regions). Replication is a property of the key,
+                so set it here or via add_key_replication_regions afterwards.
         """
         usage_info = get_key_usage_info(key_usage)
         if usage_info is None:
@@ -97,6 +110,10 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["KeyCheckValueAlgorithm"] = key_check_value_algorithm
         if tags:
             params["Tags"] = tags
+        if replication_regions:
+            params["ReplicationRegions"] = replication_regions
+        if derive_key_usage:
+            params["DeriveKeyUsage"] = derive_key_usage
 
         return _call(client().create_key, **params)
 
@@ -193,6 +210,81 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         """
         return _call(client().stop_key_usage, KeyIdentifier=key_identifier)
 
+    # ── Key Replication ───────────────────────────────────────────────────────
+
+    @mcp.tool()
+    def add_key_replication_regions(key_identifier: str, replication_regions: list[str]) -> dict:
+        """
+        Call this to make an existing key usable from additional regions — e.g. standing up
+        a DR region, or moving an acquirer workload closer to the processor.
+
+        Replication copies the key into the named regions so cryptographic calls can be
+        served there. It does not export key material: the key never leaves APC's HSMs,
+        and the replica keeps the same key ARN semantics and usage restrictions.
+
+        Args:
+            key_identifier: ARN or alias of the key
+            replication_regions: Regions to add, e.g. ["us-west-2", "eu-west-1"]
+        """
+        return _call(client().add_key_replication_regions,
+                     KeyIdentifier=key_identifier, ReplicationRegions=replication_regions)
+
+    @mcp.tool()
+    def remove_key_replication_regions(key_identifier: str, replication_regions: list[str]) -> dict:
+        """
+        Call this when decommissioning a region or narrowing a key's blast radius.
+
+        Removing a region makes the key unusable there. Confirm nothing is still
+        authorizing against it in that region first — in-flight PIN or ARQC traffic will
+        start failing as soon as the replica is gone.
+
+        Args:
+            key_identifier: ARN or alias of the key
+            replication_regions: Regions to remove, e.g. ["eu-west-1"]
+        """
+        return _call(client().remove_key_replication_regions,
+                     KeyIdentifier=key_identifier, ReplicationRegions=replication_regions)
+
+    @mcp.tool()
+    def get_default_key_replication_regions() -> dict:
+        """
+        Call this to see which regions new keys replicate into by default, before creating
+        keys or when auditing why a key landed in a region you did not expect.
+
+        Keys created or imported without an explicit replication_regions inherit this
+        account-level default.
+        """
+        return _call(client().get_default_key_replication_regions)
+
+    @mcp.tool()
+    def enable_default_key_replication_regions(replication_regions: list[str]) -> dict:
+        """
+        Call this to add regions to the account-wide default, so subsequently created keys
+        replicate there automatically.
+
+        This is account-level and affects future keys only — it does not retroactively
+        replicate existing keys. Use add_key_replication_regions for keys that already exist.
+
+        Args:
+            replication_regions: Regions to enable by default, e.g. ["us-west-2"]
+        """
+        return _call(client().enable_default_key_replication_regions,
+                     ReplicationRegions=replication_regions)
+
+    @mcp.tool()
+    def disable_default_key_replication_regions(replication_regions: list[str]) -> dict:
+        """
+        Call this to stop new keys from automatically replicating into the named regions.
+
+        Account-level and forward-looking only: existing keys keep whatever replication
+        they already have. Use remove_key_replication_regions to change those.
+
+        Args:
+            replication_regions: Regions to remove from the default, e.g. ["eu-west-1"]
+        """
+        return _call(client().disable_default_key_replication_regions,
+                     ReplicationRegions=replication_regions)
+
     # ── Alias Management ──────────────────────────────────────────────────────
 
     @mcp.tool()
@@ -282,6 +374,7 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
     def get_parameters_for_import(
         key_material_type: str,
         wrapping_key_algorithm: str,
+        reuse_last_generated_token: bool = False,
     ) -> dict:
         """
         Call this before import_key when using TR-34 or KeyCryptogram — you need APC's
@@ -303,16 +396,25 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             key_material_type: KEY_CRYPTOGRAM, Tr34KeyBlock, Tr31KeyBlock,
                                RootCertificatePublicKey, or TrustedCertificatePublicKey
             wrapping_key_algorithm: RSA_2048, RSA_3072, RSA_4096, or ECC_NIST_P521 (required for AES-256)
+            reuse_last_generated_token: Reuse the existing import token and wrapping key
+                certificate when one is still valid for the same key material type and
+                algorithm, with at least 7 days of validity left. Default false, which mints
+                a new token on every call. Set true when retrying, or when building an import
+                payload across several steps, so the token does not change underneath you.
         """
-        return _call(client().get_parameters_for_import,
-            KeyMaterialType=key_material_type,
-            WrappingKeyAlgorithm=wrapping_key_algorithm,
-        )
+        params: dict = {
+            "KeyMaterialType": key_material_type,
+            "WrappingKeyAlgorithm": wrapping_key_algorithm,
+        }
+        if reuse_last_generated_token:
+            params["ReuseLastGeneratedToken"] = reuse_last_generated_token
+        return _call(client().get_parameters_for_import, **params)
 
     @mcp.tool()
     def get_parameters_for_export(
         key_material_type: str,
         signing_key_algorithm: str,
+        reuse_last_generated_token: bool = False,
     ) -> dict:
         """
         Call this before export_key when using TR-34 — you need APC's signing certificate
@@ -321,11 +423,19 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         Args:
             key_material_type: Tr31KeyBlock or Tr34KeyBlock
             signing_key_algorithm: RSA_2048, RSA_3072, RSA_4096
+            reuse_last_generated_token: Reuse the existing export token and signing key
+                certificate when one is still valid for the same key material type and
+                algorithm, with at least 7 days of validity left. Default false, which mints
+                a new token on every call. Set true when retrying, or when building an export
+                payload across several steps, so the token does not change underneath you.
         """
-        return _call(client().get_parameters_for_export,
-            KeyMaterialType=key_material_type,
-            SigningKeyAlgorithm=signing_key_algorithm,
-        )
+        params: dict = {
+            "KeyMaterialType": key_material_type,
+            "SigningKeyAlgorithm": signing_key_algorithm,
+        }
+        if reuse_last_generated_token:
+            params["ReuseLastGeneratedToken"] = reuse_last_generated_token
+        return _call(client().get_parameters_for_export, **params)
 
     @mcp.tool()
     def import_key(
@@ -333,10 +443,20 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
         key_check_value_algorithm: str | None = None,
         enabled: bool = True,
         tags: list[dict] | None = None,
+        replication_regions: list[str] | None = None,
+        requester_comment: str | None = None,
     ) -> dict:
         """
         Call this to bring an externally generated key into APC via TR-31 key block or TR-34.
         The key_material dict structure depends on the import method.
+
+        IMPORTANT — this call does not always mean the key is imported. If the account has
+        Multi-Party Approval associated with the import operation (see
+        get_mpa_team_association), the response carries an MpaStatus with Status PENDING
+        and the key is NOT yet usable. Approval by the MPA team has to land first. Treat a
+        successful response as "submitted", not "done": check MpaStatus before using the
+        key or reporting the import as complete, and poll get_key until the status clears.
+        A response with no MpaStatus is an ordinary immediate import.
 
         For TR-31 (wrapping an existing key):
           key_material = {
@@ -360,9 +480,18 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
 
         Args:
             key_material: Import method and wrapped key material
-            key_check_value_algorithm: CMAC (required for AES) or ANSI_X9_24 (TDES only)
+            key_check_value_algorithm: CMAC, ANSI_X9_24, HMAC, or SHA_1. AES keys must use
+                CMAC (ANSI_X9_24 is rejected here per PCI PIN Annex C); TDES may use either.
+                HMAC keys use HMAC — the construction is fixed but the hash is the one bound
+                to the key at creation, over a zero-length message, so reproducing the KCV
+                outside APC requires knowing that hash. Asymmetric keys use SHA_1.
             enabled: Activate key immediately after import
             tags: Optional list of {Key, Value} tag dicts
+            replication_regions: Optional list of regions to replicate the imported key into.
+                Omit to use the account default (see get_default_key_replication_regions).
+            requester_comment: Optional reason for the import, max 200 characters. Shown to
+                Multi-Party Approval reviewers when the import is gated. Appears in
+                CloudTrail in plaintext — no personal or sensitive data.
         """
         params: dict = {
             "KeyMaterial": key_material,
@@ -372,30 +501,100 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             params["KeyCheckValueAlgorithm"] = key_check_value_algorithm
         if tags:
             params["Tags"] = tags
+        if replication_regions:
+            params["ReplicationRegions"] = replication_regions
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
         return _call(client().import_key, **params)
 
     @mcp.tool()
     def export_key(
-        key_identifier: str,
-        key_material_type: str,
+        export_key_identifier: str,
+        key_material: dict,
         export_attributes: dict | None = None,
     ) -> dict:
         """
         Call this when distributing an APC-generated key to an external HSM or system,
-        wrapped in a TR-31 key block or TR-34 structure.
+        wrapped in a TR-31 key block, a TR-34 structure, an RSA cryptogram, an ECDH-derived
+        key block, or an AS2805 cryptogram.
+
+        key_material is a single-member union naming the export method. The wrapping
+        material lives inside it — unlike import_key, there is no separate "type" argument:
+
+          {"Tr31KeyBlock": {"WrappingKeyIdentifier": "<ARN or alias of KBPK>"}}
+
+          {"Tr34KeyBlock": {"CertificateAuthorityPublicKeyIdentifier": "<CA key ARN>",
+                            "WrappingKeyCertificate": "<base64 cert>",
+                            "KeyBlockFormat": "X9_TR34_2012",
+                            "ExportToken": "<token from get_parameters_for_export>"}}
+
+          {"KeyCryptogram": {"CertificateAuthorityPublicKeyIdentifier": "<CA key ARN>",
+                             "WrappingKeyCertificate": "<base64 cert>",
+                             "WrappingSpec": "RSA_OAEP_SHA_256"}}
+
+          {"DiffieHellmanTr31KeyBlock": {...}}   ECDH-derived; needed for AES-192/256
+          {"As2805KeyCryptogram": {...}}         AS2805 (Australian standard)
 
         Args:
-            key_identifier: ARN or alias of the key to export
-            key_material_type: Tr31KeyBlock or Tr34KeyBlock
-            export_attributes: Export-method-specific parameters (wrapping key, etc.)
+            export_key_identifier: ARN or alias of the key to export
+            key_material: Single-member union selecting the export method, see above
+            export_attributes: Optional. ExportDukptInitialKey (for IPEK export) and/or
+                KeyCheckValueAlgorithm.
         """
         params: dict = {
-            "KeyIdentifier": key_identifier,
-            "KeyMaterialType": key_material_type,
+            "ExportKeyIdentifier": export_key_identifier,
+            "KeyMaterial": key_material,
         }
         if export_attributes:
             params["ExportAttributes"] = export_attributes
         return _call(client().export_key, **params)
+
+    # ── Certificates ──────────────────────────────────────────────────────────
+
+    @mcp.tool()
+    def get_certificate_signing_request(
+        key_identifier: str,
+        signing_algorithm: str,
+        certificate_subject: dict,
+    ) -> dict:
+        """
+        Call this to get a PKCS #10 CSR for an APC-held asymmetric key, so an external CA
+        (or a partner's PKI) can issue a certificate for it. This is the APC counterpart of
+        the payShield/Futurex "generate certificate request" commands — Futurex RSAR, for
+        instance, is a PKCS #10 CSR generator.
+
+        The private key stays in APC's HSMs; only the CSR leaves. Typical use is TR-34 key
+        distribution or ECDH key exchange, where the counterparty must trust an APC key.
+
+        Args:
+            key_identifier: ARN or alias of the asymmetric key (RSA or ECC) to request a
+                certificate for
+            signing_algorithm: Hash used to sign the CSR — SHA224, SHA256, SHA384, or SHA512
+            certificate_subject: X.509 subject. CommonName is required; OrganizationUnit,
+                Organization, City, Country, StateOrProvince and EmailAddress are optional:
+                  {"CommonName": "acquirer-tr34-2026",
+                   "Organization": "Example Bank",
+                   "Country": "US"}
+        """
+        return _call(client().get_certificate_signing_request,
+                     KeyIdentifier=key_identifier,
+                     SigningAlgorithm=signing_algorithm,
+                     CertificateSubject=certificate_subject)
+
+    @mcp.tool()
+    def get_public_key_certificate(key_identifier: str) -> dict:
+        """
+        Call this to fetch the certificate and chain for an APC asymmetric key — to hand a
+        counterparty the public half for TR-34 or ECDH key exchange, or to check what APC
+        currently holds for a key.
+
+        Returns KeyCertificate and KeyCertificateChain, both base64-encoded. Public material
+        only; no private key is ever returned.
+
+        Args:
+            key_identifier: ARN or alias of the asymmetric key
+        """
+        return _call(client().get_public_key_certificate, KeyIdentifier=key_identifier)
 
     # ── Tags ──────────────────────────────────────────────────────────────────
 
@@ -485,6 +684,83 @@ def register_control_plane_tools(mcp: FastMCP) -> None:
             resource_arn: Key ARN
         """
         return _call(client().delete_resource_policy, ResourceArn=resource_arn)
+
+    # ── Multi-Party Approval ──────────────────────────────────────────────────
+
+    @mcp.tool()
+    def associate_mpa_team(
+        action: str,
+        mpa_team_arn: str,
+        requester_comment: str | None = None,
+    ) -> dict:
+        """
+        Call this to put a sensitive key-management operation behind Multi-Party Approval,
+        so it requires sign-off from an AWS MPA approval team before it takes effect.
+
+        This is the APC equivalent of the dual-control requirement PCI PIN places on key
+        management: no single custodian can complete the operation alone. Associating a
+        team does not itself need approval; it changes how the named operation behaves
+        from then on.
+
+        Once associated, calls to the covered operation return with an MpaStatus of
+        PENDING rather than completing. See import_key for what that means in practice.
+
+        Args:
+            action: The operation to protect. Currently only
+                IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE is supported by APC.
+            mpa_team_arn: ARN of the AWS Multi-Party Approval team, of the form
+                arn:aws:mpa:<region>:<account>:approval-team/<name>
+            requester_comment: Optional reason for the change, max 200 characters.
+                Appears in CloudTrail in plaintext — no sensitive data.
+        """
+        params: dict = {"Action": action, "MpaTeamArn": mpa_team_arn}
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
+        return _call(client().associate_mpa_team, **params)
+
+    @mcp.tool()
+    def disassociate_mpa_team(action: str, requester_comment: str | None = None) -> dict:
+        """
+        Call this to remove Multi-Party Approval from an operation, returning it to
+        single-principal control.
+
+        This weakens a dual-control boundary, so it is worth confirming intent before
+        calling — under PCI PIN, removing dual control from key management is a
+        compliance-relevant change, not a routine configuration tweak.
+
+        The association moves to DELETE_PENDING and may itself require approval from the
+        currently associated team before it clears.
+
+        Args:
+            action: The operation to stop protecting, e.g.
+                IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE
+            requester_comment: Optional reason, max 200 characters. Plaintext in CloudTrail.
+        """
+        params: dict = {"Action": action}
+        if requester_comment:
+            params["RequesterComment"] = requester_comment
+        return _call(client().disassociate_mpa_team, **params)
+
+    @mcp.tool()
+    def get_mpa_team_association(action: str) -> dict:
+        """
+        Call this to check whether an operation is under Multi-Party Approval, which team
+        approves it, and whether a change to that association is still settling.
+
+        Use it before an import that may be gated, and when auditing dual control.
+
+        Returns MpaTeamAssociation with:
+          Action           — the protected operation
+          MpaTeamArn       — the approving team
+          AssociationState — ACTIVE, UPDATE_PENDING, or DELETE_PENDING
+          MpaStatus        — present when an approval session is in flight, carrying
+                             MpaSessionArn, Status (PENDING / APPROVED / FAILED /
+                             CANCELLED) and InitiationDate
+
+        Args:
+            action: The operation to inspect, e.g. IMPORT_ROOT_PUBLIC_KEY_CERTIFICATE
+        """
+        return _call(client().get_mpa_team_association, Action=action)
 
     # ── Compliance Helper ─────────────────────────────────────────────────────
 

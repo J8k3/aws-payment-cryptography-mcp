@@ -66,7 +66,13 @@ credentials and a configured APC environment:
                   create_alias, get_alias, update_alias, delete_alias, list_aliases,
                   get_parameters_for_import, get_parameters_for_export,
                   tag_resource, untag_resource, list_tags_for_resource,
-                  put_resource_policy, get_resource_policy, delete_resource_policy
+                  put_resource_policy, get_resource_policy, delete_resource_policy,
+                  get_certificate_signing_request, get_public_key_certificate,
+                  add_key_replication_regions, remove_key_replication_regions,
+                  get_default_key_replication_regions,
+                  enable_default_key_replication_regions,
+                  disable_default_key_replication_regions,
+                  associate_mpa_team, disassociate_mpa_team, get_mpa_team_association
 
 ═══════════════════════════════════════════════════════
 APC SERVICE OVERVIEW
